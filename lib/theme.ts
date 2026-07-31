@@ -74,11 +74,25 @@ export const boxShadow = {
 
 export const typography = {
   fontFamily: {
-    sans: ["Inter", "Noto Sans TC", "system-ui", "sans-serif"],
-    // Phase 4C: brand wordmark only (the "Birthday Rewards" header title).
-    // Web-safe serif stack — deliberately not a next/font/google import, so
-    // the wordmark never depends on an external font fetch.
-    serif: ["Georgia", "Cambria", "Times New Roman", "serif"],
+    // Phase 5D: shared sans-serif stack for the entire app (frontend +
+    // Admin), replacing the previous Inter/Noto Sans TC web-font pairing
+    // and the separate serif wordmark stack below. System fonts only —
+    // no next/font/google import — so there's no external font fetch and
+    // no macOS/Windows rendering mismatch. `-apple-system`/`BlinkMacSystemFont`
+    // cover macOS/iOS, `"Segoe UI"` covers Windows, and the CJK fallbacks
+    // ("Noto Sans TC", "Microsoft JhengHei", "PingFang TC") keep Traditional
+    // Chinese text on-system across platforms.
+    sans: [
+      "-apple-system",
+      "BlinkMacSystemFont",
+      "Segoe UI",
+      "Noto Sans TC",
+      "Microsoft JhengHei",
+      "PingFang TC",
+      "Helvetica Neue",
+      "Arial",
+      "sans-serif",
+    ],
   },
   fontSize: {
     list: ["12px", { lineHeight: "1.6" }] as [string, { lineHeight: string }],
@@ -86,9 +100,11 @@ export const typography = {
       string,
       { lineHeight: string; letterSpacing: string },
     ],
-    // Phase 4C v2: reward-card store name — serif, 20px, 1.3 line-height,
+    // Phase 4C v2: reward-card store name — 20px, 1.3 line-height,
     // 0.075em tracking (same tracking value as the app's general interface
     // text — see letterSpacing.body below).
+    // Phase 5D: font family changed from serif to the shared sans stack;
+    // size/line-height/tracking (the hierarchy) are unchanged.
     storeName: ["20px", { lineHeight: "1.3", letterSpacing: "0.075em" }] as [
       string,
       { lineHeight: string; letterSpacing: string },

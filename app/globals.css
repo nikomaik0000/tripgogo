@@ -53,4 +53,14 @@
   .stack-16 > * + * {
     margin-top: 16px;
   }
+
+  /* Phase 5D follow-up: homepage wordmark only ("Birthday Rewards"), for
+     branding purposes. Deliberately scoped to this one class rather than
+     the global fontFamily.sans config in lib/theme.ts — every other
+     heading, card, table, form, and button keeps the shared sans stack.
+     Georgia / Times New Roman / Times are preinstalled on both macOS and
+     Windows, so this stays a system font with no external font fetch. */
+  .logo-title {
+    font-family: Georgia, "Times New Roman", Times, serif;
+  }
 }

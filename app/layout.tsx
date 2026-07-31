@@ -1,16 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Noto_Sans_TC } from "next/font/google";
 import { Toaster } from "sonner";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import "./globals.css";
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
-const notoSansTC = Noto_Sans_TC({
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
-  variable: "--font-noto-tc",
-  display: "swap",
-});
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
@@ -46,7 +37,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-TW">
-      <body className={`${inter.variable} ${notoSansTC.variable} font-sans`}>
+      <body className="font-sans">
         {children}
         <Toaster position="top-center" richColors closeButton />
         <ServiceWorkerRegister />

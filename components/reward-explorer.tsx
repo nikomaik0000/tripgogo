@@ -176,7 +176,7 @@ export function RewardExplorer({
               full wordmark always fits on one line on narrow screens —
               whitespace-nowrap (not truncate) so it's never cut off with
               an ellipsis either. */}
-          <h1 className="min-w-0 flex-1 whitespace-nowrap font-serif text-base font-light uppercase tracking-wordmarkCompact text-ink sm:text-3xl sm:tracking-wordmark">
+          <h1 className="logo-title min-w-0 flex-1 whitespace-nowrap text-base font-normal uppercase tracking-wordmarkCompact text-ink sm:text-3xl sm:tracking-wordmark">
             Birthday Rewards
           </h1>
           <div className="flex shrink-0 items-center gap-2">

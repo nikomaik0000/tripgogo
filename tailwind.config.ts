@@ -28,7 +28,6 @@ const config: Config = {
       },
       fontFamily: {
         sans: [...typography.fontFamily.sans],
-        serif: [...typography.fontFamily.serif],
       },
       fontSize: typography.fontSize,
       letterSpacing: typography.letterSpacing,

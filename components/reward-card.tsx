@@ -44,7 +44,7 @@ export function RewardCard({
           corner. Used stays a labeled pill (easier to read at a glance)
           while Link/Favorite stay icon-only, all aligned on one row. */}
       <div className="flex items-start justify-between gap-2">
-        <span className="min-w-0 flex-1 truncate font-serif text-storeName font-light">{reward.store_name}</span>
+        <span className="min-w-0 flex-1 truncate text-storeName font-normal">{reward.store_name}</span>
 
         <div className="flex shrink-0 items-center gap-1.5">
           {reward.official_url && (
