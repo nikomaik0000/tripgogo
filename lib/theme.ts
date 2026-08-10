@@ -1,5 +1,5 @@
 /**
- * Centralized design tokens for Birthday Rewards.
+ * Centralized design tokens for TRAVEL GOGO.
  *
  * This file is the single source of truth for the app's visual language —
  * colors, radius, shadows, typography, spacing, and motion.
@@ -49,6 +49,10 @@ export const colors = {
   badgeText: "#BCAE9F",
   divider: "#EFEAE4",
   searchBackground: "#F2EFEB",
+  travelType: {
+    food: "#fcefdb",
+    place: "#e4efda",
+  },
 } as const;
 
 export const borderRadius = {
@@ -138,11 +142,25 @@ export const keyframes = {
     from: { opacity: "0", transform: "translateY(6px)" },
     to: { opacity: "1", transform: "translateY(0)" },
   },
+  dialogOverlayIn: { from: { opacity: "0" }, to: { opacity: "1" } },
+  dialogOverlayOut: { from: { opacity: "1" }, to: { opacity: "0" } },
+  dialogContentIn: {
+    from: { opacity: "0", scale: "0.97" },
+    to: { opacity: "1", scale: "1" },
+  },
+  dialogContentOut: {
+    from: { opacity: "1", scale: "1" },
+    to: { opacity: "0", scale: "0.98" },
+  },
 } as const;
 
 export const animation = {
   fadeIn: `fadeIn ${transitionDuration.fast} ease-out`,
   slideUp: `slideUp ${transitionDuration.base} ease-out`,
+  dialogOverlayIn: "dialogOverlayIn 200ms ease-out",
+  dialogOverlayOut: "dialogOverlayOut 160ms ease-out",
+  dialogContentIn: "dialogContentIn 220ms cubic-bezier(0.16, 1, 0.3, 1)",
+  dialogContentOut: "dialogContentOut 160ms ease-out",
 } as const;
 
 /** Focus ring used by the global `:focus-visible` style in globals.css. */

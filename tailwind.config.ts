@@ -5,6 +5,7 @@ import { colors, borderRadius, boxShadow, typography, keyframes, animation, layo
 // Tailwind. To change a color, radius, shadow, font, or animation across
 // the whole app, edit lib/theme.ts — not this file.
 const config: Config = {
+  safelist: ["bg-travelType-food", "bg-travelType-place"],
   content: [
     "./app/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
@@ -25,6 +26,7 @@ const config: Config = {
         badgeText: colors.badgeText,
         divider: colors.divider,
         searchBackground: colors.searchBackground,
+        travelType: colors.travelType,
       },
       fontFamily: {
         sans: [...typography.fontFamily.sans],

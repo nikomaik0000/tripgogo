@@ -1,5 +1,22 @@
 # Roadmap
 
+## TRAVEL GOGO v1 ✅
+
+- Trip notebooks
+- Daily, Places, Food, and Outline views
+- Centralized localStorage repository
+- Shared TravelItem data model with optional ownerId
+
+## Future
+
+- Google sign-in (Phase 2 complete)
+- Supabase repository adapter (Phase 2 complete)
+- Family sharing (database permissions/RPCs complete; member-management UI pending)
+- One-time localStorage import (Phase 4 pending)
+- Drag-and-drop itinerary ordering
+
+---
+
 ## v3.1 ✅
 
 Theme Removal

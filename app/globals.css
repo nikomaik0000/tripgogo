@@ -8,10 +8,6 @@
   }
 
   body {
-    /* Phase 4C v2: consistent typography rhythm — 0.075em tracking across
-       normal interface text (store names, descriptions, buttons, badges,
-       etc). The header wordmark overrides this locally with its own wider
-       tracking-wordmark value. */
     @apply bg-bg text-ink antialiased tracking-body;
     font-feature-settings: "cv11", "ss01";
   }
@@ -54,12 +50,6 @@
     margin-top: 16px;
   }
 
-  /* Phase 5D follow-up: homepage wordmark only ("Birthday Rewards"), for
-     branding purposes. Deliberately scoped to this one class rather than
-     the global fontFamily.sans config in lib/theme.ts — every other
-     heading, card, table, form, and button keeps the shared sans stack.
-     Georgia / Times New Roman / Times are preinstalled on both macOS and
-     Windows, so this stays a system font with no external font fetch. */
   .logo-title {
     font-family: Georgia, "Times New Roman", Times, serif;
   }

@@ -1,44 +1,67 @@
-import type { Category, DateCategory, RewardRow, TagRow } from "@/lib/database.types";
+export type TravelItemType = "place" | "food";
+export type TripRole = "owner" | "editor";
 
-export type { Category, DateCategory };
-
-export interface RewardWithTags extends RewardRow {
-  tags: TagRow[];
+export interface Trip {
+  id: string;
+  ownerId?: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export type ViewMode = "table" | "card";
-
-export type SortKey = "expiry_asc" | "score_desc";
-
-export interface RewardFilters {
-  query: string;
-  categories: Category[];
-  dateCategories: DateCategory[];
-  scores: number[];
-  favoriteOnly: boolean;
-  usedFilter: "all" | "used" | "unused";
-  tagIds: string[];
-  hideExpired: boolean;
+export interface TravelItem {
+  id: string;
+  tripId: string;
+  createdBy?: string;
+  type: TravelItemType;
+  category: string;
+  area: string;
+  date: string | null;
+  name: string;
+  googleMapsUrl: string;
+  extraLink1?: string;
+  extraLink2?: string;
+  businessHours?: string;
+  note: string;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export const DEFAULT_FILTERS: RewardFilters = {
-  query: "",
-  categories: [],
-  dateCategories: [],
-  scores: [],
-  favoriteOnly: false,
-  usedFilter: "all",
-  tagIds: [],
-  hideExpired: false,
-};
+export type TravelItemSort = "date" | "category" | "area";
 
-export interface DashboardStats {
-  totalStores: number;
-  totalRewards: number;
-  favoriteCount: number;
-  usedCount: number;
-  unusedCount: number;
-  averageScore: number;
-  topScoreStore: string | null;
-  categoryCounts: Record<Category, number>;
+export interface Flight {
+  id: string;
+  tripId: string;
+  airline: string;
+  flightNumber: string;
+  departurePlace: string;
+  arrivalPlace: string;
+  departureDate: string;
+  departureTime: string;
+  arrivalDate: string;
+  arrivalTime: string;
+  link?: string;
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HotelStay {
+  id: string;
+  tripId: string;
+  name: string;
+  checkInDate: string;
+  checkOutDate: string;
+  checkInTime?: string;
+  checkOutTime?: string;
+  address?: string;
+  phone?: string;
+  googleMapsUrl?: string;
+  link?: string;
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
 }

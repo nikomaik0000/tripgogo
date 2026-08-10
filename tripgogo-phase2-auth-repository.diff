@@ -1,0 +1,2795 @@
+diff --git a/.env.example b/.env.example
+index acf379f..54bee62 100644
+--- a/.env.example
++++ b/.env.example
+@@ -2,8 +2,8 @@
+ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+ 
+-# Only used by server-side admin actions (bulk import, service-role tasks).
+-# Keep this secret — never expose it to the client.
++# Optional future server-only administration. Phase 2 does not use this key.
++# Keep this secret — never expose it to the client or middleware.
+ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+ 
+ # Public site URL, used for SEO/OpenGraph metadata
+diff --git a/app/layout.tsx b/app/layout.tsx
+index 894ddd5..282e844 100644
+--- a/app/layout.tsx
++++ b/app/layout.tsx
+@@ -1,6 +1,6 @@
+ import type { Metadata, Viewport } from "next";
+ import { Toaster } from "sonner";
+-import { ServiceWorkerRegister } from "@/components/service-worker-register";
++import { AuthProvider } from "@/lib/auth-context";
+ import "./globals.css";
+ 
+ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+@@ -8,21 +8,22 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+ export const metadata: Metadata = {
+   metadataBase: new URL(siteUrl),
+   title: {
+-    default: "生日優惠整理 | Birthday Rewards",
+-    template: "%s | 生日優惠整理",
++    default: "TRAVEL GOGO",
++    template: "%s | TRAVEL GOGO",
+   },
+-  description: "快速查詢、篩選各大店家生日優惠，收藏你的必換清單，再也不錯過兌換期限。",
+-  applicationName: "生日優惠整理",
++  description: "TRAVEL GOGO",
++  applicationName: "TRAVEL GOGO",
+   manifest: "/manifest.webmanifest",
+   openGraph: {
+     type: "website",
+     locale: "zh_TW",
+-    siteName: "生日優惠整理",
+-    title: "生日優惠整理 | Birthday Rewards",
+-    description: "快速查詢、篩選各大店家生日優惠，收藏你的必換清單，再也不錯過兌換期限。",
++    siteName: "TRAVEL GOGO",
++    title: "TRAVEL GOGO",
++    description: "TRAVEL GOGO",
+   },
+   icons: {
+-    icon: "/icons/icon-192.png",
++    icon: "/icon.svg",
++    shortcut: "/icon.svg",
+     apple: "/icons/icon-192.png",
+   },
+ };
+@@ -38,9 +39,10 @@ export default function RootLayout({ children }: { children: React.ReactNode })
+   return (
+     <html lang="zh-TW">
+       <body className="font-sans">
+-        {children}
+-        <Toaster position="top-center" richColors closeButton />
+-        <ServiceWorkerRegister />
++        <AuthProvider>
++          {children}
++          <Toaster position="top-center" richColors closeButton />
++        </AuthProvider>
+       </body>
+     </html>
+   );
+diff --git a/app/page.tsx b/app/page.tsx
+index ed8aea8..74a0fdf 100644
+--- a/app/page.tsx
++++ b/app/page.tsx
+@@ -1,34 +1,7 @@
+-import { Suspense } from "react";
+-import { getRewardsWithTags, getAllTags } from "@/lib/queries";
+-import { createClient } from "@/lib/supabase/server";
+-import { RewardExplorer } from "@/components/reward-explorer";
+-import { RewardListSkeleton } from "@/components/reward-list-skeleton";
+-
+-export const revalidate = 0;
++import { TripList } from "@/components/trip-list";
++import { travelServerRepository } from "@/lib/travel-server-repository";
+ 
+ export default async function HomePage() {
+-  return (
+-    <Suspense fallback={<HomeSkeleton />}>
+-      <HomeContent />
+-    </Suspense>
+-  );
+-}
+-
+-async function HomeContent() {
+-  const supabase = await createClient();
+-  const [rewards, tags, userResult] = await Promise.all([
+-    getRewardsWithTags(),
+-    getAllTags(),
+-    supabase.auth.getUser(),
+-  ]);
+-  const isAdmin = Boolean(userResult.data.user);
+-  return <RewardExplorer initialRewards={rewards} allTags={tags} isAdmin={isAdmin} />;
+-}
+-
+-function HomeSkeleton() {
+-  return (
+-    <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6">
+-      <RewardListSkeleton />
+-    </div>
+-  );
++  const trips = await travelServerRepository.getTrips();
++  return <TripList initialTrips={trips} />;
+ }
+diff --git a/docs/CHANGELOG.md b/docs/CHANGELOG.md
+index 61eed71..259a737 100644
+--- a/docs/CHANGELOG.md
++++ b/docs/CHANGELOG.md
+@@ -1,5 +1,24 @@
+ # Changelog
+ 
++## TRAVEL GOGO — Supabase Phase 2
++
++Added
++
++- Added Google OAuth with cookie-backed Supabase sessions and middleware refresh.
++- Added browser/server Supabase clients and public SSR data loading so auth initialization never blocks Trip content.
++- Replaced active localStorage CRUD with an RLS-backed Supabase repository while preserving the existing localStorage source for Phase 4 import.
++- Added atomic `tg_duplicate_trip` and `tg_reorder_travel_items` repository RPCs.
++- Limited existing management controls and drag-and-drop to authenticated Trip owners/editors without changing card layouts, Maps links, or business-hours parsing.
++
++## TRAVEL GOGO — Supabase Phase 1
++
++Added
++
++- Added an isolated `tg_*` Supabase schema for Trips, members, invitations, itinerary items, flights, hotels, profiles, and idempotent localStorage import records.
++- Added indexes, integrity constraints, timestamp/ownership triggers, controlled membership/invitation/import RPCs, and database-enforced RLS.
++- Public access is read-only for Trip content; only Trip owners/editors can modify content, and only owners can manage invitations or editors.
++- Kept `tg_profiles.email`, memberships, invitations, and import records unavailable to anonymous reads.
++
+ ## v4.0 (In Progress)
+ 
+ ### Phase 5A-2 - CSV Export Cleanup
+@@ -297,4 +316,50 @@ Added
+ 
+ Removed
+ 
+-- Dark theme
+\ No newline at end of file
++- Dark theme
++# TRAVEL GOGO
++
++## 2026-08-07
++
++### Changed
++
++- Added independently stored, multi-entry Flight and HotelStay records to Outline with create, edit, delete, chronological sorting, optional links/Maps, and responsive cards.
++- Added measured note truncation with an unobtrusive Ellipsis action and read-only full-note Dialog on place and food cards.
++- Replaced the truncated-note action with a low-key `+ more` label and corrected the full-note Dialog animation so its positioning transform remains centered from the first frame.
++- Added the same measured `+ more` full-note action to truncated notes in desktop Daily cards without changing their fixed height or drag behavior.
++- Limited mobile Daily-card notes to two lines and reused the measured `+ more` full-note Dialog behavior from place and food cards.
++- Restored Google Maps links on place and food card names while retaining the existing Navigation footer action.
++- Restored fixed food/place circle backgrounds in production CSS and restored Google Maps links on Daily item names.
++- Guarded Daily drag sensors from every nested link, button, input, textarea, and select interaction.
++- Rebuilt Daily cards from the supplied desktop/mobile references, including fixed desktop proportions, compact type marks, and responsive content order.
++- Replaced Daily arrow controls with persisted same-day drag-and-drop; touch dragging requires a 350ms long press and cancels on normal scroll movement.
++- Replaced extra-link ExternalLink glyphs with Link2 for a clearer visual distinction from edit actions.
++- Added two optional URL-only extra links to travel items and rendered them as accessible ExternalLink actions in the card footer.
++- Let desktop notes use two lines beside business hours or four lines when the Info Area contains notes alone; mobile notes remain unclamped.
++- Consolidated desktop card business hours and notes into one compact fixed Info Area without placeholder rows.
++- Finalized the homepage hierarchy with a lighter wordmark, editorial section heading, and date-first trip notebook cards with fixed action footers.
++- Fixed place and food cards to a shared 300px desktop height with reserved business-hours and two-line note regions; mobile cards remain content-sized.
++- Rebuilt place and food card vertical rhythm around one 24px section token with single-owner spacing between adjacent regions.
++- Replaced the card note icon with a muted single-color ✦ and shared one spacing class across both pre-divider gaps.
++- Added a low-saturation line-art Luggage favicon while keeping PlaneTakeoff in the site header.
++- Reordered place and food card details into a stable location/category/date row, business-hours section, and icon-aligned notes row.
++- Added MessageSquareMore to non-empty card notes and tightened footer SVG sizing while preserving touch targets.
++- Refined the place and food card footer into a fixed-height, divided action area with consistent icon spacing.
++- Stabilized place and food card layouts with two-line name clamping and bottom-aligned icon actions.
++- Moved Google Maps, edit, and delete actions into a consistent card footer without changing their behavior.
++- Added optional free-text business hours to places and food without changing the v1 storage keys.
++- Added a lightweight local-time status parser for simple hours, 24-hour businesses, and overnight ranges.
++- Added subtle business-hour details to item cards while keeping Outline unchanged.
++- Added a Lucide PlaneTakeoff icon beside the TRAVEL GOGO wordmark.
++- Replaced native browser deletion prompts with the shared site Dialog styling.
++- Versioned localStorage keys and completed Supabase-ready ownership and timestamp fields.
++- Increased mobile icon-button hit areas while preserving desktop density and icon size.
++- Scoped category suggestions by item type while keeping area suggestions shared.
++- Replaced the Birthday Rewards product flow with a focused trip notebook.
++- Added trip creation, editing, duplication, and deletion backed by centralized localStorage access.
++- Added Daily, Places, Food, and Outline views derived from one TravelItem collection.
++- Added trip-range date choices, free-input suggestions, stable sorting, same-day ordering, and optional Google Maps links.
++- Removed rewards, ratings, favorites, statistics, import/export, and administration features.
++- Kept the existing design tokens, cards, dialogs, buttons, inputs, responsive breakpoints, and interaction styles.
++
++---
+diff --git a/docs/ROADMAP.md b/docs/ROADMAP.md
+index e550b1f..85bcf8d 100644
+--- a/docs/ROADMAP.md
++++ b/docs/ROADMAP.md
+@@ -1,5 +1,22 @@
+ # Roadmap
+ 
++## TRAVEL GOGO v1 ✅
++
++- Trip notebooks
++- Daily, Places, Food, and Outline views
++- Centralized localStorage repository
++- Shared TravelItem data model with optional ownerId
++
++## Future
++
++- Google sign-in (Phase 2 complete)
++- Supabase repository adapter (Phase 2 complete)
++- Family sharing (database permissions/RPCs complete; member-management UI pending)
++- One-time localStorage import (Phase 4 pending)
++- Drag-and-drop itinerary ordering
++
++---
++
+ ## v3.1 ✅
+ 
+ Theme Removal
+@@ -45,4 +62,4 @@ Search Experience
+ 
+ ## v4.0
+ 
+-Major Feature Update
+\ No newline at end of file
++Major Feature Update
+diff --git a/docs/TODO.md b/docs/TODO.md
+index 3e67b90..551c108 100644
+--- a/docs/TODO.md
++++ b/docs/TODO.md
+@@ -1,5 +1,25 @@
+ # TODO
+ 
++## TRAVEL GOGO
++
++### Done
++
++- Supabase Phase 2 Google Auth, SSR session refresh, and Supabase repository integration
++- Supabase Phase 1 schema and RLS migration for isolated `tg_*` tables
++- Core trip notebook using centralized localStorage repository
++- Versioned localStorage schema with Supabase-ready timestamps and ownership fields
++- Shared TravelItem data for Daily, Places, Food, and Outline
++- Optional business hours with device-local status calculation
++- Same-day Daily itinerary drag-and-drop with long-press mobile activation
++- Responsive card/list UI using the existing design system
++- Multi-entry flight and hotel details in Outline using independent versioned localStorage repositories
++
++### Future
++
++- Add owner-facing member and invitation management UI
++- Add one-time localStorage migration/import flow (Phase 4)
++- Add drag-and-drop itinerary ordering
++
+ ## Done
+ 
+ - CSV Export Cleanup (Phase 5A-2) — CSV export (only) now includes just the user-facing fields (店家/類別/優惠內容/日期/分數/官方網址/備註/標籤) in that order, with Traditional Chinese headers and a UTF-8 BOM; JSON/XLSX export, import, and the export button are untouched
+@@ -41,4 +61,4 @@
+ - AI Import
+ - OCR
+ - CSV Import
+-- PWA
+\ No newline at end of file
++- PWA
+diff --git a/lib/database.types.ts b/lib/database.types.ts
+index 6528acd..5982270 100644
+--- a/lib/database.types.ts
++++ b/lib/database.types.ts
+@@ -1,152 +1,25 @@
+-// Hand-authored to match supabase/schema.sql.
+-// Once your project is live, regenerate with:
+-//   npx supabase gen types typescript --project-id <id> > lib/database.types.ts
+-
+-export type Category = "飲料" | "食物" | "美妝" | "其他";
+-export type DateCategory = "月底" | "次月底" | "其他";
+-
+-export interface RewardRow {
+-  id: string;
+-  store_name: string;
+-  category: Category;
+-  content: string;
+-  date_category: DateCategory;
+-  score: number;
+-  official_url: string | null;
+-  logo_url: string | null;
+-  is_favorite: boolean;
+-  is_used: boolean;
+-  click_count: number;
+-  expiry_date: string | null;
+-  notes: string;
+-  created_at: string;
+-  updated_at: string;
+-  is_active: boolean;
+-  is_featured: boolean;
+-  reward_type: string | null;
+-  region: string | null;
+-  city: string | null;
+-  country: string | null;
+-  brand: string | null;
+-  source: string | null;
+-  last_verified_at: string | null;
+-  verified_by: string | null;
+-  ai_summary: string | null;
+-  ai_tags: string[] | null;
+-  ai_score: number | null;
+-  metadata: Record<string, unknown>;
+-}
+-
+-export interface TagRow {
+-  id: string;
+-  name: string;
+-  color_hex: string;
+-  created_at: string;
+-}
+-
+-export interface RewardTagRow {
+-  reward_id: string;
+-  tag_id: string;
+-}
+-
+-export interface CollectionRow {
+-  id: string;
+-  owner_id: string | null;
+-  name: string;
+-  created_at: string;
+-}
+-
+-export interface CollectionRewardRow {
+-  collection_id: string;
+-  reward_id: string;
+-  added_at: string;
+-}
+-
+-export interface RewardHistoryRow {
+-  id: string;
+-  reward_id: string;
+-  changed_at: string;
+-  changed_by: string | null;
+-  field_changed: string;
+-  old_value: string | null;
+-  new_value: string | null;
+-}
+-
+-// v2: added for the "資料回報" (report an issue) feature — see
+-// supabase/migrations/002_reward_reports.sql
+-export type ReportStatus = "pending" | "resolved";
+-
+-export interface ReportRow {
+-  id: string;
+-  reward_id: string;
+-  message: string;
+-  contact: string | null;
+-  status: ReportStatus;
+-  created_at: string;
+-}
+-
+-export interface Database {
+-  public: {
+-    Tables: {
+-      rewards: {
+-        Row: RewardRow;
+-        Insert: Partial<RewardRow> & {
+-          store_name: string;
+-          category: Category;
+-        };
+-        Update: Partial<RewardRow>;
+-        Relationships: [];
+-      };
+-      tags: {
+-        Row: TagRow;
+-        Insert: Partial<TagRow> & { name: string };
+-        Update: Partial<TagRow>;
+-        Relationships: [];
+-      };
+-      reward_tags: {
+-        Row: RewardTagRow;
+-        Insert: RewardTagRow;
+-        Update: Partial<RewardTagRow>;
+-        Relationships: [];
+-      };
+-      collections: {
+-        Row: CollectionRow;
+-        Insert: Partial<CollectionRow> & { name: string };
+-        Update: Partial<CollectionRow>;
+-        Relationships: [];
+-      };
+-      collection_rewards: {
+-        Row: CollectionRewardRow;
+-        Insert: CollectionRewardRow;
+-        Update: Partial<CollectionRewardRow>;
+-        Relationships: [];
+-      };
+-      reward_history: {
+-        Row: RewardHistoryRow;
+-        Insert: Partial<RewardHistoryRow> & { reward_id: string; field_changed: string };
+-        Update: Partial<RewardHistoryRow>;
+-        Relationships: [];
+-      };
+-      // v2: 資料回報 feature
+-      reward_reports: {
+-        Row: ReportRow;
+-        Insert: Partial<ReportRow> & { reward_id: string; message: string };
+-        Update: Partial<ReportRow>;
+-        Relationships: [];
+-      };
+-    };
+-    Views: Record<string, never>;
+-    Functions: {
+-      increment_click: {
+-        Args: { reward_id: string };
+-        Returns: void;
+-      };
+-      // v2: narrow, column-scoped RPC that replaces the old broad anon
+-      // UPDATE policy — see migrations/003_tighten_rls.sql
+-      toggle_reward_favorite: {
+-        Args: { reward_id: string; favorite: boolean };
+-        Returns: void;
+-      };
+-    };
+-  };
+-}
++export type TgTripRow = {
++  id: string; owner_id: string; name: string; start_date: string; end_date: string;
++  created_at: string; updated_at: string;
++};
++
++export type TgTravelItemRow = {
++  id: string; trip_id: string; created_by: string | null; type: "place" | "food";
++  category: string; area: string; date: string | null; name: string; google_maps_url: string;
++  extra_link_1: string | null; extra_link_2: string | null; business_hours: string | null;
++  note: string; sort_order: number; created_at: string; updated_at: string;
++};
++
++export type TgFlightRow = {
++  id: string; trip_id: string; created_by: string | null; airline: string; flight_number: string;
++  departure_place: string; arrival_place: string; departure_date: string; departure_time: string;
++  arrival_date: string; arrival_time: string; link: string | null; note: string | null;
++  created_at: string; updated_at: string;
++};
++
++export type TgHotelStayRow = {
++  id: string; trip_id: string; created_by: string | null; name: string; check_in_date: string;
++  check_out_date: string; check_in_time: string | null; check_out_time: string | null;
++  address: string | null; phone: string | null; google_maps_url: string | null; link: string | null;
++  note: string | null; created_at: string; updated_at: string;
++};
+diff --git a/lib/supabase/client.ts b/lib/supabase/client.ts
+index 35362c4..2b94454 100644
+--- a/lib/supabase/client.ts
++++ b/lib/supabase/client.ts
+@@ -1,9 +1,12 @@
+ import { createBrowserClient } from "@supabase/ssr";
+-import type { Database } from "@/lib/database.types";
++import { getSupabaseConfig } from "@/lib/supabase/config";
++
++let browserClient: ReturnType<typeof createBrowserClient> | undefined;
+ 
+ export function createClient() {
+-  return createBrowserClient<Database>(
+-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+-  );
++  if (!browserClient) {
++    const { url, anonKey } = getSupabaseConfig();
++    browserClient = createBrowserClient(url, anonKey);
++  }
++  return browserClient;
+ }
+diff --git a/lib/supabase/middleware.ts b/lib/supabase/middleware.ts
+index d0849d6..d939a77 100644
+--- a/lib/supabase/middleware.ts
++++ b/lib/supabase/middleware.ts
+@@ -2,40 +2,31 @@ import { createServerClient } from "@supabase/ssr";
+ import { NextResponse, type NextRequest } from "next/server";
+ 
+ export async function updateSession(request: NextRequest) {
+-  let response = NextResponse.next({ request });
++  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
++  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
++  if (!url || !anonKey) {
++    console.error("Tripgogo Supabase configuration is missing");
++    return NextResponse.next({ request });
++  }
+ 
+-  const supabase = createServerClient(
+-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+-    {
+-      cookies: {
+-        getAll() {
+-          return request.cookies.getAll();
+-        },
+-        setAll(cookiesToSet) {
+-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+-          response = NextResponse.next({ request });
+-          cookiesToSet.forEach(({ name, value, options }) =>
+-            response.cookies.set(name, value, options)
+-          );
+-        },
++  let response = NextResponse.next({ request });
++  const supabase = createServerClient(url, anonKey, {
++    cookies: {
++      getAll: () => request.cookies.getAll(),
++      setAll(cookiesToSet) {
++        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
++        response = NextResponse.next({ request });
++        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+       },
+-    }
+-  );
++    },
++  });
+ 
+-  const {
+-    data: { user },
+-  } = await supabase.auth.getUser();
+-
+-  // Protect /admin routes (except /admin/login) — redirect to login if signed out.
+-  const path = request.nextUrl.pathname;
+-  const isAdminRoute = path.startsWith("/admin") && path !== "/admin/login";
+-  if (isAdminRoute && !user) {
+-    const redirectUrl = request.nextUrl.clone();
+-    redirectUrl.pathname = "/admin/login";
+-    redirectUrl.searchParams.set("next", path);
+-    return NextResponse.redirect(redirectUrl);
++  // getUser validates and refreshes the cookie-backed session when necessary.
++  try {
++    await supabase.auth.getUser();
++  } catch (error) {
++    // Public pages must remain readable during a transient auth outage.
++    console.error("Tripgogo session refresh failed", error);
+   }
+-
+   return response;
+ }
+diff --git a/lib/supabase/server.ts b/lib/supabase/server.ts
+index e8a198a..c28dddd 100644
+--- a/lib/supabase/server.ts
++++ b/lib/supabase/server.ts
+@@ -1,46 +1,21 @@
+ import { createServerClient } from "@supabase/ssr";
+-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+ import { cookies } from "next/headers";
+-import type { Database } from "@/lib/database.types";
++import { getSupabaseConfig } from "@/lib/supabase/config";
+ 
+-/**
+- * Server-side Supabase client bound to the current request's cookies.
+- * Use inside Server Components, Server Actions, and Route Handlers.
+- */
+ export async function createClient() {
+   const cookieStore = await cookies();
++  const { url, anonKey } = getSupabaseConfig();
+ 
+-  return createServerClient<Database>(
+-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+-    {
+-      cookies: {
+-        getAll() {
+-          return cookieStore.getAll();
+-        },
+-        setAll(cookiesToSet) {
+-          try {
+-            cookiesToSet.forEach(({ name, value, options }) =>
+-              cookieStore.set(name, value, options)
+-            );
+-          } catch {
+-            // Called from a Server Component with no request context to write to.
+-            // Safe to ignore when middleware refreshes the session instead.
+-          }
+-        },
++  return createServerClient(url, anonKey, {
++    cookies: {
++      getAll: () => cookieStore.getAll(),
++      setAll(cookiesToSet) {
++        try {
++          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
++        } catch {
++          // Server Components cannot write cookies. Middleware refreshes them.
++        }
+       },
+-    }
+-  );
+-}
+-
+-/**
+- * Service-role client for privileged server-only operations (bulk import,
+- * admin utilities). NEVER import this from client components.
+- */
+-export function createServiceRoleClient() {
+-  return createSupabaseClient<Database>(
+-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+-    { auth: { persistSession: false } }
+-  );
++    },
++  });
+ }
+diff --git a/lib/types.ts b/lib/types.ts
+index 401d4d4..6301822 100644
+--- a/lib/types.ts
++++ b/lib/types.ts
+@@ -1,44 +1,67 @@
+-import type { Category, DateCategory, RewardRow, TagRow } from "@/lib/database.types";
++export type TravelItemType = "place" | "food";
++export type TripRole = "owner" | "editor";
+ 
+-export type { Category, DateCategory };
+-
+-export interface RewardWithTags extends RewardRow {
+-  tags: TagRow[];
++export interface Trip {
++  id: string;
++  ownerId?: string;
++  name: string;
++  startDate: string;
++  endDate: string;
++  createdAt: string;
++  updatedAt: string;
+ }
+ 
+-export type ViewMode = "table" | "card";
++export interface TravelItem {
++  id: string;
++  tripId: string;
++  createdBy?: string;
++  type: TravelItemType;
++  category: string;
++  area: string;
++  date: string | null;
++  name: string;
++  googleMapsUrl: string;
++  extraLink1?: string;
++  extraLink2?: string;
++  businessHours?: string;
++  note: string;
++  order: number;
++  createdAt: string;
++  updatedAt: string;
++}
+ 
+-export type SortKey = "expiry_asc" | "score_desc";
++export type TravelItemSort = "date" | "category" | "area";
+ 
+-export interface RewardFilters {
+-  query: string;
+-  categories: Category[];
+-  dateCategories: DateCategory[];
+-  scores: number[];
+-  favoriteOnly: boolean;
+-  usedFilter: "all" | "used" | "unused";
+-  tagIds: string[];
+-  hideExpired: boolean;
++export interface Flight {
++  id: string;
++  tripId: string;
++  airline: string;
++  flightNumber: string;
++  departurePlace: string;
++  arrivalPlace: string;
++  departureDate: string;
++  departureTime: string;
++  arrivalDate: string;
++  arrivalTime: string;
++  link?: string;
++  note?: string;
++  createdAt: string;
++  updatedAt: string;
+ }
+ 
+-export const DEFAULT_FILTERS: RewardFilters = {
+-  query: "",
+-  categories: [],
+-  dateCategories: [],
+-  scores: [],
+-  favoriteOnly: false,
+-  usedFilter: "all",
+-  tagIds: [],
+-  hideExpired: false,
+-};
+-
+-export interface DashboardStats {
+-  totalStores: number;
+-  totalRewards: number;
+-  favoriteCount: number;
+-  usedCount: number;
+-  unusedCount: number;
+-  averageScore: number;
+-  topScoreStore: string | null;
+-  categoryCounts: Record<Category, number>;
++export interface HotelStay {
++  id: string;
++  tripId: string;
++  name: string;
++  checkInDate: string;
++  checkOutDate: string;
++  checkInTime?: string;
++  checkOutTime?: string;
++  address?: string;
++  phone?: string;
++  googleMapsUrl?: string;
++  link?: string;
++  note?: string;
++  createdAt: string;
++  updatedAt: string;
+ }
+diff --git a/middleware.ts b/middleware.ts
+index 5868995..818c20d 100644
+--- a/middleware.ts
++++ b/middleware.ts
+@@ -1,12 +1,12 @@
+-import { type NextRequest } from "next/server";
++import type { NextRequest } from "next/server";
+ import { updateSession } from "@/lib/supabase/middleware";
+ 
+-export async function middleware(request: NextRequest) {
+-  return await updateSession(request);
++export function middleware(request: NextRequest) {
++  return updateSession(request);
+ }
+ 
+ export const config = {
+   matcher: [
+-    "/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
++    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+   ],
+ };
+diff --git a/package-lock.json b/package-lock.json
+index 84c389e..1e00d93 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1,43 +1,33 @@
+ {
+-  "name": "birthday-rewards",
++  "name": "travel-gogo",
+   "version": "2.0.0",
+   "lockfileVersion": 3,
+   "requires": true,
+   "packages": {
+     "": {
+-      "name": "birthday-rewards",
++      "name": "travel-gogo",
+       "version": "2.0.0",
+       "dependencies": {
+-        "@hookform/resolvers": "^3.9.1",
+-        "@radix-ui/react-checkbox": "^1.1.2",
++        "@dnd-kit/core": "^6.3.1",
++        "@dnd-kit/sortable": "^10.0.0",
++        "@dnd-kit/utilities": "^3.2.2",
+         "@radix-ui/react-dialog": "^1.1.2",
+-        "@radix-ui/react-dropdown-menu": "^2.1.2",
+         "@radix-ui/react-select": "^2.1.2",
+-        "@radix-ui/react-switch": "^1.1.1",
+-        "@radix-ui/react-tabs": "^1.1.1",
+-        "@radix-ui/react-tooltip": "^1.1.4",
+-        "@supabase/ssr": "^0.5.2",
+-        "@supabase/supabase-js": "2.45.4",
+-        "@tanstack/react-table": "^8.20.5",
++        "@supabase/ssr": "^0.12.4",
++        "@supabase/supabase-js": "^2.112.2",
+         "class-variance-authority": "^0.7.0",
+         "clsx": "^2.1.1",
+         "date-fns": "^4.1.0",
+-        "framer-motion": "^11.11.17",
+         "lucide-react": "^0.454.0",
+         "next": "15.5.20",
+-        "papaparse": "^5.4.1",
+         "react": "^19.0.0",
+         "react-dom": "^19.0.0",
+-        "react-hook-form": "^7.53.2",
+         "sonner": "^1.7.0",
+         "tailwind-merge": "^2.5.4",
+-        "typescript": "^5.6.3",
+-        "xlsx": "^0.18.5",
+-        "zod": "^3.23.8"
++        "typescript": "^5.6.3"
+       },
+       "devDependencies": {
+         "@types/node": "^22.9.0",
+-        "@types/papaparse": "^5.3.15",
+         "@types/react": "^19.0.1",
+         "@types/react-dom": "^19.0.2",
+         "autoprefixer": "^10.4.20",
+@@ -60,6 +50,59 @@
+         "url": "https://github.com/sponsors/sindresorhus"
+       }
+     },
++    "node_modules/@dnd-kit/accessibility": {
++      "version": "3.1.1",
++      "resolved": "https://registry.npmjs.org/@dnd-kit/accessibility/-/accessibility-3.1.1.tgz",
++      "integrity": "sha512-2P+YgaXF+gRsIihwwY1gCsQSYnu9Zyj2py8kY5fFvUM1qm2WA2u639R6YNVfU4GWr+ZM5mqEsfHZZLoRONbemw==",
++      "license": "MIT",
++      "dependencies": {
++        "tslib": "^2.0.0"
++      },
++      "peerDependencies": {
++        "react": ">=16.8.0"
++      }
++    },
++    "node_modules/@dnd-kit/core": {
++      "version": "6.3.1",
++      "resolved": "https://registry.npmjs.org/@dnd-kit/core/-/core-6.3.1.tgz",
++      "integrity": "sha512-xkGBRQQab4RLwgXxoqETICr6S5JlogafbhNsidmrkVv2YRs5MLwpjoF2qpiGjQt8S9AoxtIV603s0GIUpY5eYQ==",
++      "license": "MIT",
++      "dependencies": {
++        "@dnd-kit/accessibility": "^3.1.1",
++        "@dnd-kit/utilities": "^3.2.2",
++        "tslib": "^2.0.0"
++      },
++      "peerDependencies": {
++        "react": ">=16.8.0",
++        "react-dom": ">=16.8.0"
++      }
++    },
++    "node_modules/@dnd-kit/sortable": {
++      "version": "10.0.0",
++      "resolved": "https://registry.npmjs.org/@dnd-kit/sortable/-/sortable-10.0.0.tgz",
++      "integrity": "sha512-+xqhmIIzvAYMGfBYYnbKuNicfSsk4RksY2XdmJhT+HAC01nix6fHCztU68jooFiMUB01Ky3F0FyOvhG/BZrWkg==",
++      "license": "MIT",
++      "dependencies": {
++        "@dnd-kit/utilities": "^3.2.2",
++        "tslib": "^2.0.0"
++      },
++      "peerDependencies": {
++        "@dnd-kit/core": "^6.3.0",
++        "react": ">=16.8.0"
++      }
++    },
++    "node_modules/@dnd-kit/utilities": {
++      "version": "3.2.2",
++      "resolved": "https://registry.npmjs.org/@dnd-kit/utilities/-/utilities-3.2.2.tgz",
++      "integrity": "sha512-+MKAJEOfaBe5SmV6t34p80MMKhjvUz0vRrvVJbPT0WElzaOJ/1xs+D+KDv+tD/NE5ujfrChEcshd4fLn0wpiqg==",
++      "license": "MIT",
++      "dependencies": {
++        "tslib": "^2.0.0"
++      },
++      "peerDependencies": {
++        "react": ">=16.8.0"
++      }
++    },
+     "node_modules/@emnapi/core": {
+       "version": "1.10.0",
+       "resolved": "https://registry.npmjs.org/@emnapi/core/-/core-1.10.0.tgz",
+@@ -194,15 +237,6 @@
+       "integrity": "sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==",
+       "license": "MIT"
+     },
+-    "node_modules/@hookform/resolvers": {
+-      "version": "3.10.0",
+-      "resolved": "https://registry.npmjs.org/@hookform/resolvers/-/resolvers-3.10.0.tgz",
+-      "integrity": "sha512-79Dv+3mDF7i+2ajj7SkypSKHhl1cbln1OGavqrsF7p6mbUv11xpqpacPsGDCTRvCSjEEIez2ef1NveSVL3b0Ag==",
+-      "license": "MIT",
+-      "peerDependencies": {
+-        "react-hook-form": "^7.0.0"
+-      }
+-    },
+     "node_modules/@humanwhocodes/config-array": {
+       "version": "0.13.0",
+       "resolved": "https://registry.npmjs.org/@humanwhocodes/config-array/-/config-array-0.13.0.tgz",
+@@ -992,36 +1026,6 @@
+         }
+       }
+     },
+-    "node_modules/@radix-ui/react-checkbox": {
+-      "version": "1.3.6",
+-      "resolved": "https://registry.npmjs.org/@radix-ui/react-checkbox/-/react-checkbox-1.3.6.tgz",
+-      "integrity": "sha512-eUEUoGMDpfkgHWSE97ZZaUJtzR1M7EKnNIpD1Q16+8JR9NWghcaqMulx9PuCQ720w0UclfYn6FEbCdd5Hx087g==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@radix-ui/primitive": "1.1.4",
+-        "@radix-ui/react-compose-refs": "1.1.3",
+-        "@radix-ui/react-context": "1.1.4",
+-        "@radix-ui/react-presence": "1.1.6",
+-        "@radix-ui/react-primitive": "2.1.7",
+-        "@radix-ui/react-use-controllable-state": "1.2.3",
+-        "@radix-ui/react-use-previous": "1.1.2",
+-        "@radix-ui/react-use-size": "1.1.2"
+-      },
+-      "peerDependencies": {
+-        "@types/react": "*",
+-        "@types/react-dom": "*",
+-        "react": "^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc",
+-        "react-dom": "^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc"
+-      },
+-      "peerDependenciesMeta": {
+-        "@types/react": {
+-          "optional": true
+-        },
+-        "@types/react-dom": {
+-          "optional": true
+-        }
+-      }
+-    },
+     "node_modules/@radix-ui/react-collection": {
+       "version": "1.1.11",
+       "resolved": "https://registry.npmjs.org/@radix-ui/react-collection/-/react-collection-1.1.11.tgz",
+@@ -1156,35 +1160,6 @@
+         }
+       }
+     },
+-    "node_modules/@radix-ui/react-dropdown-menu": {
+-      "version": "2.1.19",
+-      "resolved": "https://registry.npmjs.org/@radix-ui/react-dropdown-menu/-/react-dropdown-menu-2.1.19.tgz",
+-      "integrity": "sha512-HZccBkbK0LOi8nYKIp5jll/zIRW0cCOmG6WWyqsSpmXCU+ZlcBbTqIwlBvPCu886C5RVu6c/kHV7xSP8IgYNHw==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@radix-ui/primitive": "1.1.4",
+-        "@radix-ui/react-compose-refs": "1.1.3",
+-        "@radix-ui/react-context": "1.1.4",
+-        "@radix-ui/react-id": "1.1.2",
+-        "@radix-ui/react-menu": "2.1.19",
+-        "@radix-ui/react-primitive": "2.1.7",
+-        "@radix-ui/react-use-controllable-state": "1.2.3"
+-      },
+-      "peerDependencies": {
+-        "@types/react": "*",
+-        "@types/react-dom": "*",
+-        "react": "^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc",
+-        "react-dom": "^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc"
+-      },
+-      "peerDependenciesMeta": {
+-        "@types/react": {
+-          "optional": true
+-        },
+-        "@types/react-dom": {
+-          "optional": true
+-        }
+-      }
+-    },
+     "node_modules/@radix-ui/react-focus-guards": {
+       "version": "1.1.4",
+       "resolved": "https://registry.npmjs.org/@radix-ui/react-focus-guards/-/react-focus-guards-1.1.4.tgz",
+@@ -1243,46 +1218,6 @@
+         }
+       }
+     },
+-    "node_modules/@radix-ui/react-menu": {
+-      "version": "2.1.19",
+-      "resolved": "https://registry.npmjs.org/@radix-ui/react-menu/-/react-menu-2.1.19.tgz",
+-      "integrity": "sha512-Mht9BVd1AIsNFVQr4KG3bIK7XQn5IXF0TL/2ObsrzOdc1loaly/+kBDL5roSCYn8j8XZkvpOD0WYLz2FQtH1Eg==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@radix-ui/primitive": "1.1.4",
+-        "@radix-ui/react-collection": "1.1.11",
+-        "@radix-ui/react-compose-refs": "1.1.3",
+-        "@radix-ui/react-context": "1.1.4",
+-        "@radix-ui/react-direction": "1.1.2",
+-        "@radix-ui/react-dismissable-layer": "1.1.14",
+-        "@radix-ui/react-focus-guards": "1.1.4",
+-        "@radix-ui/react-focus-scope": "1.1.11",
+-        "@radix-ui/react-id": "1.1.2",
+-        "@radix-ui/react-popper": "1.3.2",
+-        "@radix-ui/react-portal": "1.1.13",
+-        "@radix-ui/react-presence": "1.1.6",
+-        "@radix-ui/react-primitive": "2.1.7",
+-        "@radix-ui/react-roving-focus": "1.1.14",
+-        "@radix-ui/react-slot": "1.3.0",
+-        "@radix-ui/react-use-callback-ref": "1.1.2",
+-        "aria-hidden": "^1.2.4",
+-        "react-remove-scroll": "^2.7.2"
+-      },
+-      "peerDependencies": {
+-        "@types/react": "*",
+-        "@types/react-dom": "*",
+-        "react": "^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc",
+-        "react-dom": "^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc"
+-      },
+-      "peerDependenciesMeta": {
+-        "@types/react": {
+-          "optional": true
+-        },
+-        "@types/react-dom": {
+-          "optional": true
+-        }
+-      }
+-    },
+     "node_modules/@radix-ui/react-popper": {
+       "version": "1.3.2",
+       "resolved": "https://registry.npmjs.org/@radix-ui/react-popper/-/react-popper-1.3.2.tgz",
+@@ -1385,37 +1320,6 @@
+         }
+       }
+     },
+-    "node_modules/@radix-ui/react-roving-focus": {
+-      "version": "1.1.14",
+-      "resolved": "https://registry.npmjs.org/@radix-ui/react-roving-focus/-/react-roving-focus-1.1.14.tgz",
+-      "integrity": "sha512-8Qcnx9447tx/aCBgw6Jenfqg4Skq+vqab9mCBmuGNipIS5YXvL275wbKEu7+ICYHIlAPgCduUMJH1XOYewKF6Q==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@radix-ui/primitive": "1.1.4",
+-        "@radix-ui/react-collection": "1.1.11",
+-        "@radix-ui/react-compose-refs": "1.1.3",
+-        "@radix-ui/react-context": "1.1.4",
+-        "@radix-ui/react-direction": "1.1.2",
+-        "@radix-ui/react-id": "1.1.2",
+-        "@radix-ui/react-primitive": "2.1.7",
+-        "@radix-ui/react-use-callback-ref": "1.1.2",
+-        "@radix-ui/react-use-controllable-state": "1.2.3"
+-      },
+-      "peerDependencies": {
+-        "@types/react": "*",
+-        "@types/react-dom": "*",
+-        "react": "^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc",
+-        "react-dom": "^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc"
+-      },
+-      "peerDependenciesMeta": {
+-        "@types/react": {
+-          "optional": true
+-        },
+-        "@types/react-dom": {
+-          "optional": true
+-        }
+-      }
+-    },
+     "node_modules/@radix-ui/react-select": {
+       "version": "2.3.2",
+       "resolved": "https://registry.npmjs.org/@radix-ui/react-select/-/react-select-2.3.2.tgz",
+@@ -1478,99 +1382,6 @@
+         }
+       }
+     },
+-    "node_modules/@radix-ui/react-switch": {
+-      "version": "1.3.2",
+-      "resolved": "https://registry.npmjs.org/@radix-ui/react-switch/-/react-switch-1.3.2.tgz",
+-      "integrity": "sha512-tgRBI3DdNwAJYE4BBZyZcz/HRRCvAsPkRvG1wvKc+41tBGMxPn/a87T/wikXAvyDypNQ9kaZwHbeZe+veHCGpA==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@radix-ui/primitive": "1.1.4",
+-        "@radix-ui/react-compose-refs": "1.1.3",
+-        "@radix-ui/react-context": "1.1.4",
+-        "@radix-ui/react-primitive": "2.1.7",
+-        "@radix-ui/react-use-controllable-state": "1.2.3",
+-        "@radix-ui/react-use-previous": "1.1.2",
+-        "@radix-ui/react-use-size": "1.1.2"
+-      },
+-      "peerDependencies": {
+-        "@types/react": "*",
+-        "@types/react-dom": "*",
+-        "react": "^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc",
+-        "react-dom": "^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc"
+-      },
+-      "peerDependenciesMeta": {
+-        "@types/react": {
+-          "optional": true
+-        },
+-        "@types/react-dom": {
+-          "optional": true
+-        }
+-      }
+-    },
+-    "node_modules/@radix-ui/react-tabs": {
+-      "version": "1.1.16",
+-      "resolved": "https://registry.npmjs.org/@radix-ui/react-tabs/-/react-tabs-1.1.16.tgz",
+-      "integrity": "sha512-v3Ab2l7z6U7tRB4xA0IyKdq0OsqaO1o9ZjsIEoKKnSZ/l96mZz8aCTX0NCXw+YVHJXr8Km4d+Mn6/Q8YjXa+gw==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@radix-ui/primitive": "1.1.4",
+-        "@radix-ui/react-context": "1.1.4",
+-        "@radix-ui/react-direction": "1.1.2",
+-        "@radix-ui/react-id": "1.1.2",
+-        "@radix-ui/react-presence": "1.1.6",
+-        "@radix-ui/react-primitive": "2.1.7",
+-        "@radix-ui/react-roving-focus": "1.1.14",
+-        "@radix-ui/react-use-controllable-state": "1.2.3"
+-      },
+-      "peerDependencies": {
+-        "@types/react": "*",
+-        "@types/react-dom": "*",
+-        "react": "^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc",
+-        "react-dom": "^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc"
+-      },
+-      "peerDependenciesMeta": {
+-        "@types/react": {
+-          "optional": true
+-        },
+-        "@types/react-dom": {
+-          "optional": true
+-        }
+-      }
+-    },
+-    "node_modules/@radix-ui/react-tooltip": {
+-      "version": "1.2.11",
+-      "resolved": "https://registry.npmjs.org/@radix-ui/react-tooltip/-/react-tooltip-1.2.11.tgz",
+-      "integrity": "sha512-8XZ6Py3y3W2nEzAUGCN5cfVKaUi+CVApcz1d6lrNVVf2hvYEixMRkq8k9ggPKnQUpRRuOV5avt8uvxViH2jLwA==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@radix-ui/primitive": "1.1.4",
+-        "@radix-ui/react-compose-refs": "1.1.3",
+-        "@radix-ui/react-context": "1.1.4",
+-        "@radix-ui/react-dismissable-layer": "1.1.14",
+-        "@radix-ui/react-id": "1.1.2",
+-        "@radix-ui/react-popper": "1.3.2",
+-        "@radix-ui/react-portal": "1.1.13",
+-        "@radix-ui/react-presence": "1.1.6",
+-        "@radix-ui/react-primitive": "2.1.7",
+-        "@radix-ui/react-slot": "1.3.0",
+-        "@radix-ui/react-use-controllable-state": "1.2.3",
+-        "@radix-ui/react-visually-hidden": "1.2.7"
+-      },
+-      "peerDependencies": {
+-        "@types/react": "*",
+-        "@types/react-dom": "*",
+-        "react": "^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc",
+-        "react-dom": "^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc"
+-      },
+-      "peerDependenciesMeta": {
+-        "@types/react": {
+-          "optional": true
+-        },
+-        "@types/react-dom": {
+-          "optional": true
+-        }
+-      }
+-    },
+     "node_modules/@radix-ui/react-use-callback-ref": {
+       "version": "1.1.2",
+       "resolved": "https://registry.npmjs.org/@radix-ui/react-use-callback-ref/-/react-use-callback-ref-1.1.2.tgz",
+@@ -1733,90 +1544,107 @@
+       "license": "MIT"
+     },
+     "node_modules/@supabase/auth-js": {
+-      "version": "2.65.0",
+-      "resolved": "https://registry.npmjs.org/@supabase/auth-js/-/auth-js-2.65.0.tgz",
+-      "integrity": "sha512-+wboHfZufAE2Y612OsKeVP4rVOeGZzzMLD/Ac3HrTQkkY4qXNjI6Af9gtmxwccE5nFvTiF114FEbIQ1hRq5uUw==",
++      "version": "2.112.2",
++      "resolved": "https://registry.npmjs.org/@supabase/auth-js/-/auth-js-2.112.2.tgz",
++      "integrity": "sha512-l1InCp4j98d09LZ6+RgubgF4eVPGBGXcLEhFusLg1qUCHJ2IEkYu5FohKK+eaFmIOwEk0kqG/j/lycw5e15mcQ==",
+       "license": "MIT",
+       "dependencies": {
+-        "@supabase/node-fetch": "^2.6.14"
++        "tslib": "2.8.1"
++      },
++      "engines": {
++        "node": ">=22.0.0"
+       }
+     },
+     "node_modules/@supabase/functions-js": {
+-      "version": "2.4.1",
+-      "resolved": "https://registry.npmjs.org/@supabase/functions-js/-/functions-js-2.4.1.tgz",
+-      "integrity": "sha512-8sZ2ibwHlf+WkHDUZJUXqqmPvWQ3UHN0W30behOJngVh/qHHekhJLCFbh0AjkE9/FqqXtf9eoVvmYgfCLk5tNA==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@supabase/node-fetch": "^2.6.14"
+-      }
+-    },
+-    "node_modules/@supabase/node-fetch": {
+-      "version": "2.6.15",
+-      "resolved": "https://registry.npmjs.org/@supabase/node-fetch/-/node-fetch-2.6.15.tgz",
+-      "integrity": "sha512-1ibVeYUacxWYi9i0cf5efil6adJ9WRyZBLivgjs+AUpewx1F3xPi7gLgaASI2SmIQxPoCEjAsLAzKPgMJVgOUQ==",
++      "version": "2.112.2",
++      "resolved": "https://registry.npmjs.org/@supabase/functions-js/-/functions-js-2.112.2.tgz",
++      "integrity": "sha512-oMuSWN0ERmrG9S6kOM0bwhHmESGVl3kMtkZl2dNCU/r89hMiziX4GfD1omNo9QcBDele4N0GwSZ7hdbpuiA35A==",
+       "license": "MIT",
+       "dependencies": {
+-        "whatwg-url": "^5.0.0"
++        "tslib": "2.8.1"
+       },
+       "engines": {
+-        "node": "4.x || >=6.0.0"
++        "node": ">=22.0.0"
+       }
+     },
++    "node_modules/@supabase/phoenix": {
++      "version": "0.4.5",
++      "resolved": "https://registry.npmjs.org/@supabase/phoenix/-/phoenix-0.4.5.tgz",
++      "integrity": "sha512-aAn9H9ovVyeApKy11OWOrrOGq8DV68yWeH4ud2lN9fzn4aO8Zb5GLL9m1pUg9nLqIcT+ZDfAcsZe0E/nqdv2lw==",
++      "license": "MIT"
++    },
+     "node_modules/@supabase/postgrest-js": {
+-      "version": "1.16.1",
+-      "resolved": "https://registry.npmjs.org/@supabase/postgrest-js/-/postgrest-js-1.16.1.tgz",
+-      "integrity": "sha512-EOSEZFm5pPuCPGCmLF1VOCS78DfkSz600PBuvBND/IZmMciJ1pmsS3ss6TkB6UkuvTybYiBh7gKOYyxoEO3USA==",
++      "version": "2.112.2",
++      "resolved": "https://registry.npmjs.org/@supabase/postgrest-js/-/postgrest-js-2.112.2.tgz",
++      "integrity": "sha512-ewhhtRny/HFRGhUTTg/PsqIatsl8OhW8Eha/Tz4S+SRAXBnuhKei9ZpsQTgL/3XcH9UEwuPQyQgQ9itq7nRQeg==",
+       "license": "MIT",
+       "dependencies": {
+-        "@supabase/node-fetch": "^2.6.14"
++        "tslib": "2.8.1"
++      },
++      "engines": {
++        "node": ">=22.0.0"
+       }
+     },
+     "node_modules/@supabase/realtime-js": {
+-      "version": "2.10.2",
+-      "resolved": "https://registry.npmjs.org/@supabase/realtime-js/-/realtime-js-2.10.2.tgz",
+-      "integrity": "sha512-qyCQaNg90HmJstsvr2aJNxK2zgoKh9ZZA8oqb7UT2LCh3mj9zpa3Iwu167AuyNxsxrUE8eEJ2yH6wLCij4EApA==",
++      "version": "2.112.2",
++      "resolved": "https://registry.npmjs.org/@supabase/realtime-js/-/realtime-js-2.112.2.tgz",
++      "integrity": "sha512-cd9/CEUJ6Go13FxtfiuC5rYELJtuQzVzTXlGG+XjSppjDS+anq+xo++WQe7ZRUNTuHOCeyKRwmx9Hw/OQJ04ig==",
+       "license": "MIT",
+       "dependencies": {
+-        "@supabase/node-fetch": "^2.6.14",
+-        "@types/phoenix": "^1.5.4",
+-        "@types/ws": "^8.5.10",
+-        "ws": "^8.14.2"
++        "@supabase/phoenix": "0.4.5",
++        "tslib": "2.8.1"
++      },
++      "engines": {
++        "node": ">=22.0.0"
+       }
+     },
+     "node_modules/@supabase/ssr": {
+-      "version": "0.5.2",
+-      "resolved": "https://registry.npmjs.org/@supabase/ssr/-/ssr-0.5.2.tgz",
+-      "integrity": "sha512-n3plRhr2Bs8Xun1o4S3k1CDv17iH5QY9YcoEvXX3bxV1/5XSasA0mNXYycFmADIdtdE6BG9MRjP5CGIs8qxC8A==",
++      "version": "0.12.4",
++      "resolved": "https://registry.npmjs.org/@supabase/ssr/-/ssr-0.12.4.tgz",
++      "integrity": "sha512-xHzcgI8cC1TpBKSwJcR5Yd8CCwfIq0SBc5yb4yz/YFw5tbCrEQ0QT3a+2jymCxHgQWLfzwN93HZ6eRbcoMkOlA==",
+       "license": "MIT",
+       "dependencies": {
+-        "@types/cookie": "^0.6.0",
+-        "cookie": "^0.7.0"
++        "cookie": "^1.0.2"
+       },
+       "peerDependencies": {
+-        "@supabase/supabase-js": "^2.43.4"
++        "@supabase/supabase-js": "^2.111.0"
+       }
+     },
+     "node_modules/@supabase/storage-js": {
+-      "version": "2.7.0",
+-      "resolved": "https://registry.npmjs.org/@supabase/storage-js/-/storage-js-2.7.0.tgz",
+-      "integrity": "sha512-iZenEdO6Mx9iTR6T7wC7sk6KKsoDPLq8rdu5VRy7+JiT1i8fnqfcOr6mfF2Eaqky9VQzhP8zZKQYjzozB65Rig==",
++      "version": "2.112.2",
++      "resolved": "https://registry.npmjs.org/@supabase/storage-js/-/storage-js-2.112.2.tgz",
++      "integrity": "sha512-6jyBq/J1iXOHNpbjCZS7gFcDk49iM1MCJUVkDl71gLd/+XnLDzpUBs8icGebtwiHpl4kVszxIRDYAosbF4Rsig==",
+       "license": "MIT",
+       "dependencies": {
+-        "@supabase/node-fetch": "^2.6.14"
++        "iceberg-js": "^0.8.1",
++        "tslib": "2.8.1"
++      },
++      "engines": {
++        "node": ">=22.0.0"
+       }
+     },
+     "node_modules/@supabase/supabase-js": {
+-      "version": "2.45.4",
+-      "resolved": "https://registry.npmjs.org/@supabase/supabase-js/-/supabase-js-2.45.4.tgz",
+-      "integrity": "sha512-E5p8/zOLaQ3a462MZnmnz03CrduA5ySH9hZyL03Y+QZLIOO4/Gs8Rdy4ZCKDHsN7x0xdanVEWWFN3pJFQr9/hg==",
++      "version": "2.112.2",
++      "resolved": "https://registry.npmjs.org/@supabase/supabase-js/-/supabase-js-2.112.2.tgz",
++      "integrity": "sha512-UyI1epU9B4X51HvNpkmlwTdF20fEcz2vyvrcDKVzFN4jZN41f5iQRqsiIQjAY5OVJD6ljqA/1g9JQeOTvFHpkA==",
+       "license": "MIT",
+       "dependencies": {
+-        "@supabase/auth-js": "2.65.0",
+-        "@supabase/functions-js": "2.4.1",
+-        "@supabase/node-fetch": "2.6.15",
+-        "@supabase/postgrest-js": "1.16.1",
+-        "@supabase/realtime-js": "2.10.2",
+-        "@supabase/storage-js": "2.7.0"
++        "@supabase/auth-js": "2.112.2",
++        "@supabase/functions-js": "2.112.2",
++        "@supabase/postgrest-js": "2.112.2",
++        "@supabase/realtime-js": "2.112.2",
++        "@supabase/storage-js": "2.112.2"
++      },
++      "engines": {
++        "node": ">=22.0.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.0.0"
++      },
++      "peerDependenciesMeta": {
++        "@opentelemetry/api": {
++          "optional": true
++        }
+       }
+     },
+     "node_modules/@swc/helpers": {
+@@ -1828,39 +1656,6 @@
+         "tslib": "^2.8.0"
+       }
+     },
+-    "node_modules/@tanstack/react-table": {
+-      "version": "8.21.3",
+-      "resolved": "https://registry.npmjs.org/@tanstack/react-table/-/react-table-8.21.3.tgz",
+-      "integrity": "sha512-5nNMTSETP4ykGegmVkhjcS8tTLW6Vl4axfEGQN3v0zdHYbK4UfoqfPChclTrJ4EoK9QynqAu9oUf8VEmrpZ5Ww==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@tanstack/table-core": "8.21.3"
+-      },
+-      "engines": {
+-        "node": ">=12"
+-      },
+-      "funding": {
+-        "type": "github",
+-        "url": "https://github.com/sponsors/tannerlinsley"
+-      },
+-      "peerDependencies": {
+-        "react": ">=16.8",
+-        "react-dom": ">=16.8"
+-      }
+-    },
+-    "node_modules/@tanstack/table-core": {
+-      "version": "8.21.3",
+-      "resolved": "https://registry.npmjs.org/@tanstack/table-core/-/table-core-8.21.3.tgz",
+-      "integrity": "sha512-ldZXEhOBb8Is7xLs01fR3YEc3DERiz5silj8tnGkFZytt1abEvl/GhUmCE0PMLaMPTa3Jk4HbKmRlHmu+gCftg==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">=12"
+-      },
+-      "funding": {
+-        "type": "github",
+-        "url": "https://github.com/sponsors/tannerlinsley"
+-      }
+-    },
+     "node_modules/@tybys/wasm-util": {
+       "version": "0.10.3",
+       "resolved": "https://registry.npmjs.org/@tybys/wasm-util/-/wasm-util-0.10.3.tgz",
+@@ -1872,12 +1667,6 @@
+         "tslib": "^2.4.0"
+       }
+     },
+-    "node_modules/@types/cookie": {
+-      "version": "0.6.0",
+-      "resolved": "https://registry.npmjs.org/@types/cookie/-/cookie-0.6.0.tgz",
+-      "integrity": "sha512-4Kh9a6B2bQciAhf7FSuMRRkUWecJgJu9nPnx3yzpsfXX/c50REIqpHY4C82bXP90qrLtXtkDxTZosYO3UpOwlA==",
+-      "license": "MIT"
+-    },
+     "node_modules/@types/json5": {
+       "version": "0.0.29",
+       "resolved": "https://registry.npmjs.org/@types/json5/-/json5-0.0.29.tgz",
+@@ -1889,27 +1678,12 @@
+       "version": "22.20.0",
+       "resolved": "https://registry.npmjs.org/@types/node/-/node-22.20.0.tgz",
+       "integrity": "sha512-QWlFW2wf3nTjC13/DqRnBpR4ZO36VJH/JVBkA/vcnmbTBNQIlnObqyqZE1tUR7+Ni23Lda8R1BxMfbXRpCUx5g==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "undici-types": "~6.21.0"
+-      }
+-    },
+-    "node_modules/@types/papaparse": {
+-      "version": "5.5.2",
+-      "resolved": "https://registry.npmjs.org/@types/papaparse/-/papaparse-5.5.2.tgz",
+-      "integrity": "sha512-gFnFp/JMzLHCwRf7tQHrNnfhN4eYBVYYI897CGX4MY1tzY9l2aLkVyx2IlKZ/SAqDbB3I1AOZW5gTMGGsqWliA==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@types/node": "*"
++        "undici-types": "~6.21.0"
+       }
+     },
+-    "node_modules/@types/phoenix": {
+-      "version": "1.6.7",
+-      "resolved": "https://registry.npmjs.org/@types/phoenix/-/phoenix-1.6.7.tgz",
+-      "integrity": "sha512-oN9ive//QSBkf19rfDv45M7eZPi0eEXylht2OLEXicu5b4KoQ1OzXIw+xDSGWxSxe1JmepRR/ZH283vsu518/Q==",
+-      "license": "MIT"
+-    },
+     "node_modules/@types/react": {
+       "version": "19.2.17",
+       "resolved": "https://registry.npmjs.org/@types/react/-/react-19.2.17.tgz",
+@@ -1930,15 +1704,6 @@
+         "@types/react": "^19.2.0"
+       }
+     },
+-    "node_modules/@types/ws": {
+-      "version": "8.18.1",
+-      "resolved": "https://registry.npmjs.org/@types/ws/-/ws-8.18.1.tgz",
+-      "integrity": "sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@types/node": "*"
+-      }
+-    },
+     "node_modules/@typescript-eslint/eslint-plugin": {
+       "version": "8.62.1",
+       "resolved": "https://registry.npmjs.org/@typescript-eslint/eslint-plugin/-/eslint-plugin-8.62.1.tgz",
+@@ -2575,15 +2340,6 @@
+         "acorn": "^6.0.0 || ^7.0.0 || ^8.0.0"
+       }
+     },
+-    "node_modules/adler-32": {
+-      "version": "1.3.1",
+-      "resolved": "https://registry.npmjs.org/adler-32/-/adler-32-1.3.1.tgz",
+-      "integrity": "sha512-ynZ4w/nUUv5rrsR8UUGoe1VC9hZj6V5hU9Qw1HlMDJGEJw5S7TfTErWTjMys6M7vr0YWcPqs3qAr4ss0nDfP+A==",
+-      "license": "Apache-2.0",
+-      "engines": {
+-        "node": ">=0.8"
+-      }
+-    },
+     "node_modules/ajv": {
+       "version": "6.15.0",
+       "resolved": "https://registry.npmjs.org/ajv/-/ajv-6.15.0.tgz",
+@@ -3115,19 +2871,6 @@
+       ],
+       "license": "CC-BY-4.0"
+     },
+-    "node_modules/cfb": {
+-      "version": "1.2.2",
+-      "resolved": "https://registry.npmjs.org/cfb/-/cfb-1.2.2.tgz",
+-      "integrity": "sha512-KfdUZsSOw19/ObEWasvBP/Ac4reZvAGauZhs6S/gqNhXhI7cKwvlH7ulj+dOEYnca4bm4SGo8C1bTAQvnTjgQA==",
+-      "license": "Apache-2.0",
+-      "dependencies": {
+-        "adler-32": "~1.3.0",
+-        "crc-32": "~1.2.0"
+-      },
+-      "engines": {
+-        "node": ">=0.8"
+-      }
+-    },
+     "node_modules/chalk": {
+       "version": "4.1.2",
+       "resolved": "https://registry.npmjs.org/chalk/-/chalk-4.1.2.tgz",
+@@ -3210,15 +2953,6 @@
+         "node": ">=6"
+       }
+     },
+-    "node_modules/codepage": {
+-      "version": "1.15.0",
+-      "resolved": "https://registry.npmjs.org/codepage/-/codepage-1.15.0.tgz",
+-      "integrity": "sha512-3g6NUTPd/YtuuGrhMnOMRjFc+LJw/bnMp3+0r/Wcz3IXUuCosKRJvMphm5+Q+bvTVGcJJuRvVLuYba+WojaFaA==",
+-      "license": "Apache-2.0",
+-      "engines": {
+-        "node": ">=0.8"
+-      }
+-    },
+     "node_modules/color-convert": {
+       "version": "2.0.1",
+       "resolved": "https://registry.npmjs.org/color-convert/-/color-convert-2.0.1.tgz",
+@@ -3257,24 +2991,16 @@
+       "license": "MIT"
+     },
+     "node_modules/cookie": {
+-      "version": "0.7.2",
+-      "resolved": "https://registry.npmjs.org/cookie/-/cookie-0.7.2.tgz",
+-      "integrity": "sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w==",
++      "version": "1.1.1",
++      "resolved": "https://registry.npmjs.org/cookie/-/cookie-1.1.1.tgz",
++      "integrity": "sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==",
+       "license": "MIT",
+       "engines": {
+-        "node": ">= 0.6"
+-      }
+-    },
+-    "node_modules/crc-32": {
+-      "version": "1.2.2",
+-      "resolved": "https://registry.npmjs.org/crc-32/-/crc-32-1.2.2.tgz",
+-      "integrity": "sha512-ROmzCKrTnOwybPcJApAA6WBWij23HVfGVNKqqrZpuyZOHqK2CwHSvpGuyt/UNNvaIjEd8X5IFGp4Mh+Ie1IHJQ==",
+-      "license": "Apache-2.0",
+-      "bin": {
+-        "crc32": "bin/crc32.njs"
++        "node": ">=18"
+       },
+-      "engines": {
+-        "node": ">=0.8"
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/express"
+       }
+     },
+     "node_modules/cross-spawn": {
+@@ -4310,15 +4036,6 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
+-    "node_modules/frac": {
+-      "version": "1.1.2",
+-      "resolved": "https://registry.npmjs.org/frac/-/frac-1.1.2.tgz",
+-      "integrity": "sha512-w/XBfkibaTl3YDqASwfDUqkna4Z2p9cFSr1aHDt0WoMTECnRfBOv2WArlZILlqgWlmdIlALXGpM2AOhEk5W3IA==",
+-      "license": "Apache-2.0",
+-      "engines": {
+-        "node": ">=0.8"
+-      }
+-    },
+     "node_modules/fraction.js": {
+       "version": "5.3.4",
+       "resolved": "https://registry.npmjs.org/fraction.js/-/fraction.js-5.3.4.tgz",
+@@ -4333,33 +4050,6 @@
+         "url": "https://github.com/sponsors/rawify"
+       }
+     },
+-    "node_modules/framer-motion": {
+-      "version": "11.18.2",
+-      "resolved": "https://registry.npmjs.org/framer-motion/-/framer-motion-11.18.2.tgz",
+-      "integrity": "sha512-5F5Och7wrvtLVElIpclDT0CBzMVg3dL22B64aZwHtsIY8RB4mXICLrkajK4G9R+ieSAGcgrLeae2SeUTg2pr6w==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "motion-dom": "^11.18.1",
+-        "motion-utils": "^11.18.1",
+-        "tslib": "^2.4.0"
+-      },
+-      "peerDependencies": {
+-        "@emotion/is-prop-valid": "*",
+-        "react": "^18.0.0 || ^19.0.0",
+-        "react-dom": "^18.0.0 || ^19.0.0"
+-      },
+-      "peerDependenciesMeta": {
+-        "@emotion/is-prop-valid": {
+-          "optional": true
+-        },
+-        "react": {
+-          "optional": true
+-        },
+-        "react-dom": {
+-          "optional": true
+-        }
+-      }
+-    },
+     "node_modules/fs.realpath": {
+       "version": "1.0.0",
+       "resolved": "https://registry.npmjs.org/fs.realpath/-/fs.realpath-1.0.0.tgz",
+@@ -4697,6 +4387,15 @@
+         "node": ">= 0.4"
+       }
+     },
++    "node_modules/iceberg-js": {
++      "version": "0.8.1",
++      "resolved": "https://registry.npmjs.org/iceberg-js/-/iceberg-js-0.8.1.tgz",
++      "integrity": "sha512-1dhVQZXhcHje7798IVM+xoo/1ZdVfzOMIc8/rgVSijRK38EDqOJoGula9N/8ZI5RD8QTxNQtK/Gozpr+qUqRRA==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
+     "node_modules/ignore": {
+       "version": "5.3.2",
+       "resolved": "https://registry.npmjs.org/ignore/-/ignore-5.3.2.tgz",
+@@ -5497,21 +5196,6 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
+-    "node_modules/motion-dom": {
+-      "version": "11.18.1",
+-      "resolved": "https://registry.npmjs.org/motion-dom/-/motion-dom-11.18.1.tgz",
+-      "integrity": "sha512-g76KvA001z+atjfxczdRtw/RXOM3OMSdd1f4DL77qCTF/+avrRJiawSG4yDibEQ215sr9kpinSlX2pCTJ9zbhw==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "motion-utils": "^11.18.1"
+-      }
+-    },
+-    "node_modules/motion-utils": {
+-      "version": "11.18.1",
+-      "resolved": "https://registry.npmjs.org/motion-utils/-/motion-utils-11.18.1.tgz",
+-      "integrity": "sha512-49Kt+HKjtbJKLtgO/LKj9Ld+6vw9BjH5d9sc40R/kVyH8GLAXgT42M2NnuPcJNuA3s9ZfZBUcwIgpmZWGEE+hA==",
+-      "license": "MIT"
+-    },
+     "node_modules/ms": {
+       "version": "2.1.3",
+       "resolved": "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz",
+@@ -5912,12 +5596,6 @@
+         "url": "https://github.com/sponsors/sindresorhus"
+       }
+     },
+-    "node_modules/papaparse": {
+-      "version": "5.5.4",
+-      "resolved": "https://registry.npmjs.org/papaparse/-/papaparse-5.5.4.tgz",
+-      "integrity": "sha512-SwzWD9gl/ElwYLCI0nUja1mFJzjq2D8ziShfNBa7zCHzkOozeOGDwHWQ+tvCzEZcewecWZ5U7kUopDnG+DFYEQ==",
+-      "license": "MIT"
+-    },
+     "node_modules/parent-module": {
+       "version": "1.0.1",
+       "resolved": "https://registry.npmjs.org/parent-module/-/parent-module-1.0.1.tgz",
+@@ -6276,22 +5954,6 @@
+         "react": "^19.2.7"
+       }
+     },
+-    "node_modules/react-hook-form": {
+-      "version": "7.80.0",
+-      "resolved": "https://registry.npmjs.org/react-hook-form/-/react-hook-form-7.80.0.tgz",
+-      "integrity": "sha512-4P+fk6oXsxY+6xSj7Euhc2sumQD8zQqCuVHoJwoyp9EchP+IUW9OESB7uHFJOKsIBQ4MQqYE84INJFqUCYNoOg==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">=18.0.0"
+-      },
+-      "funding": {
+-        "type": "opencollective",
+-        "url": "https://opencollective.com/react-hook-form"
+-      },
+-      "peerDependencies": {
+-        "react": "^16.8.0 || ^17 || ^18 || ^19"
+-      }
+-    },
+     "node_modules/react-is": {
+       "version": "16.13.1",
+       "resolved": "https://registry.npmjs.org/react-is/-/react-is-16.13.1.tgz",
+@@ -6817,18 +6479,6 @@
+         "node": ">=0.10.0"
+       }
+     },
+-    "node_modules/ssf": {
+-      "version": "0.11.2",
+-      "resolved": "https://registry.npmjs.org/ssf/-/ssf-0.11.2.tgz",
+-      "integrity": "sha512-+idbmIXoYET47hH+d7dfm2epdOMUDjqcB4648sTZ+t2JwoyBFL/insLfB/racrDmsKB3diwsDA696pZMieAC5g==",
+-      "license": "Apache-2.0",
+-      "dependencies": {
+-        "frac": "~1.1.2"
+-      },
+-      "engines": {
+-        "node": ">=0.8"
+-      }
+-    },
+     "node_modules/stable-hash": {
+       "version": "0.0.5",
+       "resolved": "https://registry.npmjs.org/stable-hash/-/stable-hash-0.0.5.tgz",
+@@ -7263,12 +6913,6 @@
+         "node": ">=8.0"
+       }
+     },
+-    "node_modules/tr46": {
+-      "version": "0.0.3",
+-      "resolved": "https://registry.npmjs.org/tr46/-/tr46-0.0.3.tgz",
+-      "integrity": "sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==",
+-      "license": "MIT"
+-    },
+     "node_modules/ts-api-utils": {
+       "version": "2.5.0",
+       "resolved": "https://registry.npmjs.org/ts-api-utils/-/ts-api-utils-2.5.0.tgz",
+@@ -7448,6 +7092,7 @@
+       "version": "6.21.0",
+       "resolved": "https://registry.npmjs.org/undici-types/-/undici-types-6.21.0.tgz",
+       "integrity": "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==",
++      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/unrs-resolver": {
+@@ -7579,22 +7224,6 @@
+       "dev": true,
+       "license": "MIT"
+     },
+-    "node_modules/webidl-conversions": {
+-      "version": "3.0.1",
+-      "resolved": "https://registry.npmjs.org/webidl-conversions/-/webidl-conversions-3.0.1.tgz",
+-      "integrity": "sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ==",
+-      "license": "BSD-2-Clause"
+-    },
+-    "node_modules/whatwg-url": {
+-      "version": "5.0.0",
+-      "resolved": "https://registry.npmjs.org/whatwg-url/-/whatwg-url-5.0.0.tgz",
+-      "integrity": "sha512-saE57nupxk6v3HY35+jzBwYa0rKSy0XR8JSxZPwgLr7ys0IBzhGviA1/TUGJLmSVqs8pb9AnvICXEuOHLprYTw==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "tr46": "~0.0.3",
+-        "webidl-conversions": "^3.0.0"
+-      }
+-    },
+     "node_modules/which": {
+       "version": "2.0.2",
+       "resolved": "https://registry.npmjs.org/which/-/which-2.0.2.tgz",
+@@ -7700,24 +7329,6 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
+-    "node_modules/wmf": {
+-      "version": "1.0.2",
+-      "resolved": "https://registry.npmjs.org/wmf/-/wmf-1.0.2.tgz",
+-      "integrity": "sha512-/p9K7bEh0Dj6WbXg4JG0xvLQmIadrner1bi45VMJTfnbVHsc7yIajZyoSoK60/dtVBs12Fm6WkUI5/3WAVsNMw==",
+-      "license": "Apache-2.0",
+-      "engines": {
+-        "node": ">=0.8"
+-      }
+-    },
+-    "node_modules/word": {
+-      "version": "0.3.0",
+-      "resolved": "https://registry.npmjs.org/word/-/word-0.3.0.tgz",
+-      "integrity": "sha512-OELeY0Q61OXpdUfTp+oweA/vtLVg5VDOXh+3he3PNzLGG/y0oylSOC1xRVj0+l4vQ3tj/bB1HVHv1ocXkQceFA==",
+-      "license": "Apache-2.0",
+-      "engines": {
+-        "node": ">=0.8"
+-      }
+-    },
+     "node_modules/word-wrap": {
+       "version": "1.2.5",
+       "resolved": "https://registry.npmjs.org/word-wrap/-/word-wrap-1.2.5.tgz",
+@@ -7735,48 +7346,6 @@
+       "dev": true,
+       "license": "ISC"
+     },
+-    "node_modules/ws": {
+-      "version": "8.21.0",
+-      "resolved": "https://registry.npmjs.org/ws/-/ws-8.21.0.tgz",
+-      "integrity": "sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">=10.0.0"
+-      },
+-      "peerDependencies": {
+-        "bufferutil": "^4.0.1",
+-        "utf-8-validate": ">=5.0.2"
+-      },
+-      "peerDependenciesMeta": {
+-        "bufferutil": {
+-          "optional": true
+-        },
+-        "utf-8-validate": {
+-          "optional": true
+-        }
+-      }
+-    },
+-    "node_modules/xlsx": {
+-      "version": "0.18.5",
+-      "resolved": "https://registry.npmjs.org/xlsx/-/xlsx-0.18.5.tgz",
+-      "integrity": "sha512-dmg3LCjBPHZnQp5/F/+nnTa+miPJxUXB6vtk42YjBBKayDNagxGEeIdWApkYPOf3Z3pm3k62Knjzp7lMeTEtFQ==",
+-      "license": "Apache-2.0",
+-      "dependencies": {
+-        "adler-32": "~1.3.0",
+-        "cfb": "~1.2.1",
+-        "codepage": "~1.15.0",
+-        "crc-32": "~1.2.1",
+-        "ssf": "~0.11.2",
+-        "wmf": "~1.0.1",
+-        "word": "~0.3.0"
+-      },
+-      "bin": {
+-        "xlsx": "bin/xlsx.njs"
+-      },
+-      "engines": {
+-        "node": ">=0.8"
+-      }
+-    },
+     "node_modules/yocto-queue": {
+       "version": "0.1.0",
+       "resolved": "https://registry.npmjs.org/yocto-queue/-/yocto-queue-0.1.0.tgz",
+@@ -7789,15 +7358,6 @@
+       "funding": {
+         "url": "https://github.com/sponsors/sindresorhus"
+       }
+-    },
+-    "node_modules/zod": {
+-      "version": "3.25.76",
+-      "resolved": "https://registry.npmjs.org/zod/-/zod-3.25.76.tgz",
+-      "integrity": "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==",
+-      "license": "MIT",
+-      "funding": {
+-        "url": "https://github.com/sponsors/colinhacks"
+-      }
+     }
+   }
+ }
+diff --git a/package.json b/package.json
+index c709272..0ab3377 100644
+--- a/package.json
++++ b/package.json
+@@ -1,44 +1,34 @@
+ {
+-  "name": "birthday-rewards",
++  "name": "travel-gogo",
+   "version": "2.0.0",
+   "private": true,
+   "scripts": {
+     "dev": "next dev",
+     "build": "next build",
+     "start": "next start",
+-    "lint": "next lint"
++    "lint": "eslint . --max-warnings=0"
+   },
+   "dependencies": {
+-    "@hookform/resolvers": "^3.9.1",
+-    "@radix-ui/react-checkbox": "^1.1.2",
++    "@dnd-kit/core": "^6.3.1",
++    "@dnd-kit/sortable": "^10.0.0",
++    "@dnd-kit/utilities": "^3.2.2",
+     "@radix-ui/react-dialog": "^1.1.2",
+-    "@radix-ui/react-dropdown-menu": "^2.1.2",
+     "@radix-ui/react-select": "^2.1.2",
+-    "@radix-ui/react-switch": "^1.1.1",
+-    "@radix-ui/react-tabs": "^1.1.1",
+-    "@radix-ui/react-tooltip": "^1.1.4",
+-    "@supabase/ssr": "^0.5.2",
+-    "@supabase/supabase-js": "2.45.4",
+-    "@tanstack/react-table": "^8.20.5",
++    "@supabase/ssr": "^0.12.4",
++    "@supabase/supabase-js": "^2.112.2",
+     "class-variance-authority": "^0.7.0",
+     "clsx": "^2.1.1",
+     "date-fns": "^4.1.0",
+-    "framer-motion": "^11.11.17",
+     "lucide-react": "^0.454.0",
+     "next": "15.5.20",
+-    "papaparse": "^5.4.1",
+     "react": "^19.0.0",
+     "react-dom": "^19.0.0",
+-    "react-hook-form": "^7.53.2",
+     "sonner": "^1.7.0",
+     "tailwind-merge": "^2.5.4",
+-    "typescript": "^5.6.3",
+-    "xlsx": "^0.18.5",
+-    "zod": "^3.23.8"
++    "typescript": "^5.6.3"
+   },
+   "devDependencies": {
+     "@types/node": "^22.9.0",
+-    "@types/papaparse": "^5.3.15",
+     "@types/react": "^19.0.1",
+     "@types/react-dom": "^19.0.2",
+     "autoprefixer": "^10.4.20",
+diff --git a/app/auth/callback/route.ts b/app/auth/callback/route.ts
+new file mode 100644
+index 0000000..7b946ba
+--- /dev/null
++++ b/app/auth/callback/route.ts
+@@ -0,0 +1,22 @@
++import { NextResponse } from "next/server";
++import { createClient } from "@/lib/supabase/server";
++
++function safeNext(value: string | null) {
++  return value?.startsWith("/") && !value.startsWith("//") && !value.includes("\\") ? value : "/";
++}
++
++export async function GET(request: Request) {
++  const url = new URL(request.url);
++  const code = url.searchParams.get("code");
++  const next = safeNext(url.searchParams.get("next"));
++
++  if (code) {
++    const supabase = await createClient();
++    const { error } = await supabase.auth.exchangeCodeForSession(code);
++    if (!error) return NextResponse.redirect(new URL(next, url.origin));
++  }
++
++  const failure = new URL("/", url.origin);
++  failure.searchParams.set("authError", "google_callback_failed");
++  return NextResponse.redirect(failure);
++}
+diff --git a/app/trip/[id]/page.tsx b/app/trip/[id]/page.tsx
+new file mode 100644
+index 0000000..5011500
+--- /dev/null
++++ b/app/trip/[id]/page.tsx
+@@ -0,0 +1,8 @@
++import { TripWorkspace } from "@/components/trip-workspace";
++import { travelServerRepository } from "@/lib/travel-server-repository";
++
++export default async function TripPage({ params }: { params: Promise<{ id: string }> }) {
++  const { id } = await params;
++  const data = await travelServerRepository.getTripBundle(id);
++  return <TripWorkspace tripId={id} initialTrip={data.trip} initialItems={data.items} initialFlights={data.flights} initialHotelStays={data.hotelStays} />;
++}
+diff --git a/components/auth-control.tsx b/components/auth-control.tsx
+new file mode 100644
+index 0000000..ec043ea
+--- /dev/null
++++ b/components/auth-control.tsx
+@@ -0,0 +1,26 @@
++"use client";
++
++import { LogIn, LogOut } from "lucide-react";
++import { toast } from "sonner";
++import { useAuth } from "@/lib/auth-context";
++
++export function AuthControl() {
++  const { user, ready, signInWithGoogle, signOut } = useAuth();
++  const label = user ? "登出" : "使用 Google 登入";
++
++  return (
++    <button
++      type="button"
++      aria-label={label}
++      title={label}
++      disabled={!ready}
++      onClick={() => {
++        const action = user ? signOut() : signInWithGoogle();
++        action.catch((error: unknown) => toast.error(error instanceof Error ? error.message : "登入操作失敗"));
++      }}
++      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-ink disabled:opacity-0 sm:h-9 sm:w-9"
++    >
++      {user ? <LogOut className="h-5 w-5" /> : <LogIn className="h-5 w-5" />}
++    </button>
++  );
++}
+diff --git a/components/trip-list.tsx b/components/trip-list.tsx
+new file mode 100644
+index 0000000..76179be
+--- /dev/null
++++ b/components/trip-list.tsx
+@@ -0,0 +1,103 @@
++"use client";
++
++import { useCallback, useEffect, useState } from "react";
++import Link from "next/link";
++import { CirclePlus, Copy, MapPin, PlaneTakeoff, SquarePen, Trash2 } from "lucide-react";
++import { toast } from "sonner";
++import { AuthControl } from "@/components/auth-control";
++import { EmptyState } from "@/components/empty-state";
++import { ConfirmDialog } from "@/components/confirm-dialog";
++import { TripFormDialog } from "@/components/trip-form-dialog";
++import { Button } from "@/components/ui/button";
++import { useAuth } from "@/lib/auth-context";
++import { displayDate } from "@/lib/travel-dates";
++import { travelRepository } from "@/lib/travel-repository";
++import type { Trip, TripRole } from "@/lib/types";
++
++const HOME_CARD_SPACING = "py-5";
++
++export function TripList({ initialTrips }: { initialTrips: Trip[] }) {
++  const { user, ready: authReady } = useAuth();
++  const [trips, setTrips] = useState<Trip[]>(initialTrips);
++  const [roles, setRoles] = useState<Map<string, TripRole>>(new Map());
++  const [open, setOpen] = useState(false);
++  const [editing, setEditing] = useState<Trip>();
++  const [deleting, setDeleting] = useState<Trip>();
++
++  const refresh = useCallback(async () => {
++    try {
++      setTrips(await travelRepository.getTrips());
++    } catch (error) {
++      toast.error(message(error, "無法載入旅行"));
++    }
++  }, []);
++  const refreshRoles = useCallback(async () => {
++    if (!user) {
++      setRoles(new Map());
++      return;
++    }
++    setRoles(await travelRepository.getTripRoles());
++  }, [user]);
++
++  useEffect(() => { void refresh(); }, [refresh]);
++  useEffect(() => {
++    if (!authReady) return;
++    refreshRoles().catch((error) => toast.error(message(error, "無法確認編輯權限")));
++  }, [authReady, refreshRoles]);
++
++  return (
++    <main className="mx-auto max-w-6xl px-4 pb-24 pt-4 sm:px-6">
++      <header className="sticky top-0 z-20 -mx-4 mb-8 border-b border-border bg-bg/90 px-4 pb-4 pt-3 backdrop-blur sm:-mx-6 sm:px-6">
++        <div className="flex items-center justify-between gap-3">
++          <h1 className="logo-title flex min-w-0 flex-1 items-center gap-5 whitespace-nowrap text-sm font-normal uppercase tracking-[0.08em] text-ink sm:text-[27px] sm:tracking-[0.24em]"><PlaneTakeoff className="h-5 w-5 shrink-0 sm:h-6 sm:w-6" />TRAVEL GOGO</h1>
++          <div className="flex shrink-0 items-center gap-2">
++            <AuthControl />
++            {user
++              ? <Button size="icon" variant="primary" aria-label="新增旅行" title="新增旅行" className="h-11 w-11 sm:h-9 sm:w-9" onClick={() => { setEditing(undefined); setOpen(true); }}><CirclePlus className="h-5 w-5" /></Button>
++              : <span aria-hidden="true" className="h-11 w-11 sm:h-9 sm:w-9" />}
++          </div>
++        </div>
++      </header>
++      <h2 className="mb-4 text-base font-semibold tracking-[0.16em]">旅行列表</h2>
++      {trips.length === 0 ? <EmptyState title="尚未建立旅行" description="" icon="map" /> : (
++        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
++          {trips.map((trip) => {
++            const canEdit = roles.has(trip.id);
++            return <article key={trip.id} className="flex h-[260px] flex-col rounded-card border border-border bg-surface px-6 pt-6 shadow-soft">
++              <Link href={`/trip/${trip.id}`} className="flex items-center gap-2 pb-5 text-sm text-muted hover:text-ink"><MapPin className="h-5 w-5 shrink-0" />{displayDate(trip.startDate)} – {displayDate(trip.endDate)}</Link>
++              <div className="border-t border-divider" />
++              <Link href={`/trip/${trip.id}`} className={`flex min-w-0 flex-1 items-center text-storeName font-normal hover:text-accent-coffee ${HOME_CARD_SPACING}`}><span className="line-clamp-2 min-h-[3.25rem]">{trip.name}</span></Link>
++              <div className="border-t border-divider" />
++              <footer className="mt-auto flex h-14 shrink-0 items-center justify-end gap-4 pr-1">
++                {canEdit && <><IconButton label="編輯" onClick={() => { setEditing(trip); setOpen(true); }}><SquarePen /></IconButton><IconButton label="複製" onClick={() => {
++                  travelRepository.duplicateTrip(trip.id).then(() => Promise.all([refresh(), refreshRoles()])).then(() => toast.success("已複製旅行")).catch((error) => toast.error(message(error, "複製失敗")));
++                }}><Copy /></IconButton>{roles.get(trip.id) === "owner" && <IconButton label="刪除" onClick={() => setDeleting(trip)}><Trash2 /></IconButton>}</>}
++              </footer>
++            </article>;
++          })}
++        </div>
++      )}
++      <TripFormDialog open={open} trip={editing} onOpenChange={setOpen} onSave={(value) => {
++        travelRepository.saveTrip({ ...value, id: editing?.id, ownerId: editing?.ownerId }).then(() => Promise.all([refresh(), refreshRoles()])).then(() => {
++          setOpen(false);
++          toast.success(editing ? "已更新旅行" : "已新增旅行");
++        }).catch((error) => toast.error(message(error, "儲存失敗")));
++      }} />
++      <ConfirmDialog open={Boolean(deleting)} title="刪除旅行" description={`確定刪除「${deleting?.name ?? ""}」？旅行內的資料也會一併刪除。`} onOpenChange={(next) => { if (!next) setDeleting(undefined); }} onConfirm={() => {
++        if (!deleting) return;
++        travelRepository.deleteTrip(deleting.id).then(() => refresh()).then(() => {
++          setDeleting(undefined);
++          toast.success("已刪除旅行");
++        }).catch((error) => toast.error(message(error, "刪除失敗")));
++      }} />
++    </main>
++  );
++}
++
++function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactElement<{ className?: string }> }) {
++  return <button type="button" aria-label={label} title={label} onClick={onClick} className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-ink sm:h-9 sm:w-9"><span className="[&>svg]:h-5 [&>svg]:w-5">{children}</span></button>;
++}
++
++function message(error: unknown, fallback: string) {
++  return error instanceof Error ? error.message : fallback;
++}
+diff --git a/components/trip-workspace.tsx b/components/trip-workspace.tsx
+new file mode 100644
+index 0000000..1120d02
+--- /dev/null
++++ b/components/trip-workspace.tsx
+@@ -0,0 +1,358 @@
++"use client";
++
++import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
++import Link from "next/link";
++import { ArrowLeft, ArrowUpDown, CalendarDays, ChevronRight, CirclePlus, Clock3, Hotel, Link2, MapPin, MapPinned, Navigation, NotebookTabs, Plane, Search, SquarePen, Trash2, UtensilsCrossed, X } from "lucide-react";
++import { closestCenter, DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
++import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
++import { CSS } from "@dnd-kit/utilities";
++import { toast } from "sonner";
++import { AuthControl } from "@/components/auth-control";
++import { EmptyState } from "@/components/empty-state";
++import { ConfirmDialog } from "@/components/confirm-dialog";
++import { FlightDialog } from "@/components/flight-dialog";
++import { HotelStayDialog } from "@/components/hotel-stay-dialog";
++import { TravelItemDialog } from "@/components/travel-item-dialog";
++import { Button } from "@/components/ui/button";
++import { Dialog, DialogContent } from "@/components/ui/dialog";
++import { Input } from "@/components/ui/input";
++import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
++import { displayDate, tripDates } from "@/lib/travel-dates";
++import { getBusinessStatus, type BusinessStatus } from "@/lib/business-hours";
++import { useAuth } from "@/lib/auth-context";
++import { travelRepository } from "@/lib/travel-repository";
++import type { Flight, HotelStay, TravelItem, TravelItemSort, TravelItemType, Trip, TripRole } from "@/lib/types";
++
++type Tab = "daily" | "place" | "food" | "outline";
++const CARD_SECTION_SPACING = "pb-6";
++
++export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlights, initialHotelStays }: {
++  tripId: string;
++  initialTrip?: Trip;
++  initialItems: TravelItem[];
++  initialFlights: Flight[];
++  initialHotelStays: HotelStay[];
++}) {
++  const { user, ready: authReady } = useAuth();
++  const [trip, setTrip] = useState<Trip | undefined>(initialTrip);
++  const [items, setItems] = useState<TravelItem[]>(initialItems);
++  const [role, setRole] = useState<TripRole>();
++  const [tab, setTab] = useState<Tab>("daily");
++  const [query, setQuery] = useState("");
++  const [sort, setSort] = useState<TravelItemSort>("date");
++  const [dialog, setDialog] = useState<{ open: boolean; type: TravelItemType; item?: TravelItem }>({ open: false, type: "place" });
++  const [deleting, setDeleting] = useState<TravelItem>();
++  const refresh = useCallback(async () => {
++    try {
++      const [nextTrip, nextItems] = await Promise.all([travelRepository.getTrip(tripId), travelRepository.getItems(tripId)]);
++      setTrip(nextTrip);
++      setItems(nextItems);
++    } catch (error) {
++      toast.error(errorMessage(error, "無法載入旅行"));
++    }
++  }, [tripId]);
++  useEffect(() => {
++    if (!authReady || !user) {
++      setRole(undefined);
++      return;
++    }
++    travelRepository.getTripRole(tripId).then(setRole).catch((error) => toast.error(errorMessage(error, "無法確認編輯權限")));
++  }, [authReady, tripId, user]);
++  const edit = (item: TravelItem) => setDialog({ open: true, type: item.type, item });
++  const remove = (item: TravelItem) => setDeleting(item);
++  const canEdit = Boolean(role);
++
++  const reorder = async (activeId: string, overId: string) => {
++    const active = items.find((item) => item.id === activeId);
++    const over = items.find((item) => item.id === overId);
++    if (!active?.date || !over || active.tripId !== over.tripId || active.date !== over.date) return;
++    const group = items.filter((item) => item.date === active.date).sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt));
++    const from = group.findIndex((item) => item.id === activeId);
++    const to = group.findIndex((item) => item.id === overId);
++    const [moved] = group.splice(from, 1);
++    group.splice(to, 0, moved);
++    const orders = new Map(group.map((item, order) => [item.id, order]));
++    setItems((current) => current.map((item) => orders.has(item.id) ? { ...item, order: orders.get(item.id)! } : item));
++    try {
++      await travelRepository.reorderItems(tripId, active.date, group.map((item) => item.id));
++    } catch (error) {
++      toast.error(errorMessage(error, "排序儲存失敗"));
++      await refresh();
++    }
++  };
++
++  if (!trip) return <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6"><Link href="/" className="flex items-center gap-2 text-sm text-muted"><ArrowLeft className="h-5 w-5" />返回</Link><EmptyState title="找不到這趟旅行" description="" /></main>;
++  const tabs: { value: Tab; label: string; icon: typeof CalendarDays }[] = [
++    { value: "daily", label: "每日", icon: CalendarDays }, { value: "place", label: "地點", icon: MapPin },
++    { value: "food", label: "美食", icon: UtensilsCrossed }, { value: "outline", label: "大綱", icon: NotebookTabs },
++  ];
++  return (
++    <main className="mx-auto max-w-6xl px-4 pb-24 pt-4 sm:px-6">
++      <header className="sticky top-0 z-20 -mx-4 mb-8 border-b border-border bg-bg/90 px-4 pb-4 pt-3 backdrop-blur sm:-mx-6 sm:px-6">
++        <div className="mb-4 flex items-center gap-3"><Link href="/" aria-label="返回" title="返回" className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-ink sm:h-9 sm:w-9"><ArrowLeft className="h-5 w-5" /></Link><h1 className="min-w-0 flex-1 truncate text-title font-semibold">{trip.name}</h1><AuthControl />{canEdit && (tab === "place" || tab === "food") ? <Button size="icon" variant="primary" aria-label="新增" title="新增" className="h-11 w-11 sm:h-9 sm:w-9" onClick={() => setDialog({ open: true, type: tab })}><CirclePlus className="h-5 w-5" /></Button> : <span aria-hidden="true" className="h-11 w-11 sm:h-9 sm:w-9" />}</div>
++        <nav className="grid grid-cols-4 gap-1 rounded-card bg-searchBackground p-1" aria-label="旅程分頁">{tabs.map(({ value, label, icon: Icon }) => <button key={value} type="button" onClick={() => setTab(value)} className={`flex h-9 items-center justify-center gap-2 rounded-lg text-sm transition-colors ${tab === value ? "bg-surface text-ink shadow-soft" : "text-muted hover:text-ink"}`}><Icon className="h-5 w-5" /><span>{label}</span></button>)}</nav>
++      </header>
++      {tab === "daily" && <Daily trip={trip} items={items} canEdit={canEdit} onEdit={edit} onDelete={remove} onReorder={reorder} />}
++      {(tab === "place" || tab === "food") && <ItemList type={tab} items={items} query={query} sort={sort} canEdit={canEdit} onQuery={setQuery} onSort={setSort} onEdit={edit} onDelete={remove} />}
++      {tab === "outline" && <Outline trip={trip} items={items} canEdit={canEdit} initialFlights={initialFlights} initialHotelStays={initialHotelStays} />}
++      <TravelItemDialog open={dialog.open} type={dialog.type} trip={trip} item={dialog.item} items={items} onOpenChange={(open) => setDialog((value) => ({ ...value, open }))} onSave={(value) => {
++        travelRepository.saveItem({ ...value, id: dialog.item?.id, tripId, type: dialog.type, createdBy: dialog.item?.createdBy }).then(() => refresh()).then(() => { setDialog((current) => ({ ...current, open: false })); toast.success(dialog.item ? "已更新" : "已新增"); }).catch((error) => toast.error(errorMessage(error, "儲存失敗")));
++      }} />
++      <ConfirmDialog
++        open={Boolean(deleting)}
++        title={`刪除${deleting?.type === "food" ? "美食" : "地點"}`}
++        description={`確定刪除「${deleting?.name ?? ""}」？`}
++        onOpenChange={(next) => { if (!next) setDeleting(undefined); }}
++        onConfirm={() => {
++          if (!deleting) return;
++          travelRepository.deleteItem(deleting.id).then(() => refresh()).then(() => { setDeleting(undefined); toast.success("已刪除"); }).catch((error) => toast.error(errorMessage(error, "刪除失敗")));
++        }}
++      />
++    </main>
++  );
++}
++
++function ItemList({ type, items, query, sort, canEdit, onQuery, onSort, onEdit, onDelete }: { type: TravelItemType; items: TravelItem[]; query: string; sort: TravelItemSort; canEdit: boolean; onQuery: (value: string) => void; onSort: (value: TravelItemSort) => void; onEdit: (item: TravelItem) => void; onDelete: (item: TravelItem) => void }) {
++  const visible = useMemo(() => items.filter((item) => item.type === type && [item.name, item.category, item.area, item.note].some((value) => value.toLowerCase().includes(query.trim().toLowerCase()))).sort((a, b) => {
++    const value = sort === "date" ? (a.date ?? "9999-99-99") : a[sort];
++    const other = sort === "date" ? (b.date ?? "9999-99-99") : b[sort];
++    return value.localeCompare(other, "zh-Hant") || a.createdAt.localeCompare(b.createdAt);
++  }), [items, query, sort, type]);
++  return <><div className="mb-6 flex gap-2"><div className="relative flex-1"><Search className="pointer-events-none absolute left-5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" /><Input value={query} onChange={(e) => onQuery(e.target.value)} className="h-10 rounded-card border-transparent bg-searchBackground pl-12 pr-11" aria-label="搜尋" />{query && <button type="button" onClick={() => onQuery("")} aria-label="清除搜尋" className="absolute right-5 top-1/2 -translate-y-1/2 text-muted"><X className="h-4 w-4" /></button>}</div><Select value={sort} onValueChange={(value) => onSort(value as TravelItemSort)}><SelectTrigger className="w-[118px] rounded-pill"><ArrowUpDown className="h-4 w-4" /><SelectValue /></SelectTrigger><SelectContent><SelectItem value="date">日期</SelectItem><SelectItem value="category">分類</SelectItem><SelectItem value="area">地點</SelectItem></SelectContent></Select></div>{visible.length === 0 ? <EmptyState title={`尚無${type === "place" ? "地點" : "美食"}`} description="" icon="map" /> : <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">{visible.map((item) => <ItemCard key={item.id} item={item} canEdit={canEdit} listLayout onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />)}</div>}</>;
++}
++
++function ItemCard({ item, canEdit, onEdit, onDelete, controls, compactBusiness = false, listLayout = false }: { item: TravelItem; canEdit: boolean; onEdit: () => void; onDelete: () => void; controls?: React.ReactNode; compactBusiness?: boolean; listLayout?: boolean }) {
++  if (listLayout) {
++    const locationCategory = [item.area, item.category].filter(Boolean).join(" ｜ ");
++    return (
++      <article className="flex min-w-0 flex-col self-start rounded-card border border-border bg-surface px-6 pt-6 shadow-soft sm:h-[304px] sm:self-stretch">
++        <header className={`min-w-0 ${CARD_SECTION_SPACING}`}>
++          {item.googleMapsUrl
++            ? <a href={item.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label={`在 Google Maps 開啟${item.name}`} title="開啟 Google Maps" className="line-clamp-2 min-h-[2.625rem] font-medium hover:text-accent-coffee">{item.name}</a>
++            : <p className="line-clamp-2 min-h-[2.625rem] font-medium">{item.name}</p>}
++          <div className="mt-2 flex min-h-5 min-w-0 items-center justify-between gap-3 text-xs text-muted">
++            <p className="min-w-0 truncate">{locationCategory}</p>
++            {item.date && <time dateTime={item.date} className="shrink-0 whitespace-nowrap">{displayDate(item.date)}</time>}
++          </div>
++        </header>
++
++        <div className={`border-t border-divider ${CARD_SECTION_SPACING}`} />
++
++        <section className="flex min-w-0 flex-col justify-start gap-3 pb-6 sm:h-[102px] sm:overflow-hidden sm:pb-0">
++          <BusinessHours item={item} compact={false} flush />
++          {item.note && <ClampedNote note={item.note} lines={item.businessHours ? 2 : 4} />}
++        </section>
++
++        <footer className="mt-auto flex h-14 shrink-0 items-center border-t border-divider pr-1">
++          {(item.extraLink1 || item.extraLink2) && (
++            <div className="flex items-center gap-4">
++              {item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} />}
++              {item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} />}
++            </div>
++          )}
++          <div className="ml-auto flex items-center gap-4">
++            {item.googleMapsUrl && <a href={item.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label="開啟 Google Maps" title="開啟 Google Maps" className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-ink sm:h-9 sm:w-9"><Navigation className="h-[18px] w-[18px]" /></a>}
++            {canEdit && <><Action label="編輯" smallIcon onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onClick={onDelete}><Trash2 /></Action></>}
++          </div>
++        </footer>
++      </article>
++    );
++  }
++  return <article className="rounded-card border border-border bg-surface p-6 shadow-soft"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><ItemName item={item} /><p className="mt-2 text-xs text-muted">{item.date ? displayDate(item.date) : "未定"} · {item.category || (item.type === "place" ? "地點" : "美食")}</p></div>{canEdit && <div className="flex shrink-0">{controls}<Action label="編輯" onClick={onEdit}><SquarePen /></Action><Action label="刪除" onClick={onDelete}><Trash2 /></Action></div>}</div><div className="my-4 border-t border-divider" />{item.area && <p className="text-sm text-muted">{item.area}</p>}<BusinessHours item={item} compact={compactBusiness} />{item.note && <p className="mt-3 whitespace-pre-wrap text-sm text-muted">{item.note}</p>}</article>;
++}
++
++function Daily({ trip, items, canEdit, onEdit, onDelete, onReorder }: { trip: Trip; items: TravelItem[]; canEdit: boolean; onEdit: (item: TravelItem) => void; onDelete: (item: TravelItem) => void; onReorder: (activeId: string, overId: string) => void }) {
++  const sensors = useSensors(
++    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
++    useSensor(TouchSensor, { activationConstraint: { delay: 350, tolerance: 8 } })
++  );
++  const handleDragEnd = ({ active, over }: DragEndEvent) => {
++    if (over && active.id !== over.id) onReorder(String(active.id), String(over.id));
++  };
++  return <div className="space-y-8">{tripDates(trip).map((date) => { const day = items.filter((item) => item.date === date).sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt)); return <section key={date}><h2 className="mb-4 text-title font-semibold">{displayDate(date)}</h2>{day.length === 0 ? <EmptyState title="今天尚未安排" description="" /> : canEdit ? <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}><SortableContext items={day.map((item) => item.id)} strategy={verticalListSortingStrategy}><div className="space-y-3">{day.map((item) => <SortableDailyCard key={item.id} item={item} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />)}</div></SortableContext></DndContext> : <div className="space-y-3">{day.map((item) => <DailyCard key={item.id} item={item} canEdit={false} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />)}</div>}</section>; })}</div>;
++}
++
++function SortableDailyCard({ item, onEdit, onDelete }: { item: TravelItem; onEdit: () => void; onDelete: () => void }) {
++  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
++  const style = { transform: CSS.Transform.toString(transform), transition };
++  const handleMouseDown: React.MouseEventHandler<HTMLDivElement> = (event) => {
++    if (!isInteractiveTarget(event.target)) listeners?.onMouseDown?.(event);
++  };
++  const handleTouchStart: React.TouchEventHandler<HTMLDivElement> = (event) => {
++    if (!isInteractiveTarget(event.target)) listeners?.onTouchStart?.(event);
++  };
++  return <div ref={setNodeRef} style={style} {...attributes} {...listeners} onMouseDown={handleMouseDown} onTouchStart={handleTouchStart} className={`cursor-grab touch-auto active:cursor-grabbing ${isDragging ? "relative z-10 opacity-70" : ""}`}><DailyCard item={item} canEdit onEdit={onEdit} onDelete={onDelete} /></div>;
++}
++
++function DailyCard({ item, canEdit, onEdit, onDelete }: { item: TravelItem; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
++  const meta = [item.category, item.area].filter(Boolean).join(" ｜ ");
++  return <article className="rounded-card border border-border bg-surface shadow-soft sm:h-[156px]">
++    <div className="p-6 sm:hidden">
++      <div className="flex min-w-0 items-center gap-4"><TypeMark type={item.type} large /><DailyItemName item={item} /></div>
++      {meta && <p className="mt-5 truncate text-sm text-muted">{meta}</p>}
++      <div className="my-5 border-t border-divider" />
++      <BusinessHours item={item} compact={false} flush />
++      {item.note && <div className={item.businessHours ? "mt-3" : ""}><ClampedNote note={item.note} lines={2} /></div>}
++      <div className="mt-5 border-t border-divider" />
++      <DailyFooter item={item} canEdit={canEdit} onEdit={onEdit} onDelete={onDelete} />
++    </div>
++    <div className="hidden h-full grid-cols-[38fr_42fr_20fr] sm:grid">
++      <div className="flex min-w-0 flex-col justify-between px-6 py-5">
++        <div className="flex min-w-0 items-center gap-4"><TypeMark type={item.type} /><DailyItemName item={item} /></div>
++        <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2"><span className="truncate text-xs text-muted">{meta}</span><BusinessHours item={item} compact flush /></div>
++      </div>
++      <div className="flex min-w-0 flex-col border-l border-divider px-6 py-5">
++        {item.note && <ClampedNote note={item.note} lines={3} />}
++        {(item.extraLink1 || item.extraLink2) && <div className="mt-auto flex items-center gap-4">{item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} />}{item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} />}</div>}
++      </div>
++      <div className="flex items-center justify-end gap-2 border-l border-divider px-4" data-no-dnd><DailyActions item={item} canEdit={canEdit} onEdit={onEdit} onDelete={onDelete} /></div>
++    </div>
++  </article>;
++}
++
++function TypeMark({ type, large = false }: { type: TravelItemType; large?: boolean }) {
++  return <span className={`flex h-12 w-12 min-w-12 shrink-0 items-center justify-center rounded-full text-ink ${large ? "text-title" : "text-sm"} ${type === "food" ? "bg-travelType-food" : "bg-travelType-place"}`}>{type === "food" ? "食" : "景"}</span>;
++}
++
++function DailyItemName({ item }: { item: TravelItem }) {
++  const className = "line-clamp-2 min-w-0 font-medium";
++  return item.googleMapsUrl
++    ? <a href={item.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label={`在 Google Maps 開啟${item.name}`} title="開啟 Google Maps" className={`${className} hover:text-accent-coffee`}>{item.name}</a>
++    : <p className={className}>{item.name}</p>;
++}
++
++function isInteractiveTarget(target: EventTarget | null) {
++  return target instanceof Element && Boolean(target.closest("a, button, input, textarea, select"));
++}
++
++function ClampedNote({ note, lines }: { note: string; lines: 2 | 3 | 4 }) {
++  const textRef = useRef<HTMLParagraphElement>(null);
++  const [isTruncated, setIsTruncated] = useState(false);
++  const [open, setOpen] = useState(false);
++
++  useLayoutEffect(() => {
++    const element = textRef.current;
++    if (!element) return;
++    const measure = () => setIsTruncated(element.scrollHeight > element.clientHeight + 1);
++    measure();
++    const observer = new ResizeObserver(measure);
++    observer.observe(element);
++    return () => observer.disconnect();
++  }, [note, lines]);
++
++  return <>
++    <div className="grid min-w-0 grid-cols-[16px_minmax(0,1fr)] items-start gap-x-2 text-sm text-muted">
++      <span aria-hidden="true" className="flex h-4 w-4 items-center justify-center leading-4">✦</span>
++      <div className="min-w-0">
++        <p ref={textRef} className={`${lines === 2 ? "line-clamp-2" : lines === 3 ? "line-clamp-3" : "line-clamp-4"} min-w-0 whitespace-pre-wrap break-words`}>{note}</p>
++        {isTruncated && <button type="button" aria-label="查看完整備註" title="查看完整備註" onMouseDown={stopDrag} onTouchStart={stopDrag} onPointerDown={stopDrag} onClick={() => setOpen(true)} className="block text-xs leading-4 text-muted/90 transition-colors hover:text-muted">+ more</button>}
++      </div>
++    </div>
++    <Dialog open={open} onOpenChange={setOpen}>
++      <DialogContent title="備註" motion="centered">
++        <p className="whitespace-pre-wrap break-words text-sm text-ink">{note}</p>
++      </DialogContent>
++    </Dialog>
++  </>;
++}
++
++function DailyFooter({ item, canEdit, onEdit, onDelete }: { item: TravelItem; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
++  return <footer className="flex h-14 items-center" data-no-dnd><div className="flex items-center gap-4">{item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} />}{item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} />}</div><div className="ml-auto flex items-center gap-4"><DailyActions item={item} canEdit={canEdit} onEdit={onEdit} onDelete={onDelete} /></div></footer>;
++}
++
++function DailyActions({ item, canEdit, onEdit, onDelete }: { item: TravelItem; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
++  return <>{item.googleMapsUrl && <a href={item.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label="開啟 Google Maps" title="開啟 Google Maps" onPointerDown={stopDrag} className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-ink sm:h-9 sm:w-9"><Navigation className="h-[18px] w-[18px]" /></a>}{canEdit && <><Action label="編輯" smallIcon onPointerDown={stopDrag} onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onPointerDown={stopDrag} onClick={onDelete}><Trash2 /></Action></>}</>;
++}
++
++function stopDrag(event: React.SyntheticEvent) { event.stopPropagation(); }
++
++function Outline({ trip, items, canEdit, initialFlights, initialHotelStays }: { trip: Trip; items: TravelItem[]; canEdit: boolean; initialFlights: Flight[]; initialHotelStays: HotelStay[] }) {
++  const [flights, setFlights] = useState<Flight[]>(initialFlights);
++  const [hotelStays, setHotelStays] = useState<HotelStay[]>(initialHotelStays);
++  const [flightDialog, setFlightDialog] = useState<{ open: boolean; flight?: Flight }>({ open: false });
++  const [hotelDialog, setHotelDialog] = useState<{ open: boolean; stay?: HotelStay }>({ open: false });
++  const [deleting, setDeleting] = useState<{ kind: "flight"; value: Flight } | { kind: "hotel"; value: HotelStay }>();
++  const refresh = useCallback(async () => {
++    try {
++      const [nextFlights, nextHotels] = await Promise.all([travelRepository.getFlights(trip.id), travelRepository.getHotelStays(trip.id)]);
++      setFlights(nextFlights);
++      setHotelStays(nextHotels);
++    } catch (error) {
++      toast.error(errorMessage(error, "無法載入行程大綱"));
++    }
++  }, [trip.id]);
++  const sections = [...tripDates(trip).map((date) => ({ label: displayDate(date), items: items.filter((item) => item.date === date) })), { label: "未定", items: items.filter((item) => !item.date) }];
++  const sortedFlights = [...flights].sort((a, b) => `${a.departureDate}T${a.departureTime}`.localeCompare(`${b.departureDate}T${b.departureTime}`) || a.createdAt.localeCompare(b.createdAt));
++  const sortedStays = [...hotelStays].sort((a, b) => a.checkInDate.localeCompare(b.checkInDate) || a.createdAt.localeCompare(b.createdAt));
++  return <>
++    <div className="space-y-12">
++      <OutlineDetailsSection icon={Plane} label="機票" addLabel="新增機票" canEdit={canEdit} onAdd={() => setFlightDialog({ open: true })}>
++        {sortedFlights.length > 0 && <div className="grid grid-cols-1 gap-6 md:grid-cols-2">{sortedFlights.map((flight) => <FlightCard key={flight.id} flight={flight} canEdit={canEdit} onEdit={() => setFlightDialog({ open: true, flight })} onDelete={() => setDeleting({ kind: "flight", value: flight })} />)}</div>}
++      </OutlineDetailsSection>
++      <OutlineDetailsSection icon={Hotel} label="飯店" addLabel="新增飯店" canEdit={canEdit} onAdd={() => setHotelDialog({ open: true })}>
++        {sortedStays.length > 0 && <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">{sortedStays.map((stay) => <HotelStayCard key={stay.id} stay={stay} canEdit={canEdit} onEdit={() => setHotelDialog({ open: true, stay })} onDelete={() => setDeleting({ kind: "hotel", value: stay })} />)}</div>}
++      </OutlineDetailsSection>
++      <div className="space-y-8">{sections.filter((section) => section.items.length > 0).map((section) => <section key={section.label}><h2 className="mb-4 text-title font-semibold">{section.label}</h2><div className="rounded-card border border-border bg-surface px-6 shadow-soft">{section.items.sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt)).map((item, index) => <div key={item.id} className={`flex items-center gap-3 py-4 ${index ? "border-t border-divider" : ""}`}>{item.type === "place" ? <MapPin className="h-5 w-5 text-muted" /> : <UtensilsCrossed className="h-5 w-5 text-muted" />}<ItemName item={item} /></div>)}</div></section>)}</div>
++    </div>
++    <FlightDialog open={flightDialog.open} flight={flightDialog.flight} onOpenChange={(open) => setFlightDialog((current) => ({ ...current, open }))} onSave={(value) => { travelRepository.saveFlight({ ...value, id: flightDialog.flight?.id, tripId: trip.id }).then(() => refresh()).then(() => { setFlightDialog({ open: false }); toast.success(flightDialog.flight ? "已更新機票" : "已新增機票"); }).catch((error) => toast.error(errorMessage(error, "機票儲存失敗"))); }} />
++    <HotelStayDialog open={hotelDialog.open} stay={hotelDialog.stay} onOpenChange={(open) => setHotelDialog((current) => ({ ...current, open }))} onSave={(value) => { travelRepository.saveHotelStay({ ...value, id: hotelDialog.stay?.id, tripId: trip.id }).then(() => refresh()).then(() => { setHotelDialog({ open: false }); toast.success(hotelDialog.stay ? "已更新飯店" : "已新增飯店"); }).catch((error) => toast.error(errorMessage(error, "飯店儲存失敗"))); }} />
++    <ConfirmDialog open={Boolean(deleting)} title={`刪除${deleting?.kind === "flight" ? "機票" : "飯店"}`} description={`確定刪除「${deleting ? (deleting.kind === "flight" ? `${deleting.value.airline} ${deleting.value.flightNumber}` : deleting.value.name) : ""}」？`} onOpenChange={(open) => { if (!open) setDeleting(undefined); }} onConfirm={() => { if (!deleting) return; const action = deleting.kind === "flight" ? travelRepository.deleteFlight(deleting.value.id) : travelRepository.deleteHotelStay(deleting.value.id); action.then(() => refresh()).then(() => { setDeleting(undefined); toast.success("已刪除"); }).catch((error) => toast.error(errorMessage(error, "刪除失敗"))); }} />
++  </>;
++}
++
++function OutlineDetailsSection({ icon: Icon, label, addLabel, canEdit, onAdd, children }: { icon: typeof Plane; label: string; addLabel: string; canEdit: boolean; onAdd: () => void; children: React.ReactNode }) {
++  return <section><header className="mb-4 flex items-center"><Icon className="h-5 w-5 text-muted" /><h2 className="ml-3 text-sm font-semibold tracking-body">{label}</h2>{canEdit && <Button type="button" size="icon" variant="ghost" aria-label={addLabel} title={addLabel} onClick={onAdd} className="ml-auto h-11 w-11 sm:h-9 sm:w-9"><CirclePlus className="h-5 w-5" /></Button>}</header>{children}</section>;
++}
++
++function FlightCard({ flight, canEdit, onEdit, onDelete }: { flight: Flight; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
++  const crossesDate = flight.departureDate !== flight.arrivalDate;
++  return <article className="flex min-w-0 flex-col rounded-card border border-border bg-surface px-6 pt-6 shadow-soft">
++    <header className="flex min-w-0 flex-col gap-2 pb-5 sm:flex-row sm:items-center"><div className="flex min-w-0 items-center gap-4"><span className="truncate font-medium">{flight.airline}</span><span className="shrink-0 text-sm text-muted">{flight.flightNumber}</span></div><div className="flex min-w-0 items-center gap-2 text-sm text-muted sm:ml-auto"><span className="truncate">{flight.departurePlace}</span><ChevronRight className="h-4 w-4 shrink-0" /><span className="truncate">{flight.arrivalPlace}</span></div></header>
++    <div className="border-t border-divider" />
++    <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2 py-6"><div className="shrink-0 text-sm text-muted"><time dateTime={flight.departureDate}>{displayDate(flight.departureDate)}</time>{crossesDate && <><span className="mx-2">–</span><time dateTime={flight.arrivalDate}>{displayDate(flight.arrivalDate)}</time></>}</div><div className="flex items-center gap-3 text-title font-medium"><time dateTime={flight.departureTime}>{flight.departureTime}</time><ChevronRight className="h-5 w-5 text-muted" /><time dateTime={flight.arrivalTime}>{flight.arrivalTime}</time></div></div>
++    {flight.note && <div className="pb-5"><ClampedNote note={flight.note} lines={2} /></div>}
++    <footer className="mt-auto flex h-14 items-center border-t border-divider"><div>{flight.link && <ExternalLinkAction href={flight.link} index={1} />}</div>{canEdit && <div className="ml-auto flex items-center gap-4"><Action label="編輯" smallIcon onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onClick={onDelete}><Trash2 /></Action></div>}</footer>
++  </article>;
++}
++
++function HotelStayCard({ stay, canEdit, onEdit, onDelete }: { stay: HotelStay; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
++  const hasTimes = stay.checkInTime || stay.checkOutTime;
++  return <article className="flex min-w-0 flex-col rounded-card border border-border bg-surface px-6 pt-6 shadow-soft">
++    <h3 className="line-clamp-2 font-medium">{stay.name}</h3>
++    <div className="mt-5 border-t border-divider" />
++    <div className="space-y-4 py-6"><p className="text-center font-medium"><time dateTime={stay.checkInDate}>{displayDate(stay.checkInDate)}</time><span className="mx-3 text-muted">–</span><time dateTime={stay.checkOutDate}>{displayDate(stay.checkOutDate)}</time></p>
++      {hasTimes && <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 rounded-pill bg-searchBackground px-4 py-2 text-sm text-muted">{stay.checkInTime && <span>入住&nbsp; {stay.checkInTime}</span>}{stay.checkOutTime && <span>退房&nbsp; {stay.checkOutTime}</span>}</div>}
++      {stay.address && <ContactRow label="ADD" value={stay.address} />}{stay.phone && <ContactRow label="TEL" value={stay.phone} />}{stay.note && <ClampedNote note={stay.note} lines={2} />}
++    </div>
++    <footer className="mt-auto flex h-14 items-center border-t border-divider"><div className="flex items-center gap-4">{stay.link && <ExternalLinkAction href={stay.link} index={1} />}{stay.googleMapsUrl && <a href={stay.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label="開啟 Google Maps" title="開啟 Google Maps" className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-ink sm:h-9 sm:w-9"><Navigation className="h-[18px] w-[18px]" /></a>}</div>{canEdit && <div className="ml-auto flex items-center gap-4"><Action label="編輯" smallIcon onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onClick={onDelete}><Trash2 /></Action></div>}</footer>
++  </article>;
++}
++
++function ContactRow({ label, value }: { label: string; value: string }) {
++  return <div className="grid min-w-0 grid-cols-[42px_minmax(0,1fr)] gap-3 text-sm"><span className="font-medium tracking-body">{label}</span><p className="break-words border-l border-divider pl-3 text-muted">{value}</p></div>;
++}
++
++function ItemName({ item }: { item: TravelItem }) { return item.googleMapsUrl ? <a href={item.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 font-medium hover:text-accent-coffee"><span>{item.name}</span><MapPinned className="h-5 w-5 shrink-0" /></a> : <p className="font-medium">{item.name}</p>; }
++function BusinessHours({ item, compact, flush = false }: { item: TravelItem; compact: boolean; flush?: boolean }) {
++  if (!item.businessHours) return null;
++  const status = getBusinessStatus(item.businessHours);
++  return <div className={`flex min-w-0 flex-wrap items-center gap-2 text-muted ${compact ? "mt-2 text-xs" : `${flush ? "" : "mt-3"} text-sm`}`}><Clock3 className="h-4 w-4 shrink-0" /><span className="min-w-0 break-words">{item.businessHours}</span>{status && <BusinessStatusLabel status={status} />}</div>;
++}
++function BusinessStatusLabel({ status }: { status: BusinessStatus }) {
++  const values = {
++    open: { label: "營業中", className: "border-tag-drink bg-tag-drink text-tag-drink-fg" },
++    "closing-soon": { label: "即將打烊", className: "border-tag-expiring bg-tag-expiring text-tag-expiring-fg" },
++    closed: { label: "已打烊", className: "border-tag-other bg-tag-other text-tag-other-fg" },
++  } as const;
++  const value = values[status];
++  return <span className={`rounded-lg border px-2 py-0.5 text-[11px] leading-4 ${value.className}`}>{value.label}</span>;
++}
++function ExternalLinkAction({ href, index }: { href: string; index: 1 | 2 }) {
++  const label = `開啟其他連結 ${index}`;
++  return <a href={href} target="_blank" rel="noopener noreferrer" aria-label={label} title={label} onPointerDown={stopDrag} className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-ink sm:h-9 sm:w-9"><Link2 className="h-[18px] w-[18px]" /></a>;
++}
++function Action({ label, onClick, onPointerDown, children, disabled, smallIcon = false }: { label: string; onClick: () => void; onPointerDown?: React.PointerEventHandler<HTMLButtonElement>; children: React.ReactElement; disabled?: boolean; smallIcon?: boolean }) { return <button type="button" aria-label={label} title={label} disabled={disabled} onPointerDown={onPointerDown} onClick={onClick} className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-ink disabled:opacity-30 sm:h-9 sm:w-9"><span className={smallIcon ? "[&>svg]:h-[18px] [&>svg]:w-[18px]" : "[&>svg]:h-5 [&>svg]:w-5"}>{children}</span></button>; }
++
++function errorMessage(error: unknown, fallback: string) {
++  return error instanceof Error ? error.message : fallback;
++}
+diff --git a/lib/auth-context.tsx b/lib/auth-context.tsx
+new file mode 100644
+index 0000000..98f9cd6
+--- /dev/null
++++ b/lib/auth-context.tsx
+@@ -0,0 +1,58 @@
++"use client";
++
++import { createContext, useContext, useEffect, useMemo, useState } from "react";
++import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
++import { createClient } from "@/lib/supabase/client";
++
++type AuthValue = {
++  user: User | null;
++  ready: boolean;
++  signInWithGoogle: (next?: string) => Promise<void>;
++  signOut: () => Promise<void>;
++};
++
++const AuthContext = createContext<AuthValue | null>(null);
++
++export function AuthProvider({ children }: { children: React.ReactNode }) {
++  const [user, setUser] = useState<User | null>(null);
++  const [ready, setReady] = useState(false);
++
++  useEffect(() => {
++    const supabase = createClient();
++    supabase.auth.getUser().then(({ data }: { data: { user: User | null } }) => {
++      setUser(data.user);
++      setReady(true);
++    });
++    const { data } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
++      setUser(session?.user ?? null);
++      setReady(true);
++    });
++    return () => data.subscription.unsubscribe();
++  }, []);
++
++  const value = useMemo<AuthValue>(() => ({
++    user,
++    ready,
++    async signInWithGoogle(next = window.location.pathname) {
++      const callback = new URL("/auth/callback", window.location.origin);
++      callback.searchParams.set("next", next);
++      const { error } = await createClient().auth.signInWithOAuth({
++        provider: "google",
++        options: { redirectTo: callback.toString() },
++      });
++      if (error) throw error;
++    },
++    async signOut() {
++      const { error } = await createClient().auth.signOut();
++      if (error) throw error;
++    },
++  }), [ready, user]);
++
++  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
++}
++
++export function useAuth() {
++  const value = useContext(AuthContext);
++  if (!value) throw new Error("useAuth must be used inside AuthProvider");
++  return value;
++}
+diff --git a/lib/supabase/config.ts b/lib/supabase/config.ts
+new file mode 100644
+index 0000000..10566d6
+--- /dev/null
++++ b/lib/supabase/config.ts
+@@ -0,0 +1,10 @@
++export function getSupabaseConfig() {
++  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
++  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
++
++  if (!url || !anonKey) {
++    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
++  }
++
++  return { url, anonKey };
++}
+diff --git a/lib/travel-mappers.ts b/lib/travel-mappers.ts
+new file mode 100644
+index 0000000..6d03bed
+--- /dev/null
++++ b/lib/travel-mappers.ts
+@@ -0,0 +1,33 @@
++import type { TgFlightRow, TgHotelStayRow, TgTravelItemRow, TgTripRow } from "@/lib/database.types";
++import type { Flight, HotelStay, TravelItem, Trip } from "@/lib/types";
++
++export const mapTrip = (row: TgTripRow): Trip => ({
++  id: row.id, ownerId: row.owner_id, name: row.name, startDate: row.start_date,
++  endDate: row.end_date, createdAt: row.created_at, updatedAt: row.updated_at,
++});
++
++export const mapItem = (row: TgTravelItemRow): TravelItem => ({
++  id: row.id, tripId: row.trip_id, createdBy: row.created_by ?? undefined, type: row.type,
++  category: row.category, area: row.area, date: row.date, name: row.name,
++  googleMapsUrl: row.google_maps_url, extraLink1: row.extra_link_1 ?? undefined,
++  extraLink2: row.extra_link_2 ?? undefined, businessHours: row.business_hours ?? undefined,
++  note: row.note, order: row.sort_order, createdAt: row.created_at, updatedAt: row.updated_at,
++});
++
++export const mapFlight = (row: TgFlightRow): Flight => ({
++  id: row.id, tripId: row.trip_id, airline: row.airline, flightNumber: row.flight_number,
++  departurePlace: row.departure_place, arrivalPlace: row.arrival_place,
++  departureDate: row.departure_date, departureTime: row.departure_time.slice(0, 5),
++  arrivalDate: row.arrival_date, arrivalTime: row.arrival_time.slice(0, 5),
++  link: row.link ?? undefined, note: row.note ?? undefined,
++  createdAt: row.created_at, updatedAt: row.updated_at,
++});
++
++export const mapHotelStay = (row: TgHotelStayRow): HotelStay => ({
++  id: row.id, tripId: row.trip_id, name: row.name, checkInDate: row.check_in_date,
++  checkOutDate: row.check_out_date, checkInTime: row.check_in_time?.slice(0, 5),
++  checkOutTime: row.check_out_time?.slice(0, 5), address: row.address ?? undefined,
++  phone: row.phone ?? undefined, googleMapsUrl: row.google_maps_url ?? undefined,
++  link: row.link ?? undefined, note: row.note ?? undefined,
++  createdAt: row.created_at, updatedAt: row.updated_at,
++});
+diff --git a/lib/travel-repository.ts b/lib/travel-repository.ts
+new file mode 100644
+index 0000000..c390cf1
+--- /dev/null
++++ b/lib/travel-repository.ts
+@@ -0,0 +1,164 @@
++import type { PostgrestError } from "@supabase/supabase-js";
++import { createClient } from "@/lib/supabase/client";
++import type { TgFlightRow, TgHotelStayRow, TgTravelItemRow, TgTripRow } from "@/lib/database.types";
++import { mapFlight, mapHotelStay, mapItem, mapTrip } from "@/lib/travel-mappers";
++import type { Flight, HotelStay, TravelItem, Trip, TripRole } from "@/lib/types";
++
++function result<T>(data: T | null, error: PostgrestError | null): T {
++  if (error) throw new Error(error.message);
++  if (data === null) throw new Error("Supabase did not return the requested data");
++  return data;
++}
++
++export const travelRepository = {
++  async getTrips() {
++    const { data, error } = await createClient().from("tg_trips").select("*").order("start_date");
++    return result(data, error).map((row: unknown) => mapTrip(row as TgTripRow));
++  },
++
++  async getTrip(tripId: string) {
++    const { data, error } = await createClient().from("tg_trips").select("*").eq("id", tripId).maybeSingle();
++    if (error) throw new Error(error.message);
++    return data ? mapTrip(data as TgTripRow) : undefined;
++  },
++
++  async getTripRole(tripId: string): Promise<TripRole | undefined> {
++    const supabase = createClient();
++    const { data: authData } = await supabase.auth.getUser();
++    if (!authData.user) return undefined;
++    const { data, error } = await supabase.from("tg_trip_members").select("role").eq("trip_id", tripId).eq("user_id", authData.user.id).maybeSingle();
++    if (error) throw new Error(error.message);
++    return data?.role as TripRole | undefined;
++  },
++
++  async getTripRoles() {
++    const supabase = createClient();
++    const { data: authData } = await supabase.auth.getUser();
++    if (!authData.user) return new Map<string, TripRole>();
++    const { data, error } = await supabase.from("tg_trip_members").select("trip_id, role").eq("user_id", authData.user.id);
++    return new Map<string, TripRole>(result(data, error).map((row: { trip_id: string; role: string }) => [row.trip_id, row.role as TripRole]));
++  },
++
++  async saveTrip(input: Pick<Trip, "name" | "startDate" | "endDate"> & { id?: string; ownerId?: string }) {
++    const supabase = createClient();
++    if (input.id) {
++      const { data, error } = await supabase.from("tg_trips").update({
++        name: input.name, start_date: input.startDate, end_date: input.endDate,
++      }).eq("id", input.id).select().single();
++      return mapTrip(result(data, error) as TgTripRow);
++    }
++    const { data: authData, error: authError } = await supabase.auth.getUser();
++    if (authError || !authData.user) throw new Error("請先登入再新增旅行");
++    const { data, error } = await supabase.from("tg_trips").insert({
++      owner_id: authData.user.id, name: input.name, start_date: input.startDate, end_date: input.endDate,
++    }).select().single();
++    return mapTrip(result(data, error) as TgTripRow);
++  },
++
++  async duplicateTrip(tripId: string) {
++    const { data, error } = await createClient().rpc("tg_duplicate_trip", { p_trip_id: tripId });
++    return result(data, error) as string;
++  },
++
++  async deleteTrip(tripId: string) {
++    const { error } = await createClient().from("tg_trips").delete().eq("id", tripId);
++    if (error) throw new Error(error.message);
++  },
++
++  async getItems(tripId: string) {
++    const { data, error } = await createClient().from("tg_travel_items").select("*").eq("trip_id", tripId).order("sort_order");
++    return result(data, error).map((row: unknown) => mapItem(row as TgTravelItemRow));
++  },
++
++  async saveItem(input: Omit<TravelItem, "id" | "createdAt" | "updatedAt" | "order"> & { id?: string }) {
++    const supabase = createClient();
++    let sortOrder: number | undefined;
++    if (input.id) {
++      const { data: existing, error } = await supabase.from("tg_travel_items").select("date, sort_order").eq("id", input.id).single();
++      if (error) throw new Error(error.message);
++      if (existing.date === input.date) sortOrder = existing.sort_order;
++    }
++    if (sortOrder === undefined) {
++      let lastQuery = supabase.from("tg_travel_items").select("sort_order").eq("trip_id", input.tripId);
++      lastQuery = input.date ? lastQuery.eq("date", input.date) : lastQuery.is("date", null);
++      const { data: last, error } = await lastQuery.order("sort_order", { ascending: false }).limit(1).maybeSingle();
++      if (error) throw new Error(error.message);
++      sortOrder = (last?.sort_order ?? -1) + 1;
++    }
++    const values = {
++      trip_id: input.tripId, type: input.type, category: input.category, area: input.area,
++      date: input.date, name: input.name, google_maps_url: input.googleMapsUrl,
++      extra_link_1: input.extraLink1 ?? null, extra_link_2: input.extraLink2 ?? null,
++      business_hours: input.businessHours ?? null, note: input.note, sort_order: sortOrder,
++    };
++    if (input.id) {
++      const { data, error } = await supabase.from("tg_travel_items").update(values).eq("id", input.id).select().single();
++      return mapItem(result(data, error) as TgTravelItemRow);
++    }
++    const { data, error } = await supabase.from("tg_travel_items").insert(values).select().single();
++    return mapItem(result(data, error) as TgTravelItemRow);
++  },
++
++  async deleteItem(itemId: string) {
++    const { error } = await createClient().from("tg_travel_items").delete().eq("id", itemId);
++    if (error) throw new Error(error.message);
++  },
++
++  async reorderItems(tripId: string, date: string, orderedIds: string[]) {
++    const { error } = await createClient().rpc("tg_reorder_travel_items", {
++      p_trip_id: tripId, p_date: date, p_ordered_ids: orderedIds,
++    });
++    if (error) throw new Error(error.message);
++  },
++
++  async getFlights(tripId: string) {
++    const { data, error } = await createClient().from("tg_flights").select("*").eq("trip_id", tripId)
++      .order("departure_date").order("departure_time");
++    return result(data, error).map((row: unknown) => mapFlight(row as TgFlightRow));
++  },
++
++  async saveFlight(input: Omit<Flight, "id" | "createdAt" | "updatedAt"> & { id?: string }) {
++    const values = {
++      trip_id: input.tripId, airline: input.airline, flight_number: input.flightNumber,
++      departure_place: input.departurePlace, arrival_place: input.arrivalPlace,
++      departure_date: input.departureDate, departure_time: input.departureTime,
++      arrival_date: input.arrivalDate, arrival_time: input.arrivalTime,
++      link: input.link ?? null, note: input.note ?? null,
++    };
++    const query = input.id
++      ? createClient().from("tg_flights").update(values).eq("id", input.id)
++      : createClient().from("tg_flights").insert(values);
++    const { data, error } = await query.select().single();
++    return mapFlight(result(data, error) as TgFlightRow);
++  },
++
++  async deleteFlight(flightId: string) {
++    const { error } = await createClient().from("tg_flights").delete().eq("id", flightId);
++    if (error) throw new Error(error.message);
++  },
++
++  async getHotelStays(tripId: string) {
++    const { data, error } = await createClient().from("tg_hotel_stays").select("*").eq("trip_id", tripId).order("check_in_date");
++    return result(data, error).map((row: unknown) => mapHotelStay(row as TgHotelStayRow));
++  },
++
++  async saveHotelStay(input: Omit<HotelStay, "id" | "createdAt" | "updatedAt"> & { id?: string }) {
++    const values = {
++      trip_id: input.tripId, name: input.name, check_in_date: input.checkInDate,
++      check_out_date: input.checkOutDate, check_in_time: input.checkInTime ?? null,
++      check_out_time: input.checkOutTime ?? null, address: input.address ?? null,
++      phone: input.phone ?? null, google_maps_url: input.googleMapsUrl ?? null,
++      link: input.link ?? null, note: input.note ?? null,
++    };
++    const query = input.id
++      ? createClient().from("tg_hotel_stays").update(values).eq("id", input.id)
++      : createClient().from("tg_hotel_stays").insert(values);
++    const { data, error } = await query.select().single();
++    return mapHotelStay(result(data, error) as TgHotelStayRow);
++  },
++
++  async deleteHotelStay(stayId: string) {
++    const { error } = await createClient().from("tg_hotel_stays").delete().eq("id", stayId);
++    if (error) throw new Error(error.message);
++  },
++};
+diff --git a/lib/travel-server-repository.ts b/lib/travel-server-repository.ts
+new file mode 100644
+index 0000000..e5bfc51
+--- /dev/null
++++ b/lib/travel-server-repository.ts
+@@ -0,0 +1,32 @@
++import { createClient } from "@/lib/supabase/server";
++import type { TgFlightRow, TgHotelStayRow, TgTravelItemRow, TgTripRow } from "@/lib/database.types";
++import { mapFlight, mapHotelStay, mapItem, mapTrip } from "@/lib/travel-mappers";
++
++function ensure<T>(data: T | null, error: { message: string } | null): T {
++  if (error) throw new Error(error.message);
++  if (data === null) throw new Error("Supabase did not return the requested data");
++  return data;
++}
++
++export const travelServerRepository = {
++  async getTrips() {
++    const { data, error } = await (await createClient()).from("tg_trips").select("*").order("start_date");
++    return ensure(data, error).map((row) => mapTrip(row as TgTripRow));
++  },
++  async getTripBundle(tripId: string) {
++    const supabase = await createClient();
++    const [tripResult, itemsResult, flightsResult, hotelsResult] = await Promise.all([
++      supabase.from("tg_trips").select("*").eq("id", tripId).maybeSingle(),
++      supabase.from("tg_travel_items").select("*").eq("trip_id", tripId).order("sort_order"),
++      supabase.from("tg_flights").select("*").eq("trip_id", tripId).order("departure_date").order("departure_time"),
++      supabase.from("tg_hotel_stays").select("*").eq("trip_id", tripId).order("check_in_date"),
++    ]);
++    if (tripResult.error) throw new Error(tripResult.error.message);
++    return {
++      trip: tripResult.data ? mapTrip(tripResult.data as TgTripRow) : undefined,
++      items: ensure(itemsResult.data, itemsResult.error).map((row) => mapItem(row as TgTravelItemRow)),
++      flights: ensure(flightsResult.data, flightsResult.error).map((row) => mapFlight(row as TgFlightRow)),
++      hotelStays: ensure(hotelsResult.data, hotelsResult.error).map((row) => mapHotelStay(row as TgHotelStayRow)),
++    };
++  },
++};
+diff --git a/supabase/migrations/005_tripgogo_repository_rpcs.sql b/supabase/migrations/005_tripgogo_repository_rpcs.sql
+new file mode 100644
+index 0000000..3cbeee0
+--- /dev/null
++++ b/supabase/migrations/005_tripgogo_repository_rpcs.sql
+@@ -0,0 +1,120 @@
++-- ============================================================
++-- TRAVEL GOGO Phase 2 — atomic repository operations
++-- Requires 004_tripgogo_schema_rls.sql.
++-- Only creates tg_* functions and only accesses tg_* tables.
++-- ============================================================
++
++create or replace function public.tg_reorder_travel_items(
++  p_trip_id uuid,
++  p_date date,
++  p_ordered_ids uuid[]
++)
++returns void
++language plpgsql
++security definer
++set search_path = pg_catalog, public
++as $$
++declare
++  v_expected_count integer;
++begin
++  if auth.uid() is null or not public.tg_is_trip_member(p_trip_id) then
++    raise exception 'Trip edit permission is required';
++  end if;
++  if p_date is null or p_ordered_ids is null then
++    raise exception 'A scheduled date and complete ordered ID list are required';
++  end if;
++  if cardinality(p_ordered_ids) <> (
++    select count(distinct ids.id) from unnest(p_ordered_ids) as ids(id)
++  ) then
++    raise exception 'Ordered item IDs must be unique';
++  end if;
++
++  perform 1
++  from public.tg_travel_items
++  where trip_id = p_trip_id and date = p_date
++  for update;
++
++  select count(*) into v_expected_count
++  from public.tg_travel_items
++  where trip_id = p_trip_id and date = p_date;
++
++  if v_expected_count <> cardinality(p_ordered_ids)
++     or exists (
++       select 1 from unnest(p_ordered_ids) as ids(id)
++       where not exists (
++         select 1 from public.tg_travel_items item
++         where item.id = ids.id and item.trip_id = p_trip_id and item.date = p_date
++       )
++     ) then
++    raise exception 'Ordered item IDs must exactly match the Trip date group';
++  end if;
++
++  update public.tg_travel_items item
++  set sort_order = (ordered.position - 1)::integer
++  from unnest(p_ordered_ids) with ordinality ordered(id, position)
++  where item.id = ordered.id;
++end;
++$$;
++
++create or replace function public.tg_duplicate_trip(p_trip_id uuid)
++returns uuid
++language plpgsql
++security definer
++set search_path = pg_catalog, public
++as $$
++declare
++  v_user_id uuid := auth.uid();
++  v_new_trip_id uuid := gen_random_uuid();
++begin
++  if v_user_id is null or not public.tg_is_trip_member(p_trip_id) then
++    raise exception 'Trip edit permission is required';
++  end if;
++
++  insert into public.tg_trips (id, owner_id, name, start_date, end_date)
++  select v_new_trip_id, v_user_id, name || ' - 複製', start_date, end_date
++  from public.tg_trips
++  where id = p_trip_id;
++
++  if not found then
++    raise exception 'Trip not found';
++  end if;
++
++  insert into public.tg_travel_items (
++    id, trip_id, created_by, type, category, area, date, name, google_maps_url,
++    extra_link_1, extra_link_2, business_hours, note, sort_order
++  )
++  select
++    gen_random_uuid(), v_new_trip_id, v_user_id, type, category, area, date, name,
++    google_maps_url, extra_link_1, extra_link_2, business_hours, note, sort_order
++  from public.tg_travel_items
++  where trip_id = p_trip_id;
++
++  insert into public.tg_flights (
++    id, trip_id, created_by, airline, flight_number, departure_place, arrival_place,
++    departure_date, departure_time, arrival_date, arrival_time, link, note
++  )
++  select
++    gen_random_uuid(), v_new_trip_id, v_user_id, airline, flight_number,
++    departure_place, arrival_place, departure_date, departure_time,
++    arrival_date, arrival_time, link, note
++  from public.tg_flights
++  where trip_id = p_trip_id;
++
++  insert into public.tg_hotel_stays (
++    id, trip_id, created_by, name, check_in_date, check_out_date, check_in_time,
++    check_out_time, address, phone, google_maps_url, link, note
++  )
++  select
++    gen_random_uuid(), v_new_trip_id, v_user_id, name, check_in_date, check_out_date,
++    check_in_time, check_out_time, address, phone, google_maps_url, link, note
++  from public.tg_hotel_stays
++  where trip_id = p_trip_id;
++
++  return v_new_trip_id;
++end;
++$$;
++
++revoke all on function public.tg_reorder_travel_items(uuid, date, uuid[]) from public;
++revoke all on function public.tg_duplicate_trip(uuid) from public;
++grant execute on function public.tg_reorder_travel_items(uuid, date, uuid[]) to authenticated;
++grant execute on function public.tg_duplicate_trip(uuid) to authenticated;
+

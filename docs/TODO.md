@@ -1,5 +1,25 @@
 # TODO
 
+## TRAVEL GOGO
+
+### Done
+
+- Supabase Phase 2 Google Auth, SSR session refresh, and Supabase repository integration
+- Supabase Phase 1 schema and RLS migration for isolated `tg_*` tables
+- Core trip notebook using centralized localStorage repository
+- Versioned localStorage schema with Supabase-ready timestamps and ownership fields
+- Shared TravelItem data for Daily, Places, Food, and Outline
+- Optional business hours with device-local status calculation
+- Same-day Daily itinerary drag-and-drop with long-press mobile activation
+- Responsive card/list UI using the existing design system
+- Multi-entry flight and hotel details in Outline using independent versioned localStorage repositories
+
+### Future
+
+- Add owner-facing member and invitation management UI
+- Add one-time localStorage migration/import flow (Phase 4)
+- Add drag-and-drop itinerary ordering
+
 ## Done
 
 - CSV Export Cleanup (Phase 5A-2) — CSV export (only) now includes just the user-facing fields (店家/類別/優惠內容/日期/分數/官方網址/備註/標籤) in that order, with Traditional Chinese headers and a UTF-8 BOM; JSON/XLSX export, import, and the export button are untouched

@@ -1,5 +1,24 @@
 # Changelog
 
+## TRAVEL GOGO — Supabase Phase 2
+
+Added
+
+- Added Google OAuth with cookie-backed Supabase sessions and middleware refresh.
+- Added browser/server Supabase clients and public SSR data loading so auth initialization never blocks Trip content.
+- Replaced active localStorage CRUD with an RLS-backed Supabase repository while preserving the existing localStorage source for Phase 4 import.
+- Added atomic `tg_duplicate_trip` and `tg_reorder_travel_items` repository RPCs.
+- Limited existing management controls and drag-and-drop to authenticated Trip owners/editors without changing card layouts, Maps links, or business-hours parsing.
+
+## TRAVEL GOGO — Supabase Phase 1
+
+Added
+
+- Added an isolated `tg_*` Supabase schema for Trips, members, invitations, itinerary items, flights, hotels, profiles, and idempotent localStorage import records.
+- Added indexes, integrity constraints, timestamp/ownership triggers, controlled membership/invitation/import RPCs, and database-enforced RLS.
+- Public access is read-only for Trip content; only Trip owners/editors can modify content, and only owners can manage invitations or editors.
+- Kept `tg_profiles.email`, memberships, invitations, and import records unavailable to anonymous reads.
+
 ## v4.0 (In Progress)
 
 ### Phase 5A-2 - CSV Export Cleanup
@@ -298,3 +317,49 @@ Added
 Removed
 
 - Dark theme
+# TRAVEL GOGO
+
+## 2026-08-07
+
+### Changed
+
+- Added independently stored, multi-entry Flight and HotelStay records to Outline with create, edit, delete, chronological sorting, optional links/Maps, and responsive cards.
+- Added measured note truncation with an unobtrusive Ellipsis action and read-only full-note Dialog on place and food cards.
+- Replaced the truncated-note action with a low-key `+ more` label and corrected the full-note Dialog animation so its positioning transform remains centered from the first frame.
+- Added the same measured `+ more` full-note action to truncated notes in desktop Daily cards without changing their fixed height or drag behavior.
+- Limited mobile Daily-card notes to two lines and reused the measured `+ more` full-note Dialog behavior from place and food cards.
+- Restored Google Maps links on place and food card names while retaining the existing Navigation footer action.
+- Restored fixed food/place circle backgrounds in production CSS and restored Google Maps links on Daily item names.
+- Guarded Daily drag sensors from every nested link, button, input, textarea, and select interaction.
+- Rebuilt Daily cards from the supplied desktop/mobile references, including fixed desktop proportions, compact type marks, and responsive content order.
+- Replaced Daily arrow controls with persisted same-day drag-and-drop; touch dragging requires a 350ms long press and cancels on normal scroll movement.
+- Replaced extra-link ExternalLink glyphs with Link2 for a clearer visual distinction from edit actions.
+- Added two optional URL-only extra links to travel items and rendered them as accessible ExternalLink actions in the card footer.
+- Let desktop notes use two lines beside business hours or four lines when the Info Area contains notes alone; mobile notes remain unclamped.
+- Consolidated desktop card business hours and notes into one compact fixed Info Area without placeholder rows.
+- Finalized the homepage hierarchy with a lighter wordmark, editorial section heading, and date-first trip notebook cards with fixed action footers.
+- Fixed place and food cards to a shared 300px desktop height with reserved business-hours and two-line note regions; mobile cards remain content-sized.
+- Rebuilt place and food card vertical rhythm around one 24px section token with single-owner spacing between adjacent regions.
+- Replaced the card note icon with a muted single-color ✦ and shared one spacing class across both pre-divider gaps.
+- Added a low-saturation line-art Luggage favicon while keeping PlaneTakeoff in the site header.
+- Reordered place and food card details into a stable location/category/date row, business-hours section, and icon-aligned notes row.
+- Added MessageSquareMore to non-empty card notes and tightened footer SVG sizing while preserving touch targets.
+- Refined the place and food card footer into a fixed-height, divided action area with consistent icon spacing.
+- Stabilized place and food card layouts with two-line name clamping and bottom-aligned icon actions.
+- Moved Google Maps, edit, and delete actions into a consistent card footer without changing their behavior.
+- Added optional free-text business hours to places and food without changing the v1 storage keys.
+- Added a lightweight local-time status parser for simple hours, 24-hour businesses, and overnight ranges.
+- Added subtle business-hour details to item cards while keeping Outline unchanged.
+- Added a Lucide PlaneTakeoff icon beside the TRAVEL GOGO wordmark.
+- Replaced native browser deletion prompts with the shared site Dialog styling.
+- Versioned localStorage keys and completed Supabase-ready ownership and timestamp fields.
+- Increased mobile icon-button hit areas while preserving desktop density and icon size.
+- Scoped category suggestions by item type while keeping area suggestions shared.
+- Replaced the Birthday Rewards product flow with a focused trip notebook.
+- Added trip creation, editing, duplication, and deletion backed by centralized localStorage access.
+- Added Daily, Places, Food, and Outline views derived from one TravelItem collection.
+- Added trip-range date choices, free-input suggestions, stable sorting, same-day ordering, and optional Google Maps links.
+- Removed rewards, ratings, favorites, statistics, import/export, and administration features.
+- Kept the existing design tokens, cards, dialogs, buttons, inputs, responsive breakpoints, and interaction styles.
+
+---

@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "生日優惠整理",
-    short_name: "生日優惠",
-    description: "快速查詢、篩選各大店家生日優惠，收藏你的必換清單。",
+    name: "TRAVEL GOGO",
+    short_name: "TRAVEL GOGO",
+    description: "TRAVEL GOGO",
     start_url: "/",
     display: "standalone",
     background_color: "#FAF8F4",
