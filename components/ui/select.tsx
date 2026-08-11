@@ -16,7 +16,7 @@ export function SelectTrigger({
     <SelectPrimitive.Trigger
       className={cn(
         "flex h-9 items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 text-sm",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/40",
+        "focus-visible:outline-none",
         className
       )}
       {...props}

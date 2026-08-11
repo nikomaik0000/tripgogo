@@ -9,8 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { dateOptions } from "@/lib/travel-dates";
 import type { TravelItem, TravelItemType, Trip } from "@/lib/types";
 
-export function TravelItemDialog({ open, type, trip, item, items, onOpenChange, onSave }: {
+export function TravelItemDialog({ open, type, trip, item, items, initialDate, allowTypeChange = false, onTypeChange, onOpenChange, onSave }: {
   open: boolean; type: TravelItemType; trip: Trip; item?: TravelItem; items: TravelItem[];
+  initialDate?: string;
+  allowTypeChange?: boolean;
+  onTypeChange?: (type: TravelItemType) => void;
   onOpenChange: (open: boolean) => void;
   onSave: (value: Pick<TravelItem, "category" | "area" | "date" | "name" | "googleMapsUrl" | "extraLink1" | "extraLink2" | "businessHours" | "note">) => void;
 }) {
@@ -19,8 +22,8 @@ export function TravelItemDialog({ open, type, trip, item, items, onOpenChange, 
   const areaList = useId();
   useEffect(() => {
     if (!open) return;
-    setForm({ category: item?.category ?? "", area: item?.area ?? "", date: item?.date ?? "", name: item?.name ?? "", googleMapsUrl: item?.googleMapsUrl ?? "", extraLink1: item?.extraLink1 ?? "", extraLink2: item?.extraLink2 ?? "", businessHours: item?.businessHours ?? "", note: item?.note ?? "" });
-  }, [open, item]);
+    setForm({ category: item?.category ?? "", area: item?.area ?? "", date: item?.date ?? initialDate ?? "", name: item?.name ?? "", googleMapsUrl: item?.googleMapsUrl ?? "", extraLink1: item?.extraLink1 ?? "", extraLink2: item?.extraLink2 ?? "", businessHours: item?.businessHours ?? "", note: item?.note ?? "" });
+  }, [initialDate, open, item]);
   const suggestions = (key: "category" | "area") => [
     ...new Set(
       items
@@ -30,6 +33,7 @@ export function TravelItemDialog({ open, type, trip, item, items, onOpenChange, 
     ),
   ].sort();
   const set = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const hasFixedEntryDate = !item && Boolean(initialDate);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent title={`${item ? "編輯" : "新增"}${type === "place" ? "地點" : "美食"}`}>
@@ -38,9 +42,10 @@ export function TravelItemDialog({ open, type, trip, item, items, onOpenChange, 
           if (!form.name.trim()) return toast.error(`請填寫${type === "place" ? "景點名稱" : "店名"}`);
           onSave({ ...form, category: form.category.trim(), area: form.area.trim(), name: form.name.trim(), date: form.date || null, extraLink1: form.extraLink1.trim() || undefined, extraLink2: form.extraLink2.trim() || undefined });
         }}>
+          {allowTypeChange && <Field label="類型"><Select value={type} onValueChange={(value) => onTypeChange?.(value as TravelItemType)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="place">地點</SelectItem><SelectItem value="food">美食</SelectItem></SelectContent></Select></Field>}
           <Field label="分類"><Input list={categoryList} value={form.category} onChange={(e) => set("category", e.target.value)} /><datalist id={categoryList}>{suggestions("category").map((value) => <option key={value} value={value} />)}</datalist></Field>
           <Field label="地點"><Input list={areaList} value={form.area} onChange={(e) => set("area", e.target.value)} /><datalist id={areaList}>{suggestions("area").map((value) => <option key={value} value={value} />)}</datalist></Field>
-          <Field label="日期"><Select value={form.date || "unscheduled"} onValueChange={(value) => set("date", value === "unscheduled" ? "" : value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="unscheduled">未定</SelectItem>{dateOptions(trip).map((date) => <SelectItem key={date.value} value={date.value}>{date.label}</SelectItem>)}</SelectContent></Select></Field>
+          {!hasFixedEntryDate && <Field label="日期"><Select value={form.date || "unscheduled"} onValueChange={(value) => set("date", value === "unscheduled" ? "" : value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="unscheduled">未定</SelectItem>{dateOptions(trip).map((date) => <SelectItem key={date.value} value={date.value}>{date.label}</SelectItem>)}</SelectContent></Select></Field>}
           <Field label={type === "place" ? "景點名稱" : "店名"}><Input required value={form.name} onChange={(e) => set("name", e.target.value)} /></Field>
           <Field label="Google Maps 網址"><Input type="url" value={form.googleMapsUrl} onChange={(e) => set("googleMapsUrl", e.target.value)} /></Field>
           <Field label="其他連結 1（選填）"><Input type="url" value={form.extraLink1} onChange={(e) => set("extraLink1", e.target.value)} /></Field>

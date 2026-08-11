@@ -4,6 +4,8 @@
 
 ### Done
 
+- Owner-only public/private Trip control backed by visibility-aware RLS and `tg_set_trip_visibility`
+- Supabase Phase 3 role-aware controls and owner-only shared-editor management
 - Supabase Phase 2 Google Auth, SSR session refresh, and Supabase repository integration
 - Supabase Phase 1 schema and RLS migration for isolated `tg_*` tables
 - Core trip notebook using centralized localStorage repository
@@ -16,7 +18,6 @@
 
 ### Future
 
-- Add owner-facing member and invitation management UI
 - Add one-time localStorage migration/import flow (Phase 4)
 - Add drag-and-drop itinerary ordering
 

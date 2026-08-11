@@ -1,5 +1,36 @@
 # Changelog
 
+## TRAVEL GOGO — Trip Visibility UI
+
+Added
+
+- Added an owner-only public/private Switch to the existing Trip create/edit Dialog without changing its dimensions or surrounding layouts.
+- New Trips default to public, while edited Trips display their persisted `is_public` value.
+
+Changed
+
+- Owner visibility changes are saved through the existing owner-only `tg_set_trip_visibility` RPC; editors cannot see or submit this control.
+
+## TRAVEL GOGO — OAuth Redirect Fix
+
+Changed
+
+- Google OAuth now sends an exact origin-relative `/auth/callback` redirect without query parameters, preventing localhost login from falling back to the production Site URL.
+- The pre-login path is retained in same-origin sessionStorage and restored only after a successful session instead of being included in Supabase's redirect allowlist URL.
+
+## TRAVEL GOGO — Supabase Phase 3
+
+Added
+
+- Added owner-only editor management inside the existing Trip edit Dialog, including invite, pending status, revoke, and editor removal actions.
+- Added a low-key invitation prompt that is completely absent when the signed-in user has no pending invitations.
+- Added invitation acceptance through the existing RLS-protected RPC and refreshed Trip permissions immediately after acceptance.
+
+Changed
+
+- Swapped the existing Trip List header controls so Add Trip is left of Login/Logout without changing their styling or dimensions.
+- Kept anonymous users, signed-in non-members, and editors away from owner-only Email/member management UI; RLS remains authoritative.
+
 ## TRAVEL GOGO — Supabase Phase 2
 
 Added
@@ -323,6 +354,13 @@ Removed
 
 ### Changed
 
+- Renamed the user-facing brand from TRAVEL GOGO to TRIP GOGO across the Header, metadata, Open Graph, and PWA manifest without changing internal identifiers or deployment URLs.
+- Moved inner-page create actions into Daily, Place, Food, Flight, and Hotel content areas, and unified every shared Dialog on the centered `+ more` viewport animation.
+- Refined the Place/Food control bar with a search-first desktop row and a separated mobile sort/icon-action row, using an icon-only muted CirclePlus.
+- Restored the inner-page Header create action as a fixed left slot beside Auth, removed content-level Daily/Place/Food create controls, and unified Flight/Hotel create icons with the homepage CirclePlus style.
+- Unified every create entry on one outline-only muted CirclePlus component, matched Header Auth/create hit areas, and restored icon-only date-specific Daily creation.
+- Hid the redundant date selector only when creating a TravelItem from a specific Daily date, while preserving selectable dates for generic creation and every edit flow.
+- Replaced the blue-gray global focus outline with a subtle inset accentSoft keyboard focus treatment and added an overflow-safe Daily date quick-navigation row with sticky-header-aware smooth scrolling.
 - Added independently stored, multi-entry Flight and HotelStay records to Outline with create, edit, delete, chronological sorting, optional links/Maps, and responsive cards.
 - Added measured note truncation with an unobtrusive Ellipsis action and read-only full-note Dialog on place and food cards.
 - Replaced the truncated-note action with a low-key `+ more` label and corrected the full-note Dialog animation so its positioning transform remains centered from the first frame.

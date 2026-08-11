@@ -8,18 +8,18 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "TRAVEL GOGO",
-    template: "%s | TRAVEL GOGO",
+    default: "TRIP GOGO",
+    template: "%s | TRIP GOGO",
   },
-  description: "TRAVEL GOGO",
-  applicationName: "TRAVEL GOGO",
+  description: "TRIP GOGO",
+  applicationName: "TRIP GOGO",
   manifest: "/manifest.webmanifest",
   openGraph: {
     type: "website",
     locale: "zh_TW",
-    siteName: "TRAVEL GOGO",
-    title: "TRAVEL GOGO",
-    description: "TRAVEL GOGO",
+    siteName: "TRIP GOGO",
+    title: "TRIP GOGO",
+    description: "TRIP GOGO",
   },
   icons: {
     icon: "/icon.svg",

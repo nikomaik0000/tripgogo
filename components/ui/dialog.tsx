@@ -11,31 +11,18 @@ export function DialogContent({
   className,
   children,
   title,
-  motion = "default",
   ...props
-}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
-  title: string;
-  motion?: "default" | "centered";
-}) {
-  const isCenteredMotion = motion === "centered";
-
+}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { title: string }) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay
-        className={cn(
-          "fixed inset-0 z-40 bg-black/30",
-          isCenteredMotion
-            ? "data-[state=closed]:animate-dialogOverlayOut data-[state=open]:animate-dialogOverlayIn"
-            : "animate-fadeIn"
-        )}
+        className="fixed inset-0 z-40 bg-black/30 data-[state=closed]:animate-dialogOverlayOut data-[state=open]:animate-dialogOverlayIn"
       />
       <DialogPrimitive.Content
         className={cn(
           "fixed left-1/2 top-1/2 z-50 w-[calc(100%-32px)] max-w-lg -translate-x-1/2 -translate-y-1/2",
           "rounded-card bg-surface p-6 shadow-pop",
-          isCenteredMotion
-            ? "data-[state=closed]:animate-dialogContentOut data-[state=open]:animate-dialogContentIn"
-            : "animate-slideUp",
+          "data-[state=closed]:animate-dialogContentOut data-[state=open]:animate-dialogContentIn",
           "max-h-[85vh] overflow-y-auto",
           className
         )}

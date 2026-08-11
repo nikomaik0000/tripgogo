@@ -130,18 +130,7 @@ export const typography = {
   },
 } as const;
 
-/** Transition durations used across the app's motion tokens below. */
-export const transitionDuration = {
-  fast: "0.18s",
-  base: "0.2s",
-} as const;
-
 export const keyframes = {
-  fadeIn: { from: { opacity: "0" }, to: { opacity: "1" } },
-  slideUp: {
-    from: { opacity: "0", transform: "translateY(6px)" },
-    to: { opacity: "1", transform: "translateY(0)" },
-  },
   dialogOverlayIn: { from: { opacity: "0" }, to: { opacity: "1" } },
   dialogOverlayOut: { from: { opacity: "1" }, to: { opacity: "0" } },
   dialogContentIn: {
@@ -155,17 +144,8 @@ export const keyframes = {
 } as const;
 
 export const animation = {
-  fadeIn: `fadeIn ${transitionDuration.fast} ease-out`,
-  slideUp: `slideUp ${transitionDuration.base} ease-out`,
   dialogOverlayIn: "dialogOverlayIn 200ms ease-out",
   dialogOverlayOut: "dialogOverlayOut 160ms ease-out",
   dialogContentIn: "dialogContentIn 220ms cubic-bezier(0.16, 1, 0.3, 1)",
   dialogContentOut: "dialogContentOut 160ms ease-out",
-} as const;
-
-/** Focus ring used by the global `:focus-visible` style in globals.css. */
-export const focusRing = {
-  color: "#8CA3B5",
-  offset: "2px",
-  radius: "4px",
 } as const;

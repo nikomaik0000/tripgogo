@@ -18,7 +18,7 @@ export function AuthControl() {
         const action = user ? signOut() : signInWithGoogle();
         action.catch((error: unknown) => toast.error(error instanceof Error ? error.message : "登入操作失敗"));
       }}
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-ink disabled:opacity-0 sm:h-9 sm:w-9"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-ink disabled:opacity-0"
     >
       {user ? <LogOut className="h-5 w-5" /> : <LogIn className="h-5 w-5" />}
     </button>

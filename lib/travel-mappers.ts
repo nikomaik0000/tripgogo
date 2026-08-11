@@ -3,7 +3,7 @@ import type { Flight, HotelStay, TravelItem, Trip } from "@/lib/types";
 
 export const mapTrip = (row: TgTripRow): Trip => ({
   id: row.id, ownerId: row.owner_id, name: row.name, startDate: row.start_date,
-  endDate: row.end_date, createdAt: row.created_at, updatedAt: row.updated_at,
+  endDate: row.end_date, isPublic: row.is_public, createdAt: row.created_at, updatedAt: row.updated_at,
 });
 
 export const mapItem = (row: TgTravelItemRow): TravelItem => ({

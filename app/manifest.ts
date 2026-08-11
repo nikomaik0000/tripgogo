@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "TRAVEL GOGO",
-    short_name: "TRAVEL GOGO",
-    description: "TRAVEL GOGO",
+    name: "TRIP GOGO",
+    short_name: "TRIP GOGO",
+    description: "TRIP GOGO",
     start_url: "/",
     display: "standalone",
     background_color: "#FAF8F4",

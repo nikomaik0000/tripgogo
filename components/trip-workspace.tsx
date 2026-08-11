@@ -2,18 +2,18 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowUpDown, CalendarDays, ChevronRight, CirclePlus, Clock3, Hotel, Link2, MapPin, MapPinned, Navigation, NotebookTabs, Plane, Search, SquarePen, Trash2, UtensilsCrossed, X } from "lucide-react";
+import { ArrowLeft, ArrowUpDown, CalendarDays, ChevronRight, Clock3, Hotel, Link2, MapPin, MapPinned, Navigation, NotebookTabs, Plane, Search, SquarePen, Trash2, UtensilsCrossed, X } from "lucide-react";
 import { closestCenter, DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
 import { AuthControl } from "@/components/auth-control";
+import { AddIconButton } from "@/components/add-icon-button";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { FlightDialog } from "@/components/flight-dialog";
 import { HotelStayDialog } from "@/components/hotel-stay-dialog";
 import { TravelItemDialog } from "@/components/travel-item-dialog";
-import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -40,7 +40,7 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
   const [tab, setTab] = useState<Tab>("daily");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<TravelItemSort>("date");
-  const [dialog, setDialog] = useState<{ open: boolean; type: TravelItemType; item?: TravelItem }>({ open: false, type: "place" });
+  const [dialog, setDialog] = useState<{ open: boolean; type: TravelItemType; item?: TravelItem; initialDate?: string; allowTypeChange?: boolean }>({ open: false, type: "place" });
   const [deleting, setDeleting] = useState<TravelItem>();
   const refresh = useCallback(async () => {
     try {
@@ -89,13 +89,13 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24 pt-4 sm:px-6">
       <header className="sticky top-0 z-20 -mx-4 mb-8 border-b border-border bg-bg/90 px-4 pb-4 pt-3 backdrop-blur sm:-mx-6 sm:px-6">
-        <div className="mb-4 flex items-center gap-3"><Link href="/" aria-label="返回" title="返回" className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-ink sm:h-9 sm:w-9"><ArrowLeft className="h-5 w-5" /></Link><h1 className="min-w-0 flex-1 truncate text-title font-semibold">{trip.name}</h1><AuthControl />{canEdit && (tab === "place" || tab === "food") ? <Button size="icon" variant="primary" aria-label="新增" title="新增" className="h-11 w-11 sm:h-9 sm:w-9" onClick={() => setDialog({ open: true, type: tab })}><CirclePlus className="h-5 w-5" /></Button> : <span aria-hidden="true" className="h-11 w-11 sm:h-9 sm:w-9" />}</div>
+        <div className="mb-4 flex items-center gap-3"><Link href="/" aria-label="返回" title="返回" className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-ink sm:h-9 sm:w-9"><ArrowLeft className="h-5 w-5" /></Link><h1 className="min-w-0 flex-1 truncate text-title font-semibold">{trip.name}</h1><div className="flex w-[96px] shrink-0 items-center justify-end gap-2">{canEdit && tab !== "outline" ? <AddIconButton context="header" label={tab === "daily" ? "新增行程" : `新增${tab === "place" ? "地點" : "美食"}`} onClick={() => setDialog({ open: true, type: tab === "food" ? "food" : "place", allowTypeChange: tab === "daily" })} /> : <span aria-hidden="true" className="h-11 w-11 shrink-0" />}<AuthControl /></div></div>
         <nav className="grid grid-cols-4 gap-1 rounded-card bg-searchBackground p-1" aria-label="旅程分頁">{tabs.map(({ value, label, icon: Icon }) => <button key={value} type="button" onClick={() => setTab(value)} className={`flex h-9 items-center justify-center gap-2 rounded-lg text-sm transition-colors ${tab === value ? "bg-surface text-ink shadow-soft" : "text-muted hover:text-ink"}`}><Icon className="h-5 w-5" /><span>{label}</span></button>)}</nav>
       </header>
-      {tab === "daily" && <Daily trip={trip} items={items} canEdit={canEdit} onEdit={edit} onDelete={remove} onReorder={reorder} />}
+      {tab === "daily" && <Daily trip={trip} items={items} canEdit={canEdit} onAdd={(date) => setDialog({ open: true, type: "place", initialDate: date, allowTypeChange: true })} onEdit={edit} onDelete={remove} onReorder={reorder} />}
       {(tab === "place" || tab === "food") && <ItemList type={tab} items={items} query={query} sort={sort} canEdit={canEdit} onQuery={setQuery} onSort={setSort} onEdit={edit} onDelete={remove} />}
       {tab === "outline" && <Outline trip={trip} items={items} canEdit={canEdit} initialFlights={initialFlights} initialHotelStays={initialHotelStays} />}
-      <TravelItemDialog open={dialog.open} type={dialog.type} trip={trip} item={dialog.item} items={items} onOpenChange={(open) => setDialog((value) => ({ ...value, open }))} onSave={(value) => {
+      <TravelItemDialog open={dialog.open} type={dialog.type} trip={trip} item={dialog.item} items={items} initialDate={dialog.initialDate} allowTypeChange={dialog.allowTypeChange} onTypeChange={(type) => setDialog((value) => ({ ...value, type }))} onOpenChange={(open) => setDialog((value) => ({ ...value, open }))} onSave={(value) => {
         travelRepository.saveItem({ ...value, id: dialog.item?.id, tripId, type: dialog.type, createdBy: dialog.item?.createdBy }).then(() => refresh()).then(() => { setDialog((current) => ({ ...current, open: false })); toast.success(dialog.item ? "已更新" : "已新增"); }).catch((error) => toast.error(errorMessage(error, "儲存失敗")));
       }} />
       <ConfirmDialog
@@ -161,7 +161,10 @@ function ItemCard({ item, canEdit, onEdit, onDelete, controls, compactBusiness =
   return <article className="rounded-card border border-border bg-surface p-6 shadow-soft"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><ItemName item={item} /><p className="mt-2 text-xs text-muted">{item.date ? displayDate(item.date) : "未定"} · {item.category || (item.type === "place" ? "地點" : "美食")}</p></div>{canEdit && <div className="flex shrink-0">{controls}<Action label="編輯" onClick={onEdit}><SquarePen /></Action><Action label="刪除" onClick={onDelete}><Trash2 /></Action></div>}</div><div className="my-4 border-t border-divider" />{item.area && <p className="text-sm text-muted">{item.area}</p>}<BusinessHours item={item} compact={compactBusiness} />{item.note && <p className="mt-3 whitespace-pre-wrap text-sm text-muted">{item.note}</p>}</article>;
 }
 
-function Daily({ trip, items, canEdit, onEdit, onDelete, onReorder }: { trip: Trip; items: TravelItem[]; canEdit: boolean; onEdit: (item: TravelItem) => void; onDelete: (item: TravelItem) => void; onReorder: (activeId: string, overId: string) => void }) {
+function Daily({ trip, items, canEdit, onAdd, onEdit, onDelete, onReorder }: { trip: Trip; items: TravelItem[]; canEdit: boolean; onAdd: (date: string) => void; onEdit: (item: TravelItem) => void; onDelete: (item: TravelItem) => void; onReorder: (activeId: string, overId: string) => void }) {
+  const dates = tripDates(trip);
+  const [activeDate, setActiveDate] = useState(trip.startDate);
+  useEffect(() => setActiveDate(trip.startDate), [trip.startDate]);
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 350, tolerance: 8 } })
@@ -169,7 +172,11 @@ function Daily({ trip, items, canEdit, onEdit, onDelete, onReorder }: { trip: Tr
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
     if (over && active.id !== over.id) onReorder(String(active.id), String(over.id));
   };
-  return <div className="space-y-8">{tripDates(trip).map((date) => { const day = items.filter((item) => item.date === date).sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt)); return <section key={date}><h2 className="mb-4 text-title font-semibold">{displayDate(date)}</h2>{day.length === 0 ? <EmptyState title="今天尚未安排" description="" /> : canEdit ? <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}><SortableContext items={day.map((item) => item.id)} strategy={verticalListSortingStrategy}><div className="space-y-3">{day.map((item) => <SortableDailyCard key={item.id} item={item} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />)}</div></SortableContext></DndContext> : <div className="space-y-3">{day.map((item) => <DailyCard key={item.id} item={item} canEdit={false} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />)}</div>}</section>; })}</div>;
+  const jumpToDate = (date: string) => {
+    setActiveDate(date);
+    document.getElementById(`daily-${date}`)?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  };
+  return <><nav aria-label="快速跳轉日期" className="no-scrollbar mb-6 max-w-full overflow-x-auto"><div className="flex min-w-max flex-nowrap items-center gap-5 pr-4">{dates.map((date) => <button key={date} type="button" onClick={() => jumpToDate(date)} aria-current={activeDate === date ? "date" : undefined} className={`shrink-0 border-b pb-1 text-xs transition-colors ${activeDate === date ? "border-muted text-ink" : "border-transparent text-muted hover:text-ink"}`}>{displayDate(date)}</button>)}</div></nav><div className="space-y-8">{dates.map((date) => { const day = items.filter((item) => item.date === date).sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt)); return <section id={`daily-${date}`} className="scroll-mt-36" key={date}><div className="mb-4 flex items-center justify-between"><h2 className="text-title font-semibold">{displayDate(date)}</h2>{canEdit && <AddIconButton label={`新增 ${displayDate(date)} 行程`} onClick={() => onAdd(date)} />}</div>{day.length === 0 ? <EmptyState title="今天尚未安排" description="" /> : canEdit ? <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}><SortableContext items={day.map((item) => item.id)} strategy={verticalListSortingStrategy}><div className="space-y-3">{day.map((item) => <SortableDailyCard key={item.id} item={item} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />)}</div></SortableContext></DndContext> : <div className="space-y-3">{day.map((item) => <DailyCard key={item.id} item={item} canEdit={false} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />)}</div>}</section>; })}</div></>;
 }
 
 function SortableDailyCard({ item, onEdit, onDelete }: { item: TravelItem; onEdit: () => void; onDelete: () => void }) {
@@ -249,7 +256,7 @@ function ClampedNote({ note, lines }: { note: string; lines: 2 | 3 | 4 }) {
       </div>
     </div>
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent title="備註" motion="centered">
+      <DialogContent title="備註">
         <p className="whitespace-pre-wrap break-words text-sm text-ink">{note}</p>
       </DialogContent>
     </Dialog>
@@ -301,7 +308,7 @@ function Outline({ trip, items, canEdit, initialFlights, initialHotelStays }: { 
 }
 
 function OutlineDetailsSection({ icon: Icon, label, addLabel, canEdit, onAdd, children }: { icon: typeof Plane; label: string; addLabel: string; canEdit: boolean; onAdd: () => void; children: React.ReactNode }) {
-  return <section><header className="mb-4 flex items-center"><Icon className="h-5 w-5 text-muted" /><h2 className="ml-3 text-sm font-semibold tracking-body">{label}</h2>{canEdit && <Button type="button" size="icon" variant="ghost" aria-label={addLabel} title={addLabel} onClick={onAdd} className="ml-auto h-11 w-11 sm:h-9 sm:w-9"><CirclePlus className="h-5 w-5" /></Button>}</header>{children}</section>;
+  return <section><header className="mb-4 flex items-center"><Icon className="h-5 w-5 text-muted" /><h2 className="ml-3 text-sm font-semibold tracking-body">{label}</h2>{canEdit && <AddIconButton label={addLabel} onClick={onAdd} className="ml-auto" />}</header>{children}</section>;
 }
 
 function FlightCard({ flight, canEdit, onEdit, onDelete }: { flight: Flight; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {

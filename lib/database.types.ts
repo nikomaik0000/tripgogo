@@ -1,5 +1,21 @@
 export type TgTripRow = {
   id: string; owner_id: string; name: string; start_date: string; end_date: string;
+  is_public: boolean; created_at: string; updated_at: string;
+};
+
+export type TgTripMemberRow = {
+  trip_id: string; user_id: string; role: "owner" | "editor";
+  invited_by: string | null; created_at: string;
+};
+
+export type TgTripInvitationRow = {
+  id: string; trip_id: string; email: string; role: "editor"; invited_by: string;
+  accepted_by: string | null; accepted_at: string | null; created_at: string;
+  expires_at: string | null;
+};
+
+export type TgProfileRow = {
+  id: string; email: string; display_name: string | null;
   created_at: string; updated_at: string;
 };
 

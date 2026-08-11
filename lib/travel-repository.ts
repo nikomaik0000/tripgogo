@@ -1,8 +1,8 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
-import type { TgFlightRow, TgHotelStayRow, TgTravelItemRow, TgTripRow } from "@/lib/database.types";
+import type { TgFlightRow, TgHotelStayRow, TgProfileRow, TgTravelItemRow, TgTripInvitationRow, TgTripMemberRow, TgTripRow } from "@/lib/database.types";
 import { mapFlight, mapHotelStay, mapItem, mapTrip } from "@/lib/travel-mappers";
-import type { Flight, HotelStay, TravelItem, Trip, TripRole } from "@/lib/types";
+import type { Flight, HotelStay, TravelItem, Trip, TripEditor, TripInvitation, TripRole } from "@/lib/types";
 
 function result<T>(data: T | null, error: PostgrestError | null): T {
   if (error) throw new Error(error.message);
@@ -39,7 +39,68 @@ export const travelRepository = {
     return new Map<string, TripRole>(result(data, error).map((row: { trip_id: string; role: string }) => [row.trip_id, row.role as TripRole]));
   },
 
-  async saveTrip(input: Pick<Trip, "name" | "startDate" | "endDate"> & { id?: string; ownerId?: string }) {
+  async getTripEditors(tripId: string): Promise<TripEditor[]> {
+    const supabase = createClient();
+    const { data: memberData, error: memberError } = await supabase.from("tg_trip_members")
+      .select("user_id, created_at").eq("trip_id", tripId).eq("role", "editor").order("created_at");
+    const members = result(memberData, memberError) as Pick<TgTripMemberRow, "user_id" | "created_at">[];
+    if (members.length === 0) return [];
+    const { data: profileData, error: profileError } = await supabase.from("tg_profiles")
+      .select("id, email, display_name").in("id", members.map((member) => member.user_id));
+    const profiles = new Map((result(profileData, profileError) as Pick<TgProfileRow, "id" | "email" | "display_name">[])
+      .map((profile) => [profile.id, profile]));
+    return members.flatMap((member) => {
+      const profile = profiles.get(member.user_id);
+      return profile ? [{ userId: member.user_id, email: profile.email, displayName: profile.display_name ?? undefined, createdAt: member.created_at }] : [];
+    });
+  },
+
+  async getTripPendingInvitations(tripId: string): Promise<TripInvitation[]> {
+    const { data, error } = await createClient().from("tg_trip_invitations").select("*")
+      .eq("trip_id", tripId).is("accepted_at", null).order("created_at");
+    return (result(data, error) as TgTripInvitationRow[]).map(mapInvitation);
+  },
+
+  async getMyPendingInvitations(): Promise<TripInvitation[]> {
+    const supabase = createClient();
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError) throw new Error(authError.message);
+    const email = authData.user?.email?.trim().toLowerCase();
+    if (!email) return [];
+    const { data, error } = await supabase.from("tg_trip_invitations").select("*")
+      .eq("email", email).is("accepted_at", null)
+      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`).order("created_at");
+    const invitations = (result(data, error) as TgTripInvitationRow[]).map(mapInvitation);
+    if (invitations.length === 0) return [];
+    const { data: tripData, error: tripError } = await supabase.from("tg_trips").select("id, name")
+      .in("id", invitations.map((invitation) => invitation.tripId));
+    const names = new Map<string, string>(result(tripData, tripError).map((trip: { id: string; name: string }) => [trip.id, trip.name]));
+    return invitations.map((invitation) => ({ ...invitation, tripName: names.get(invitation.tripId) }));
+  },
+
+  async inviteTripEditor(tripId: string, email: string) {
+    const { error } = await createClient().rpc("tg_invite_trip_member", {
+      p_trip_id: tripId, p_email: email, p_expires_at: null,
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  async acceptTripInvitation(invitationId: string) {
+    const { data, error } = await createClient().rpc("tg_accept_trip_invitation", { p_invitation_id: invitationId });
+    return result(data, error) as string;
+  },
+
+  async revokeTripInvitation(invitationId: string) {
+    const { error } = await createClient().rpc("tg_revoke_trip_invitation", { p_invitation_id: invitationId });
+    if (error) throw new Error(error.message);
+  },
+
+  async removeTripEditor(tripId: string, userId: string) {
+    const { error } = await createClient().rpc("tg_remove_trip_editor", { p_trip_id: tripId, p_user_id: userId });
+    if (error) throw new Error(error.message);
+  },
+
+  async saveTrip(input: Pick<Trip, "name" | "startDate" | "endDate"> & { id?: string; ownerId?: string; isPublic?: boolean }) {
     const supabase = createClient();
     if (input.id) {
       const { data, error } = await supabase.from("tg_trips").update({
@@ -51,8 +112,16 @@ export const travelRepository = {
     if (authError || !authData.user) throw new Error("請先登入再新增旅行");
     const { data, error } = await supabase.from("tg_trips").insert({
       owner_id: authData.user.id, name: input.name, start_date: input.startDate, end_date: input.endDate,
+      is_public: input.isPublic ?? true,
     }).select().single();
     return mapTrip(result(data, error) as TgTripRow);
+  },
+
+  async setTripVisibility(tripId: string, isPublic: boolean) {
+    const { error } = await createClient().rpc("tg_set_trip_visibility", {
+      p_trip_id: tripId, p_is_public: isPublic,
+    });
+    if (error) throw new Error(error.message);
   },
 
   async duplicateTrip(tripId: string) {
@@ -162,3 +231,13 @@ export const travelRepository = {
     if (error) throw new Error(error.message);
   },
 };
+
+function mapInvitation(row: TgTripInvitationRow): TripInvitation {
+  return {
+    id: row.id,
+    tripId: row.trip_id,
+    email: row.email,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at ?? undefined,
+  };
+}

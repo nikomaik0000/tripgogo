@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { CirclePlus, Copy, MapPin, PlaneTakeoff, SquarePen, Trash2 } from "lucide-react";
+import { Copy, MapPin, PlaneTakeoff, SquarePen, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AuthControl } from "@/components/auth-control";
+import { AddIconButton } from "@/components/add-icon-button";
+import { PendingInvitationsControl } from "@/components/pending-invitations-control";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { TripFormDialog } from "@/components/trip-form-dialog";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { displayDate } from "@/lib/travel-dates";
 import { travelRepository } from "@/lib/travel-repository";
@@ -49,12 +50,13 @@ export function TripList({ initialTrips }: { initialTrips: Trip[] }) {
     <main className="mx-auto max-w-6xl px-4 pb-24 pt-4 sm:px-6">
       <header className="sticky top-0 z-20 -mx-4 mb-8 border-b border-border bg-bg/90 px-4 pb-4 pt-3 backdrop-blur sm:-mx-6 sm:px-6">
         <div className="flex items-center justify-between gap-3">
-          <h1 className="logo-title flex min-w-0 flex-1 items-center gap-5 whitespace-nowrap text-sm font-normal uppercase tracking-[0.08em] text-ink sm:text-[27px] sm:tracking-[0.24em]"><PlaneTakeoff className="h-5 w-5 shrink-0 sm:h-6 sm:w-6" />TRAVEL GOGO</h1>
+          <h1 className="logo-title flex min-w-0 flex-1 items-center gap-5 whitespace-nowrap text-sm font-normal uppercase tracking-[0.08em] text-ink sm:text-[27px] sm:tracking-[0.24em]"><PlaneTakeoff className="h-5 w-5 shrink-0 sm:h-6 sm:w-6" />TRIP GOGO</h1>
           <div className="flex shrink-0 items-center gap-2">
-            <AuthControl />
             {user
-              ? <Button size="icon" variant="primary" aria-label="新增旅行" title="新增旅行" className="h-11 w-11 sm:h-9 sm:w-9" onClick={() => { setEditing(undefined); setOpen(true); }}><CirclePlus className="h-5 w-5" /></Button>
-              : <span aria-hidden="true" className="h-11 w-11 sm:h-9 sm:w-9" />}
+              ? <AddIconButton context="header" label="新增旅行" onClick={() => { setEditing(undefined); setOpen(true); }} />
+              : <span aria-hidden="true" className="h-11 w-11" />}
+            <PendingInvitationsControl onAccepted={refreshRoles} />
+            <AuthControl />
           </div>
         </div>
       </header>
@@ -77,8 +79,15 @@ export function TripList({ initialTrips }: { initialTrips: Trip[] }) {
           })}
         </div>
       )}
-      <TripFormDialog open={open} trip={editing} onOpenChange={setOpen} onSave={(value) => {
-        travelRepository.saveTrip({ ...value, id: editing?.id, ownerId: editing?.ownerId }).then(() => Promise.all([refresh(), refreshRoles()])).then(() => {
+      <TripFormDialog open={open} trip={editing} role={editing ? roles.get(editing.id) : undefined} onOpenChange={setOpen} onSave={(value) => {
+        const save = async () => {
+          const saved = await travelRepository.saveTrip({ ...value, id: editing?.id, ownerId: editing?.ownerId });
+          if (editing && roles.get(editing.id) === "owner" && value.isPublic !== editing.isPublic) {
+            await travelRepository.setTripVisibility(editing.id, value.isPublic);
+          }
+          return saved;
+        };
+        save().then(() => Promise.all([refresh(), refreshRoles()])).then(() => {
           setOpen(false);
           toast.success(editing ? "已更新旅行" : "已新增旅行");
         }).catch((error) => toast.error(message(error, "儲存失敗")));
