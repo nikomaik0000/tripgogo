@@ -1,0 +1,55 @@
+diff --git a/lib/auth-context.tsx b/lib/auth-context.tsx
+index 98f9cd6..1eb1fc8 100644
+--- a/lib/auth-context.tsx
++++ b/lib/auth-context.tsx
+@@ -12,6 +12,11 @@ type AuthValue = {
+ };
+ 
+ const AuthContext = createContext<AuthValue | null>(null);
++const AUTH_RETURN_PATH_KEY = "travel-gogo:auth-return-path";
++
++function safeReturnPath(value: string) {
++  return value.startsWith("/") && !value.startsWith("//") && !value.includes("\\") ? value : "/";
++}
+ 
+ export function AuthProvider({ children }: { children: React.ReactNode }) {
+   const [user, setUser] = useState<User | null>(null);
+@@ -22,6 +27,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
+     supabase.auth.getUser().then(({ data }: { data: { user: User | null } }) => {
+       setUser(data.user);
+       setReady(true);
++      if (data.user) {
++        const returnPath = window.sessionStorage.getItem(AUTH_RETURN_PATH_KEY);
++        if (returnPath) {
++          window.sessionStorage.removeItem(AUTH_RETURN_PATH_KEY);
++          const safePath = safeReturnPath(returnPath);
++          if (safePath !== window.location.pathname + window.location.search) window.location.replace(safePath);
++        }
++      }
+     });
+     const { data } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
+       setUser(session?.user ?? null);
+@@ -34,8 +47,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
+     user,
+     ready,
+     async signInWithGoogle(next = window.location.pathname) {
++      window.sessionStorage.setItem(AUTH_RETURN_PATH_KEY, safeReturnPath(next));
+       const callback = new URL("/auth/callback", window.location.origin);
+-      callback.searchParams.set("next", next);
+       const { error } = await createClient().auth.signInWithOAuth({
+         provider: "google",
+         options: { redirectTo: callback.toString() },
+diff --git a/docs/CHANGELOG.md b/docs/CHANGELOG.md
+--- a/docs/CHANGELOG.md
++++ b/docs/CHANGELOG.md
+@@ -1,2 +1,9 @@
+ # Changelog
+ 
++## TRAVEL GOGO — OAuth Redirect Fix
++
++Changed
++
++- Google OAuth now sends an exact origin-relative `/auth/callback` redirect without query parameters, preventing localhost login from falling back to the production Site URL.
++- The pre-login path is retained in same-origin sessionStorage and restored only after a successful session instead of being included in Supabase's redirect allowlist URL.
++
+
