@@ -39,3 +39,14 @@ export type TgHotelStayRow = {
   address: string | null; phone: string | null; google_maps_url: string | null; link: string | null;
   note: string | null; created_at: string; updated_at: string;
 };
+
+export type TgTransportationRow = {
+  id: string; trip_id: string; created_by: string | null; type: "rental_car" | "rail";
+  company: string | null; vehicle_model: string | null; route_name: string | null;
+  start_date: string; start_time: string; end_date: string; end_time: string;
+  departure_place: string; arrival_place: string; train_number: string | null;
+  seat: string | null; carriage: string | null; ticket: string | null;
+  reservation_number: string | null; cost: string | null; address: string | null;
+  link: string | null; google_maps_url: string | null; note: string | null;
+  created_at: string; updated_at: string;
+};

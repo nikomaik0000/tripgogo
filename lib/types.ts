@@ -82,3 +82,45 @@ export interface HotelStay {
   createdAt: string;
   updatedAt: string;
 }
+
+export type TransportationType = "rental_car" | "rail";
+
+interface TransportationBase {
+  id: string;
+  tripId: string;
+  type: TransportationType;
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+  departurePlace: string;
+  arrivalPlace: string;
+  reservationNumber?: string;
+  cost?: string;
+  link?: string;
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RentalCarTransportation extends TransportationBase {
+  type: "rental_car";
+  company: string;
+  vehicleModel: string;
+  address?: string;
+  googleMapsUrl?: string;
+}
+
+export interface RailTransportation extends TransportationBase {
+  type: "rail";
+  routeName: string;
+  trainNumber?: string;
+  seat?: string;
+  carriage?: string;
+  ticket?: string;
+}
+
+export type Transportation = RentalCarTransportation | RailTransportation;
+export type TransportationInput =
+  | Omit<RentalCarTransportation, "id" | "tripId" | "createdAt" | "updatedAt">
+  | Omit<RailTransportation, "id" | "tripId" | "createdAt" | "updatedAt">;

@@ -4,6 +4,7 @@
 
 ### Done
 
+- Multi-entry rental-car and JR/rail transportation details in Outline with visibility-aware RLS
 - Owner-only public/private Trip control backed by visibility-aware RLS and `tg_set_trip_visibility`
 - Supabase Phase 3 role-aware controls and owner-only shared-editor management
 - Supabase Phase 2 Google Auth, SSR session refresh, and Supabase repository integration

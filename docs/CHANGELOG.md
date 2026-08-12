@@ -1,5 +1,17 @@
 # Changelog
 
+## TRIP GOGO — Transportation Details
+
+Added
+
+- Added multi-entry rental-car and JR/rail details to the existing Outline page, including responsive cards, dialogs, links, notes, and owner/editor CRUD controls.
+- Added the isolated `tg_transportations` table with type/integrity constraints, indexes, creator/timestamp triggers, visibility-aware reads, member-only writes, and Trip duplication support.
+
+Changed
+
+- Extended the existing Supabase client/server repository bundle and mapper/type layers to load transportation details alongside flights and hotels.
+- Added an Outline quick navigation row for flights, accommodation, transportation, and the existing date-grouped TravelItem summary, with sticky-header-safe smooth scrolling.
+
 ## TRAVEL GOGO — Trip Visibility UI
 
 Added

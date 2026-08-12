@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import type { TgFlightRow, TgHotelStayRow, TgTravelItemRow, TgTripRow } from "@/lib/database.types";
-import { mapFlight, mapHotelStay, mapItem, mapTrip } from "@/lib/travel-mappers";
+import type { TgFlightRow, TgHotelStayRow, TgTransportationRow, TgTravelItemRow, TgTripRow } from "@/lib/database.types";
+import { mapFlight, mapHotelStay, mapItem, mapTransportation, mapTrip } from "@/lib/travel-mappers";
 
 function ensure<T>(data: T | null, error: { message: string } | null): T {
   if (error) throw new Error(error.message);
@@ -15,11 +15,12 @@ export const travelServerRepository = {
   },
   async getTripBundle(tripId: string) {
     const supabase = await createClient();
-    const [tripResult, itemsResult, flightsResult, hotelsResult] = await Promise.all([
+    const [tripResult, itemsResult, flightsResult, hotelsResult, transportationsResult] = await Promise.all([
       supabase.from("tg_trips").select("*").eq("id", tripId).maybeSingle(),
       supabase.from("tg_travel_items").select("*").eq("trip_id", tripId).order("sort_order"),
       supabase.from("tg_flights").select("*").eq("trip_id", tripId).order("departure_date").order("departure_time"),
       supabase.from("tg_hotel_stays").select("*").eq("trip_id", tripId).order("check_in_date"),
+      supabase.from("tg_transportations").select("*").eq("trip_id", tripId).order("start_date").order("start_time"),
     ]);
     if (tripResult.error) throw new Error(tripResult.error.message);
     return {
@@ -27,6 +28,7 @@ export const travelServerRepository = {
       items: ensure(itemsResult.data, itemsResult.error).map((row) => mapItem(row as TgTravelItemRow)),
       flights: ensure(flightsResult.data, flightsResult.error).map((row) => mapFlight(row as TgFlightRow)),
       hotelStays: ensure(hotelsResult.data, hotelsResult.error).map((row) => mapHotelStay(row as TgHotelStayRow)),
+      transportations: ensure(transportationsResult.data, transportationsResult.error).map((row) => mapTransportation(row as TgTransportationRow)),
     };
   },
 };

@@ -1,5 +1,5 @@
-import type { TgFlightRow, TgHotelStayRow, TgTravelItemRow, TgTripRow } from "@/lib/database.types";
-import type { Flight, HotelStay, TravelItem, Trip } from "@/lib/types";
+import type { TgFlightRow, TgHotelStayRow, TgTransportationRow, TgTravelItemRow, TgTripRow } from "@/lib/database.types";
+import type { Flight, HotelStay, Transportation, TravelItem, Trip } from "@/lib/types";
 
 export const mapTrip = (row: TgTripRow): Trip => ({
   id: row.id, ownerId: row.owner_id, name: row.name, startDate: row.start_date,
@@ -31,3 +31,16 @@ export const mapHotelStay = (row: TgHotelStayRow): HotelStay => ({
   link: row.link ?? undefined, note: row.note ?? undefined,
   createdAt: row.created_at, updatedAt: row.updated_at,
 });
+
+export const mapTransportation = (row: TgTransportationRow): Transportation => {
+  const common = {
+    id: row.id, tripId: row.trip_id, startDate: row.start_date, startTime: row.start_time.slice(0, 5),
+    endDate: row.end_date, endTime: row.end_time.slice(0, 5), departurePlace: row.departure_place,
+    arrivalPlace: row.arrival_place, reservationNumber: row.reservation_number ?? undefined,
+    cost: row.cost ?? undefined, link: row.link ?? undefined, note: row.note ?? undefined,
+    createdAt: row.created_at, updatedAt: row.updated_at,
+  };
+  return row.type === "rental_car"
+    ? { ...common, type: "rental_car", company: row.company ?? "", vehicleModel: row.vehicle_model ?? "", address: row.address ?? undefined, googleMapsUrl: row.google_maps_url ?? undefined }
+    : { ...common, type: "rail", routeName: row.route_name ?? "", trainNumber: row.train_number ?? undefined, seat: row.seat ?? undefined, carriage: row.carriage ?? undefined, ticket: row.ticket ?? undefined };
+};

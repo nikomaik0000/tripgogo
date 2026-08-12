@@ -1,8 +1,8 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
-import type { TgFlightRow, TgHotelStayRow, TgProfileRow, TgTravelItemRow, TgTripInvitationRow, TgTripMemberRow, TgTripRow } from "@/lib/database.types";
-import { mapFlight, mapHotelStay, mapItem, mapTrip } from "@/lib/travel-mappers";
-import type { Flight, HotelStay, TravelItem, Trip, TripEditor, TripInvitation, TripRole } from "@/lib/types";
+import type { TgFlightRow, TgHotelStayRow, TgProfileRow, TgTransportationRow, TgTravelItemRow, TgTripInvitationRow, TgTripMemberRow, TgTripRow } from "@/lib/database.types";
+import { mapFlight, mapHotelStay, mapItem, mapTransportation, mapTrip } from "@/lib/travel-mappers";
+import type { Flight, HotelStay, Transportation, TransportationInput, TravelItem, Trip, TripEditor, TripInvitation, TripRole } from "@/lib/types";
 
 function result<T>(data: T | null, error: PostgrestError | null): T {
   if (error) throw new Error(error.message);
@@ -228,6 +228,42 @@ export const travelRepository = {
 
   async deleteHotelStay(stayId: string) {
     const { error } = await createClient().from("tg_hotel_stays").delete().eq("id", stayId);
+    if (error) throw new Error(error.message);
+  },
+
+  async getTransportations(tripId: string) {
+    const { data, error } = await createClient().from("tg_transportations").select("*").eq("trip_id", tripId)
+      .order("start_date").order("start_time");
+    return result(data, error).map((row: unknown) => mapTransportation(row as TgTransportationRow));
+  },
+
+  async saveTransportation(input: TransportationInput & { tripId: string; id?: string }) {
+    const values = {
+      trip_id: input.tripId, type: input.type,
+      company: input.type === "rental_car" ? input.company : null,
+      vehicle_model: input.type === "rental_car" ? input.vehicleModel : null,
+      route_name: input.type === "rail" ? input.routeName : null,
+      start_date: input.startDate, start_time: input.startTime, end_date: input.endDate, end_time: input.endTime,
+      departure_place: input.departurePlace, arrival_place: input.arrivalPlace,
+      train_number: input.type === "rail" ? input.trainNumber ?? null : null,
+      seat: input.type === "rail" ? input.seat ?? null : null,
+      carriage: input.type === "rail" ? input.carriage ?? null : null,
+      ticket: input.type === "rail" ? input.ticket ?? null : null,
+      reservation_number: input.reservationNumber ?? null, cost: input.cost ?? null,
+      address: input.type === "rental_car" ? input.address ?? null : null,
+      link: input.link ?? null,
+      google_maps_url: input.type === "rental_car" ? input.googleMapsUrl ?? null : null,
+      note: input.note ?? null,
+    };
+    const query = input.id
+      ? createClient().from("tg_transportations").update(values).eq("id", input.id)
+      : createClient().from("tg_transportations").insert(values);
+    const { data, error } = await query.select().single();
+    return mapTransportation(result(data, error) as TgTransportationRow);
+  },
+
+  async deleteTransportation(transportationId: string) {
+    const { error } = await createClient().from("tg_transportations").delete().eq("id", transportationId);
     if (error) throw new Error(error.message);
   },
 };
