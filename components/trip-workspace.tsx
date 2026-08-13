@@ -194,29 +194,36 @@ function SortableDailyCard({ item, onEdit, onDelete }: { item: TravelItem; onEdi
 }
 
 function DailyCard({ item, canEdit, onEdit, onDelete }: { item: TravelItem; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
-  const meta = [item.category, item.area].filter(Boolean).join(" ｜ ");
   return <article className="rounded-card border border-border bg-surface shadow-soft sm:h-[156px]">
     <div className="p-6 sm:hidden">
       <div className="flex min-w-0 items-center gap-4"><TypeMark type={item.type} large /><DailyItemName item={item} /></div>
-      {meta && <p className="mt-5 truncate text-sm text-muted">{meta}</p>}
+      <DailyInfoRow item={item} className="mt-5" />
       <div className="my-5 border-t border-divider" />
-      <BusinessHours item={item} compact={false} flush />
-      {item.note && <div className={item.businessHours ? "mt-3" : ""}><ClampedNote note={item.note} lines={2} /></div>}
+      {item.note && <ClampedNote note={item.note} lines={2} />}
       <div className="mt-5 border-t border-divider" />
       <DailyFooter item={item} canEdit={canEdit} onEdit={onEdit} onDelete={onDelete} />
     </div>
     <div className="hidden h-full grid-cols-[38fr_42fr_20fr] sm:grid">
       <div className="flex min-w-0 flex-col justify-between px-6 py-5">
         <div className="flex min-w-0 items-center gap-4"><TypeMark type={item.type} /><DailyItemName item={item} /></div>
-        <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2"><span className="truncate text-xs text-muted">{meta}</span><BusinessHours item={item} compact flush /></div>
+        <DailyInfoRow item={item} compact />
       </div>
       <div className="flex min-w-0 flex-col border-l border-divider px-6 py-5">
         {item.note && <ClampedNote note={item.note} lines={3} />}
-        {(item.extraLink1 || item.extraLink2) && <div className="mt-auto flex items-center gap-4">{item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} />}{item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} />}</div>}
       </div>
-      <div className="flex items-center justify-end gap-2 border-l border-divider px-4" data-no-dnd><DailyActions item={item} canEdit={canEdit} onEdit={onEdit} onDelete={onDelete} /></div>
+      <div className="flex items-center justify-end gap-2 border-l border-divider px-4" data-no-dnd><DailyActions item={item} canEdit={canEdit} includeExternalLinks onEdit={onEdit} onDelete={onDelete} /></div>
     </div>
   </article>;
+}
+
+function DailyInfoRow({ item, compact = false, className = "" }: { item: TravelItem; compact?: boolean; className?: string }) {
+  const status = item.businessHours ? getBusinessStatus(item.businessHours) : null;
+  const hasHoursDivider = Boolean((item.category || item.area) && item.businessHours);
+  if (!item.category && !item.area && !item.businessHours) return null;
+  return <div className={`flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-2 leading-4 text-muted ${compact ? "text-xs sm:gap-x-2" : "text-sm"} ${className}`}>
+    {(item.category || item.area) && <span className="max-w-full shrink-0 truncate">{[item.category, item.area].filter(Boolean).join(" ｜ ")}</span>}
+    {item.businessHours && <span className="flex shrink-0 items-center gap-2 leading-4">{hasHoursDivider && <span aria-hidden="true" className="shrink-0 leading-4">｜</span>}<Clock3 className="h-4 w-4 shrink-0" /><span className="shrink-0 whitespace-nowrap leading-4">{item.businessHours}</span>{status && <BusinessStatusLabel status={status} />}</span>}
+  </div>;
 }
 
 function TypeMark({ type, large = false }: { type: TravelItemType; large?: boolean }) {
@@ -266,11 +273,11 @@ function ClampedNote({ note, lines }: { note: string; lines: 2 | 3 | 4 }) {
 }
 
 function DailyFooter({ item, canEdit, onEdit, onDelete }: { item: TravelItem; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
-  return <footer className="flex h-14 items-center" data-no-dnd><div className="flex items-center gap-4">{item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} />}{item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} />}</div><div className="ml-auto flex items-center gap-4"><DailyActions item={item} canEdit={canEdit} onEdit={onEdit} onDelete={onDelete} /></div></footer>;
+  return <footer className="flex h-14 items-center justify-end" data-no-dnd><div className="flex items-center gap-4"><DailyActions item={item} canEdit={canEdit} includeExternalLinks onEdit={onEdit} onDelete={onDelete} /></div></footer>;
 }
 
-function DailyActions({ item, canEdit, onEdit, onDelete }: { item: TravelItem; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
-  return <>{item.googleMapsUrl && <a href={item.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label="開啟 Google Maps" title="開啟 Google Maps" onPointerDown={stopDrag} className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-ink sm:h-9 sm:w-9"><Navigation className="h-[18px] w-[18px]" /></a>}{canEdit && <><Action label="編輯" smallIcon onPointerDown={stopDrag} onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onPointerDown={stopDrag} onClick={onDelete}><Trash2 /></Action></>}</>;
+function DailyActions({ item, canEdit, includeExternalLinks = false, onEdit, onDelete }: { item: TravelItem; canEdit: boolean; includeExternalLinks?: boolean; onEdit: () => void; onDelete: () => void }) {
+  return <>{includeExternalLinks && item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} />}{includeExternalLinks && item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} />}{item.googleMapsUrl && <a href={item.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label="開啟 Google Maps" title="開啟 Google Maps" onPointerDown={stopDrag} className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-ink sm:h-9 sm:w-9"><Navigation className="h-[18px] w-[18px]" /></a>}{canEdit && <><Action label="編輯" smallIcon onPointerDown={stopDrag} onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onPointerDown={stopDrag} onClick={onDelete}><Trash2 /></Action></>}</>;
 }
 
 function stopDrag(event: React.SyntheticEvent) { event.stopPropagation(); }
@@ -385,16 +392,16 @@ function ItemName({ item }: { item: TravelItem }) { return item.googleMapsUrl ? 
 function BusinessHours({ item, compact, flush = false }: { item: TravelItem; compact: boolean; flush?: boolean }) {
   if (!item.businessHours) return null;
   const status = getBusinessStatus(item.businessHours);
-  return <div className={`flex min-w-0 flex-wrap items-center gap-2 text-muted ${compact ? "mt-2 text-xs" : `${flush ? "" : "mt-3"} text-sm`}`}><Clock3 className="h-4 w-4 shrink-0" /><span className="min-w-0 break-words">{item.businessHours}</span>{status && <BusinessStatusLabel status={status} />}</div>;
+  return <div className={`flex min-w-0 flex-wrap items-center gap-2 leading-4 text-muted ${compact ? `${flush ? "" : "mt-2"} text-xs` : `${flush ? "" : "mt-3"} text-sm`}`}><Clock3 className="h-4 w-4 shrink-0" /><span className="min-w-0 break-words">{item.businessHours}</span>{status && <BusinessStatusLabel status={status} />}</div>;
 }
 function BusinessStatusLabel({ status }: { status: BusinessStatus }) {
   const values = {
-    open: { label: "營業中", className: "border-tag-drink bg-tag-drink text-tag-drink-fg" },
-    "closing-soon": { label: "即將打烊", className: "border-tag-expiring bg-tag-expiring text-tag-expiring-fg" },
-    closed: { label: "已打烊", className: "border-tag-other bg-tag-other text-tag-other-fg" },
+    open: { label: "營業中", mobileLabel: "營", className: "border-tag-drink bg-tag-drink text-tag-drink-fg" },
+    "closing-soon": { label: "即將打烊", mobileLabel: "營", className: "border-tag-expiring bg-tag-expiring text-tag-expiring-fg" },
+    closed: { label: "已打烊", mobileLabel: "休", className: "border-tag-other bg-tag-other text-tag-other-fg" },
   } as const;
   const value = values[status];
-  return <span className={`rounded-lg border px-2 py-0.5 text-[11px] leading-4 ${value.className}`}>{value.label}</span>;
+  return <span className={`inline-flex shrink-0 items-center rounded-lg border px-2 py-0.5 text-[11px] leading-4 ${value.className}`}><span className="sm:hidden">{value.mobileLabel}</span><span className="hidden sm:inline">{value.label}</span></span>;
 }
 function ExternalLinkAction({ href, index }: { href: string; index: 1 | 2 }) {
   const label = `開啟其他連結 ${index}`;
