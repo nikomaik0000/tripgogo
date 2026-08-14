@@ -1,5 +1,6 @@
 export type TravelItemType = "place" | "food";
 export type TripRole = "owner" | "editor";
+export type TripResourceCategory = "transportation" | "coupon" | "note";
 
 export interface TripEditor {
   userId: string;
@@ -24,6 +25,19 @@ export interface Trip {
   startDate: string;
   endDate: string;
   isPublic: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TripResource {
+  id: string;
+  tripId: string;
+  createdBy?: string;
+  category: TripResourceCategory;
+  title: string;
+  note?: string;
+  externalUrl?: string;
+  imagePath?: string;
   createdAt: string;
   updatedAt: string;
 }

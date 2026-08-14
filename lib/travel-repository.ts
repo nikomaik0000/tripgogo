@@ -1,8 +1,12 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
-import type { TgFlightRow, TgHotelStayRow, TgProfileRow, TgTransportationRow, TgTravelItemRow, TgTripInvitationRow, TgTripMemberRow, TgTripRow } from "@/lib/database.types";
-import { mapFlight, mapHotelStay, mapItem, mapTransportation, mapTrip } from "@/lib/travel-mappers";
-import type { Flight, HotelStay, Transportation, TransportationInput, TravelItem, Trip, TripEditor, TripInvitation, TripRole } from "@/lib/types";
+import type { TgFlightRow, TgHotelStayRow, TgProfileRow, TgTransportationRow, TgTravelItemRow, TgTripInvitationRow, TgTripMemberRow, TgTripResourceRow, TgTripRow } from "@/lib/database.types";
+import { mapFlight, mapHotelStay, mapItem, mapTransportation, mapTrip, mapTripResource } from "@/lib/travel-mappers";
+import type { Flight, HotelStay, Transportation, TransportationInput, TravelItem, Trip, TripEditor, TripInvitation, TripResource, TripRole } from "@/lib/types";
+
+const RESOURCE_IMAGE_BUCKET = "tg-trip-resources";
+const RESOURCE_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+const RESOURCE_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 function result<T>(data: T | null, error: PostgrestError | null): T {
   if (error) throw new Error(error.message);
@@ -171,6 +175,48 @@ export const travelRepository = {
   async deleteItem(itemId: string) {
     const { error } = await createClient().from("tg_travel_items").delete().eq("id", itemId);
     if (error) throw new Error(error.message);
+  },
+
+  async getTripResources(tripId: string) {
+    const { data, error } = await createClient().from("tg_trip_resources").select("*")
+      .eq("trip_id", tripId).order("created_at", { ascending: false });
+    return result(data, error).map((row: unknown) => mapTripResource(row as TgTripResourceRow));
+  },
+
+  async saveTripResource(input: Pick<TripResource, "tripId" | "category" | "title" | "note" | "externalUrl" | "imagePath"> & { id?: string }) {
+    const values = {
+      trip_id: input.tripId, category: input.category, title: input.title,
+      note: input.note ?? null, external_url: input.externalUrl ?? null,
+      image_path: input.imagePath ?? null,
+    };
+    const query = input.id
+      ? createClient().from("tg_trip_resources").update(values).eq("id", input.id)
+      : createClient().from("tg_trip_resources").insert(values);
+    const { data, error } = await query.select().single();
+    return mapTripResource(result(data, error) as TgTripResourceRow);
+  },
+
+  async deleteTripResource(resourceId: string) {
+    const { error } = await createClient().from("tg_trip_resources").delete().eq("id", resourceId);
+    if (error) throw new Error(error.message);
+  },
+
+  async uploadTripResourceImage(tripId: string, file: File) {
+    if (!RESOURCE_IMAGE_TYPES.has(file.type)) throw new Error("圖片格式僅支援 JPG、PNG、WebP 或 GIF");
+    if (file.size > RESOURCE_IMAGE_MAX_BYTES) throw new Error("圖片大小不可超過 10 MB");
+    const extension = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "image";
+    const path = `${tripId}/${crypto.randomUUID()}.${extension}`;
+    const { error } = await createClient().storage.from(RESOURCE_IMAGE_BUCKET).upload(path, file, {
+      cacheControl: "31536000", contentType: file.type, upsert: false,
+    });
+    if (error) throw new Error(error.message);
+    return path;
+  },
+
+  async getTripResourceImageUrl(path: string) {
+    const { data, error } = await createClient().storage.from(RESOURCE_IMAGE_BUCKET).createSignedUrl(path, 60 * 60);
+    if (error) throw new Error(error.message);
+    return data.signedUrl;
   },
 
   async reorderItems(tripId: string, date: string, orderedIds: string[]) {

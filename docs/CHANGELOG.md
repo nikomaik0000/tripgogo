@@ -362,6 +362,21 @@ Removed
 - Dark theme
 # TRAVEL GOGO
 
+## 2026-08-14
+
+### Added
+
+- Added Trip-scoped 旅途資訊 for transportation references, coupons, and notes, with optional notes, external links, and one private image.
+- Added visibility-aware Resource and Storage RLS, owner/editor CRUD controls, responsive image previews, and Resource-aware Trip duplication.
+- Preserved the shared Daily, Places, Food, and Outline navigation on the Resource page, with links back to each corresponding Trip view.
+- Grouped Resources into transportation, coupon, and note sections with Outline-style quick navigation, responsive horizontal scrolling, and sticky-header-aware smooth jumps.
+- Unified Resource notes with the shared measured two-line `+ more` behavior and kept desktop grid rows equal-height without fixed card or note heights.
+- Added permission-aware section create actions that open the Resource Dialog with transportation, coupon, or note preselected while leaving the category editable.
+- Made Resource note previews image-aware (two lines with an image, ten without) and safely linkified HTTP(S) URLs in both previews and full-note Dialogs.
+- Simplified linkified Resource-note URLs to accessible icon-only actions while preserving each complete external href.
+- Kept the FolderHeart shortcut visible across every Trip view and gave it the existing foreground token as a background-free active state on Resources.
+- Replaced the Resource Dialog's native image input with an accessible clickable dropzone, drag-and-drop states, previews, and replace/remove actions while preserving the existing upload flow.
+
 ## 2026-08-07
 
 ### Changed

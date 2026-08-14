@@ -1,5 +1,5 @@
-import type { TgFlightRow, TgHotelStayRow, TgTransportationRow, TgTravelItemRow, TgTripRow } from "@/lib/database.types";
-import type { Flight, HotelStay, Transportation, TravelItem, Trip } from "@/lib/types";
+import type { TgFlightRow, TgHotelStayRow, TgTransportationRow, TgTravelItemRow, TgTripResourceRow, TgTripRow } from "@/lib/database.types";
+import type { Flight, HotelStay, Transportation, TravelItem, Trip, TripResource } from "@/lib/types";
 
 export const mapTrip = (row: TgTripRow): Trip => ({
   id: row.id, ownerId: row.owner_id, name: row.name, startDate: row.start_date,
@@ -12,6 +12,13 @@ export const mapItem = (row: TgTravelItemRow): TravelItem => ({
   googleMapsUrl: row.google_maps_url, extraLink1: row.extra_link_1 ?? undefined,
   extraLink2: row.extra_link_2 ?? undefined, businessHours: row.business_hours ?? undefined,
   note: row.note, order: row.sort_order, createdAt: row.created_at, updatedAt: row.updated_at,
+});
+
+export const mapTripResource = (row: TgTripResourceRow): TripResource => ({
+  id: row.id, tripId: row.trip_id, createdBy: row.created_by ?? undefined,
+  category: row.category, title: row.title, note: row.note ?? undefined,
+  externalUrl: row.external_url ?? undefined, imagePath: row.image_path ?? undefined,
+  createdAt: row.created_at, updatedAt: row.updated_at,
 });
 
 export const mapFlight = (row: TgFlightRow): Flight => ({

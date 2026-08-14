@@ -21,6 +21,9 @@
 
 - Add one-time localStorage migration/import flow (Phase 4)
 - Add drag-and-drop itinerary ordering
+- Design a Resource image reference/cleanup mechanism after the Phase 1 shared-image model.
+  - Deleting a Resource must not assume its Storage object has no other references.
+  - Revisit cleanup together with physical image duplication if Trip duplicate later copies image objects.
 
 ## Done
 

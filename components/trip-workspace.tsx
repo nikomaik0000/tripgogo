@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowUpDown, CalendarDays, CarFront, ChevronRight, Clock3, Hotel, Link2, MapPin, MapPinned, Navigation, NotebookTabs, Plane, Search, SquarePen, Trash2, UtensilsCrossed, X } from "lucide-react";
+import { ArrowLeft, ArrowUpDown, CalendarDays, CarFront, ChevronRight, Clock3, FolderHeart, Hotel, Link2, MapPin, MapPinned, Navigation, Plane, Search, SquarePen, Trash2, UtensilsCrossed, X } from "lucide-react";
 import { closestCenter, DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -11,11 +11,12 @@ import { AuthControl } from "@/components/auth-control";
 import { AddIconButton } from "@/components/add-icon-button";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ClampedNote } from "@/components/clamped-note";
 import { FlightDialog } from "@/components/flight-dialog";
 import { HotelStayDialog } from "@/components/hotel-stay-dialog";
 import { TransportationDialog } from "@/components/transportation-dialog";
 import { TravelItemDialog } from "@/components/travel-item-dialog";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { TripPrimaryNav, type TripPrimaryTab } from "@/components/trip-primary-nav";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { displayDate, tripDates } from "@/lib/travel-dates";
@@ -60,6 +61,10 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
     }
     travelRepository.getTripRole(tripId).then(setRole).catch((error) => toast.error(errorMessage(error, "無法確認編輯權限")));
   }, [authReady, tripId, user]);
+  useEffect(() => {
+    const requestedTab = new URLSearchParams(window.location.search).get("tab");
+    if (requestedTab === "daily" || requestedTab === "place" || requestedTab === "food" || requestedTab === "outline") setTab(requestedTab);
+  }, []);
   const edit = (item: TravelItem) => setDialog({ open: true, type: item.type, item });
   const remove = (item: TravelItem) => setDeleting(item);
   const canEdit = Boolean(role);
@@ -84,15 +89,11 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
   };
 
   if (!trip) return <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6"><Link href="/" className="flex items-center gap-2 text-sm text-muted"><ArrowLeft className="h-5 w-5" />返回</Link><EmptyState title="找不到這趟旅行" description="" /></main>;
-  const tabs: { value: Tab; label: string; icon: typeof CalendarDays }[] = [
-    { value: "daily", label: "每日", icon: CalendarDays }, { value: "place", label: "地點", icon: MapPin },
-    { value: "food", label: "美食", icon: UtensilsCrossed }, { value: "outline", label: "大綱", icon: NotebookTabs },
-  ];
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24 pt-4 sm:px-6">
       <header className="sticky top-0 z-20 -mx-4 mb-8 border-b border-border bg-bg/90 px-4 pb-4 pt-3 backdrop-blur sm:-mx-6 sm:px-6">
-        <div className="mb-4 flex items-center gap-3"><Link href="/" aria-label="返回" title="返回" className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-ink sm:h-9 sm:w-9"><ArrowLeft className="h-5 w-5" /></Link><h1 className="min-w-0 flex-1 truncate text-title font-semibold">{trip.name}</h1><div className="flex w-[96px] shrink-0 items-center justify-end gap-2">{canEdit && tab !== "outline" ? <AddIconButton context="header" label={tab === "daily" ? "新增行程" : `新增${tab === "place" ? "地點" : "美食"}`} onClick={() => setDialog({ open: true, type: tab === "food" ? "food" : "place", allowTypeChange: tab === "daily" })} /> : <span aria-hidden="true" className="h-11 w-11 shrink-0" />}<AuthControl /></div></div>
-        <nav className="grid grid-cols-4 gap-1 rounded-card bg-searchBackground p-1" aria-label="旅程分頁">{tabs.map(({ value, label, icon: Icon }) => <button key={value} type="button" onClick={() => setTab(value)} className={`flex h-9 items-center justify-center gap-2 rounded-lg text-sm transition-colors ${tab === value ? "bg-surface text-ink shadow-soft" : "text-muted hover:text-ink"}`}><Icon className="h-5 w-5" /><span>{label}</span></button>)}</nav>
+        <div className="mb-4 flex items-center gap-3"><Link href="/" aria-label="返回" title="返回" className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-ink sm:h-9 sm:w-9"><ArrowLeft className="h-5 w-5" /></Link><h1 className="min-w-0 flex-1 truncate text-title font-semibold">{trip.name}</h1><div className="flex w-[140px] shrink-0 items-center justify-end gap-2">{canEdit && tab !== "outline" ? <AddIconButton context="header" label={tab === "daily" ? "新增行程" : `新增${tab === "place" ? "地點" : "美食"}`} onClick={() => setDialog({ open: true, type: tab === "food" ? "food" : "place", allowTypeChange: tab === "daily" })} /> : <span aria-hidden="true" className="h-11 w-11 shrink-0" />}<Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-ink"><FolderHeart className="h-5 w-5" /></Link><AuthControl /></div></div>
+        <TripPrimaryNav activeTab={tab} onTabChange={setTab} />
       </header>
       {tab === "daily" && <Daily trip={trip} items={items} canEdit={canEdit} onAdd={(date) => setDialog({ open: true, type: "place", initialDate: date, allowTypeChange: true })} onEdit={edit} onDelete={remove} onReorder={reorder} />}
       {(tab === "place" || tab === "food") && <ItemList type={tab} items={items} query={query} sort={sort} canEdit={canEdit} onQuery={setQuery} onSort={setSort} onEdit={edit} onDelete={remove} />}
@@ -241,43 +242,27 @@ function isInteractiveTarget(target: EventTarget | null) {
   return target instanceof Element && Boolean(target.closest("a, button, input, textarea, select"));
 }
 
-function ClampedNote({ note, lines }: { note: string; lines: 2 | 3 | 4 }) {
-  const textRef = useRef<HTMLParagraphElement>(null);
-  const [isTruncated, setIsTruncated] = useState(false);
-  const [open, setOpen] = useState(false);
-
-  useLayoutEffect(() => {
-    const element = textRef.current;
-    if (!element) return;
-    const measure = () => setIsTruncated(element.scrollHeight > element.clientHeight + 1);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [note, lines]);
-
-  return <>
-    <div className="grid min-w-0 grid-cols-[16px_minmax(0,1fr)] items-start gap-x-2 text-sm text-muted">
-      <span aria-hidden="true" className="flex h-4 w-4 items-center justify-center leading-4">✦</span>
-      <div className="min-w-0">
-        <p ref={textRef} className={`${lines === 2 ? "line-clamp-2" : lines === 3 ? "line-clamp-3" : "line-clamp-4"} min-w-0 whitespace-pre-wrap break-words`}>{note}</p>
-        {isTruncated && <button type="button" aria-label="查看完整備註" title="查看完整備註" onMouseDown={stopDrag} onTouchStart={stopDrag} onPointerDown={stopDrag} onClick={() => setOpen(true)} className="block text-xs leading-4 text-muted/90 transition-colors hover:text-muted">+ more</button>}
-      </div>
-    </div>
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent title="備註">
-        <p className="whitespace-pre-wrap break-words text-sm text-ink">{note}</p>
-      </DialogContent>
-    </Dialog>
-  </>;
-}
-
 function DailyFooter({ item, canEdit, onEdit, onDelete }: { item: TravelItem; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
   return <footer className="flex h-14 items-center justify-end" data-no-dnd><div className="flex items-center gap-4"><DailyActions item={item} canEdit={canEdit} includeExternalLinks onEdit={onEdit} onDelete={onDelete} /></div></footer>;
 }
 
+function DailyDesktopActions({ item, canEdit, onEdit, onDelete }: { item: TravelItem; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
+  const slots = [
+    item.extraLink1 && item.extraLink2 ? <ExternalLinkAction href={item.extraLink1} index={1} /> : null,
+    item.extraLink2 ? <ExternalLinkAction href={item.extraLink2} index={2} /> : item.extraLink1 ? <ExternalLinkAction href={item.extraLink1} index={1} /> : null,
+    item.googleMapsUrl ? <DailyNavigationAction href={item.googleMapsUrl} /> : null,
+    canEdit ? <Action label="編輯" smallIcon onPointerDown={stopDrag} onClick={onEdit}><SquarePen /></Action> : null,
+    canEdit ? <Action label="刪除" smallIcon onPointerDown={stopDrag} onClick={onDelete}><Trash2 /></Action> : null,
+  ];
+  return <div className="grid grid-cols-5 items-center border-l border-divider px-2" data-no-dnd>{slots.map((action, index) => <div key={index} className="flex min-w-0 items-center justify-center">{action}</div>)}</div>;
+}
+
 function DailyActions({ item, canEdit, includeExternalLinks = false, onEdit, onDelete }: { item: TravelItem; canEdit: boolean; includeExternalLinks?: boolean; onEdit: () => void; onDelete: () => void }) {
-  return <>{includeExternalLinks && item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} />}{includeExternalLinks && item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} />}{item.googleMapsUrl && <a href={item.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label="開啟 Google Maps" title="開啟 Google Maps" onPointerDown={stopDrag} className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-ink sm:h-9 sm:w-9"><Navigation className="h-[18px] w-[18px]" /></a>}{canEdit && <><Action label="編輯" smallIcon onPointerDown={stopDrag} onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onPointerDown={stopDrag} onClick={onDelete}><Trash2 /></Action></>}</>;
+  return <>{includeExternalLinks && item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} />}{includeExternalLinks && item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} />}{item.googleMapsUrl && <DailyNavigationAction href={item.googleMapsUrl} />}{canEdit && <><Action label="編輯" smallIcon onPointerDown={stopDrag} onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onPointerDown={stopDrag} onClick={onDelete}><Trash2 /></Action></>}</>;
+}
+
+function DailyNavigationAction({ href }: { href: string }) {
+  return <a href={href} target="_blank" rel="noopener noreferrer" aria-label="開啟 Google Maps" title="開啟 Google Maps" onPointerDown={stopDrag} className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-ink sm:h-9 sm:w-9"><Navigation className="h-[18px] w-[18px]" /></a>;
 }
 
 function stopDrag(event: React.SyntheticEvent) { event.stopPropagation(); }
