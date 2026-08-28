@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useUnsavedChangesDialog } from "@/components/confirm-dialog";
 import { TripMembersManager } from "@/components/trip-members-manager";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -29,9 +30,12 @@ export function TripFormDialog({ open, trip, role, onOpenChange, onSave }: {
     setIsPublic(trip?.isPublic ?? true);
   }, [open, trip]);
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent title={trip ? "編輯旅行" : "新增旅行"}>
+  const isDirty = name !== (trip?.name ?? "") || startDate !== (trip?.startDate ?? "") || endDate !== (trip?.endDate ?? "") || isPublic !== (trip?.isPublic ?? true);
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesDialog(isDirty, () => onOpenChange(false));
+
+  return <>
+    <Dialog open={open} onOpenChange={(next) => { if (!next) requestClose(); }}>
+      <DialogContent title={trip ? "編輯旅行" : "新增旅行"} preventOutsideDismiss onEscapeKeyDown={(event) => { event.preventDefault(); requestClose(); }}>
         <form className="space-y-4" onSubmit={(event) => {
           event.preventDefault();
           if (!name.trim() || !startDate || !endDate) return toast.error("請完整填寫資料");
@@ -53,14 +57,15 @@ export function TripFormDialog({ open, trip, role, onOpenChange, onSave }: {
             </div>
           )}
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>取消</Button>
+            <Button type="button" variant="ghost" onClick={requestClose}>取消</Button>
             <Button type="submit">儲存</Button>
           </div>
         </form>
         {trip && role === "owner" && <TripMembersManager tripId={trip.id} />}
       </DialogContent>
     </Dialog>
-  );
+    {unsavedChangesDialog}
+  </>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

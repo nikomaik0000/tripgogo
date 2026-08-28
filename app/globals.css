@@ -52,4 +52,18 @@
   .logo-title {
     font-family: Georgia, "Times New Roman", Times, serif;
   }
+
+  .trip-primary-nav {
+    container-type: inline-size;
+  }
+
+  @container (max-width: 15.5em) {
+    .trip-primary-nav-item {
+      gap: 0;
+    }
+
+    .trip-primary-nav-label {
+      display: none;
+    }
+  }
 }

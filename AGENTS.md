@@ -79,6 +79,8 @@ Before stopping, always provide:
 3. Explanation of why each file was modified.
 4. A git patch (.diff) containing all changes.
 
+所有工作產生的 `.diff` artifact 一律存放於 repository root 的 `diffs/`，不得直接放在 repository root。
+
 Then stop and wait for my approval.
 
 Do not commit.

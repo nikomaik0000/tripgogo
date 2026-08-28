@@ -362,6 +362,19 @@ Removed
 - Dark theme
 # TRAVEL GOGO
 
+## 2026-08-28
+
+### Changed
+
+- Added an idempotent follow-up migration that restores the atomic, member-protected TravelItem reorder RPC without replacing later Trip duplication behavior.
+- Prevented every data-entry Dialog from closing through overlay or outside clicks, and added unsaved-change confirmation for X, Cancel, and Escape while preserving read-only Dialog dismissal behavior.
+
+## 2026-08-17
+
+### Changed
+
+- Added a font-size-aware container-query fallback to the shared four-item Trip navigation, hiding labels only when its actual inline space cannot fit them while preserving icons, active styling, and accessible names.
+
 ## 2026-08-14
 
 ### Added

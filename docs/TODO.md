@@ -4,6 +4,9 @@
 
 ### Done
 
+- Idempotent Supabase migration restoring member-protected Daily TravelItem reordering
+- Data-entry Dialog outside-dismiss prevention and unsaved-change confirmation
+- Trip primary navigation falls back to icon-only presentation when its container cannot fit the four enlarged labels
 - Multi-entry rental-car and JR/rail transportation details in Outline with visibility-aware RLS
 - Owner-only public/private Trip control backed by visibility-aware RLS and `tg_set_trip_visibility`
 - Supabase Phase 3 role-aware controls and owner-only shared-editor management

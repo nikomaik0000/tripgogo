@@ -17,13 +17,13 @@ export function TripPrimaryNav({ activeTab, onTabChange, tripId }: {
   onTabChange?: (tab: TripPrimaryTab) => void;
   tripId?: string;
 }) {
-  return <nav className="grid grid-cols-4 gap-1 rounded-card bg-searchBackground p-1" aria-label="旅程分頁">
+  return <nav className="trip-primary-nav grid grid-cols-4 gap-1 rounded-card bg-searchBackground p-1" aria-label="旅程分頁">
     {TABS.map(({ value, label, icon: Icon }) => {
-      const className = `flex h-9 min-w-0 items-center justify-center gap-2 rounded-lg text-sm transition-colors ${activeTab === value ? "bg-surface text-ink shadow-soft" : "text-muted hover:text-ink"}`;
-      const content = <><Icon className="h-5 w-5 shrink-0" /><span className="truncate">{label}</span></>;
+      const className = `trip-primary-nav-item flex h-9 min-w-0 items-center justify-center gap-2 rounded-lg text-sm transition-colors ${activeTab === value ? "bg-surface text-ink shadow-soft" : "text-muted hover:text-ink"}`;
+      const content = <><Icon className="h-5 w-5 shrink-0" /><span className="trip-primary-nav-label whitespace-nowrap">{label}</span></>;
       return onTabChange
-        ? <button key={value} type="button" onClick={() => onTabChange(value)} className={className}>{content}</button>
-        : <Link key={value} href={`/trip/${tripId}?tab=${value}`} className={className}>{content}</Link>;
+        ? <button key={value} type="button" aria-label={label} onClick={() => onTabChange(value)} className={className}>{content}</button>
+        : <Link key={value} href={`/trip/${tripId}?tab=${value}`} aria-label={label} className={className}>{content}</Link>;
     })}
   </nav>;
 }

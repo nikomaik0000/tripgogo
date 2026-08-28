@@ -25,8 +25,8 @@ import { useAuth } from "@/lib/auth-context";
 import { travelRepository } from "@/lib/travel-repository";
 import type { Flight, HotelStay, Transportation, TravelItem, TravelItemSort, TravelItemType, Trip, TripRole } from "@/lib/types";
 
-type Tab = "daily" | "place" | "food" | "outline";
-const CARD_SECTION_SPACING = "pb-6";
+type Tab = TripPrimaryTab;
+const CARD_SECTION_SPACING = "pb-5";
 
 export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlights, initialHotelStays, initialTransportations }: {
   tripId: string;
@@ -126,15 +126,14 @@ function ItemList({ type, items, query, sort, canEdit, onQuery, onSort, onEdit, 
 
 function ItemCard({ item, canEdit, onEdit, onDelete, controls, compactBusiness = false, listLayout = false }: { item: TravelItem; canEdit: boolean; onEdit: () => void; onDelete: () => void; controls?: React.ReactNode; compactBusiness?: boolean; listLayout?: boolean }) {
   if (listLayout) {
-    const locationCategory = [item.area, item.category].filter(Boolean).join(" ｜ ");
     return (
       <article className="flex min-w-0 flex-col self-start rounded-card border border-border bg-surface px-6 pt-6 shadow-soft sm:h-[304px] sm:self-stretch">
         <header className={`min-w-0 ${CARD_SECTION_SPACING}`}>
           {item.googleMapsUrl
             ? <a href={item.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label={`在 Google Maps 開啟${item.name}`} title="開啟 Google Maps" className="line-clamp-2 min-h-[2.625rem] font-medium hover:text-accent-coffee">{item.name}</a>
             : <p className="line-clamp-2 min-h-[2.625rem] font-medium">{item.name}</p>}
-          <div className="mt-2 flex min-h-5 min-w-0 items-center justify-between gap-3 text-xs text-muted">
-            <p className="min-w-0 truncate">{locationCategory}</p>
+          <div className="mt-1 flex min-h-5 min-w-0 items-center justify-between gap-3 text-sm leading-4 text-muted sm:text-xs">
+            <LocationCategory item={item} />
             {item.date && <time dateTime={item.date} className="shrink-0 whitespace-nowrap">{displayDate(item.date)}</time>}
           </div>
         </header>
@@ -195,24 +194,23 @@ function SortableDailyCard({ item, onEdit, onDelete }: { item: TravelItem; onEdi
 }
 
 function DailyCard({ item, canEdit, onEdit, onDelete }: { item: TravelItem; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
-  return <article className="rounded-card border border-border bg-surface shadow-soft sm:h-[156px]">
-    <div className="p-6 sm:hidden">
-      <div className="flex min-w-0 items-center gap-4"><TypeMark type={item.type} large /><DailyItemName item={item} /></div>
+  return <article className="h-full rounded-card border border-border bg-surface shadow-soft">
+    <div className="flex flex-col px-6 pt-6 sm:hidden">
+      <div className="flex min-w-0 items-center gap-4"><TypeMark item={item} large /><DailyItemName item={item} /></div>
       <DailyInfoRow item={item} className="mt-5" />
-      <div className="my-5 border-t border-divider" />
-      {item.note && <ClampedNote note={item.note} lines={2} />}
+      {item.note && <><div className="my-5 border-t border-divider" /><ClampedNote note={item.note} lines={3} textClassName="leading-[1.55]" /></>}
       <div className="mt-5 border-t border-divider" />
       <DailyFooter item={item} canEdit={canEdit} onEdit={onEdit} onDelete={onDelete} />
     </div>
-    <div className="hidden h-full grid-cols-[38fr_42fr_20fr] sm:grid">
-      <div className="flex min-w-0 flex-col justify-between px-6 py-5">
-        <div className="flex min-w-0 items-center gap-4"><TypeMark type={item.type} /><DailyItemName item={item} /></div>
-        <DailyInfoRow item={item} compact />
+    <div className="hidden h-full grid-cols-[minmax(0,34fr)_minmax(0,42fr)_minmax(196px,24fr)] items-stretch sm:grid">
+      <div className="flex min-w-0 items-center px-6 py-5">
+        <div className="flex min-w-0 items-center gap-4"><TypeMark item={item} /><DailyItemName item={item} /></div>
       </div>
-      <div className="flex min-w-0 flex-col border-l border-divider px-6 py-5">
+      <div className="flex min-w-0 flex-col justify-center gap-3 border-l border-divider px-6 py-5">
+        <DailyInfoRow item={item} compact />
         {item.note && <ClampedNote note={item.note} lines={3} />}
       </div>
-      <div className="flex items-center justify-end gap-2 border-l border-divider px-4" data-no-dnd><DailyActions item={item} canEdit={canEdit} includeExternalLinks onEdit={onEdit} onDelete={onDelete} /></div>
+      <DailyDesktopActions item={item} canEdit={canEdit} onEdit={onEdit} onDelete={onDelete} />
     </div>
   </article>;
 }
@@ -222,13 +220,20 @@ function DailyInfoRow({ item, compact = false, className = "" }: { item: TravelI
   const hasHoursDivider = Boolean((item.category || item.area) && item.businessHours);
   if (!item.category && !item.area && !item.businessHours) return null;
   return <div className={`flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-2 leading-4 text-muted ${compact ? "text-xs sm:gap-x-2" : "text-sm"} ${className}`}>
-    {(item.category || item.area) && <span className="max-w-full shrink-0 truncate">{[item.category, item.area].filter(Boolean).join(" ｜ ")}</span>}
+    {(item.category || item.area) && <LocationCategory item={item} />}
     {item.businessHours && <span className="flex shrink-0 items-center gap-2 leading-4">{hasHoursDivider && <span aria-hidden="true" className="shrink-0 leading-4">｜</span>}<Clock3 className="h-4 w-4 shrink-0" /><span className="shrink-0 whitespace-nowrap leading-4">{item.businessHours}</span>{status && <BusinessStatusLabel status={status} />}</span>}
   </div>;
 }
 
-function TypeMark({ type, large = false }: { type: TravelItemType; large?: boolean }) {
-  return <span className={`flex h-12 w-12 min-w-12 shrink-0 items-center justify-center rounded-full text-ink ${large ? "text-title" : "text-sm"} ${type === "food" ? "bg-travelType-food" : "bg-travelType-place"}`}>{type === "food" ? "食" : "景"}</span>;
+function LocationCategory({ item }: { item: TravelItem }) {
+  return <span className="min-w-0 max-w-full truncate">{[item.area, item.category].filter(Boolean).join(" ｜ ")}</span>;
+}
+
+function TypeMark({ item, large = false }: { item: TravelItem; large?: boolean }) {
+  const isShop = item.type === "place" && item.category === "店";
+  const label = item.type === "food" ? "食" : isShop ? "店" : "景";
+  const background = item.type === "food" ? "bg-travelType-food" : isShop ? "bg-travelType-shop" : "bg-travelType-place";
+  return <span className={`flex h-12 w-12 min-w-12 shrink-0 items-center justify-center rounded-full text-ink ${large ? "text-title" : "text-sm"} ${background}`}>{label}</span>;
 }
 
 function DailyItemName({ item }: { item: TravelItem }) {

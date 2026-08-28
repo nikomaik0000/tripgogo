@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { useUnsavedChangesDialog } from "@/components/confirm-dialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input, Textarea } from "@/components/ui/input";
 import type { HotelStay } from "@/lib/types";
@@ -21,7 +22,9 @@ export function HotelStayDialog({ open, stay, onOpenChange, onSave }: {
     setForm(stay ? { name: stay.name, checkInDate: stay.checkInDate, checkOutDate: stay.checkOutDate, checkInTime: stay.checkInTime ?? "", checkOutTime: stay.checkOutTime ?? "", address: stay.address ?? "", phone: stay.phone ?? "", googleMapsUrl: stay.googleMapsUrl ?? "", link: stay.link ?? "", note: stay.note ?? "" } : EMPTY_FORM);
   }, [open, stay]);
   const set = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent title={`${stay ? "編輯" : "新增"}飯店`}><form className="space-y-4" onSubmit={(event) => {
+  const initial = stay ? { name: stay.name, checkInDate: stay.checkInDate, checkOutDate: stay.checkOutDate, checkInTime: stay.checkInTime ?? "", checkOutTime: stay.checkOutTime ?? "", address: stay.address ?? "", phone: stay.phone ?? "", googleMapsUrl: stay.googleMapsUrl ?? "", link: stay.link ?? "", note: stay.note ?? "" } : EMPTY_FORM;
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesDialog(JSON.stringify(form) !== JSON.stringify(initial), () => onOpenChange(false));
+  return <><Dialog open={open} onOpenChange={(next) => { if (!next) requestClose(); }}><DialogContent title={`${stay ? "編輯" : "新增"}飯店`} preventOutsideDismiss onEscapeKeyDown={(event) => { event.preventDefault(); requestClose(); }}><form className="space-y-4" onSubmit={(event) => {
     event.preventDefault();
     if (!form.name.trim() || !form.checkInDate || !form.checkOutDate) return toast.error("請填寫飯店名稱與入住日期");
     onSave({ name: form.name.trim(), checkInDate: form.checkInDate, checkOutDate: form.checkOutDate, checkInTime: form.checkInTime || undefined, checkOutTime: form.checkOutTime || undefined, address: form.address.trim() || undefined, phone: form.phone.trim() || undefined, googleMapsUrl: form.googleMapsUrl.trim() || undefined, link: form.link.trim() || undefined, note: form.note.trim() || undefined });
@@ -34,8 +37,8 @@ export function HotelStayDialog({ open, stay, onOpenChange, onSave }: {
     <Field label="Google Maps URL（選填）"><Input type="url" value={form.googleMapsUrl} onChange={(event) => set("googleMapsUrl", event.target.value)} /></Field>
     <Field label="其他連結（選填）"><Input type="url" value={form.link} onChange={(event) => set("link", event.target.value)} /></Field>
     <Field label="備註（選填）"><Textarea rows={3} value={form.note} onChange={(event) => set("note", event.target.value)} /></Field>
-    <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>取消</Button><Button type="submit">儲存</Button></div>
-  </form></DialogContent></Dialog>;
+    <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="ghost" onClick={requestClose}>取消</Button><Button type="submit">儲存</Button></div>
+  </form></DialogContent></Dialog>{unsavedChangesDialog}</>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

@@ -3,11 +3,14 @@
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { useUnsavedChangesDialog } from "@/components/confirm-dialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input, Textarea } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { dateOptions } from "@/lib/travel-dates";
 import type { TravelItem, TravelItemType, Trip } from "@/lib/types";
+
+const EMPTY_FORM = { category: "", area: "", date: "", name: "", googleMapsUrl: "", extraLink1: "", extraLink2: "", businessHours: "", note: "" };
 
 export function TravelItemDialog({ open, type, trip, item, items, initialDate, allowTypeChange = false, onTypeChange, onOpenChange, onSave }: {
   open: boolean; type: TravelItemType; trip: Trip; item?: TravelItem; items: TravelItem[];
@@ -17,12 +20,12 @@ export function TravelItemDialog({ open, type, trip, item, items, initialDate, a
   onOpenChange: (open: boolean) => void;
   onSave: (value: Pick<TravelItem, "category" | "area" | "date" | "name" | "googleMapsUrl" | "extraLink1" | "extraLink2" | "businessHours" | "note">) => void;
 }) {
-  const [form, setForm] = useState({ category: "", area: "", date: "", name: "", googleMapsUrl: "", extraLink1: "", extraLink2: "", businessHours: "", note: "" });
+  const [form, setForm] = useState(EMPTY_FORM);
   const categoryList = useId();
   const areaList = useId();
   useEffect(() => {
     if (!open) return;
-    setForm({ category: item?.category ?? "", area: item?.area ?? "", date: item?.date ?? initialDate ?? "", name: item?.name ?? "", googleMapsUrl: item?.googleMapsUrl ?? "", extraLink1: item?.extraLink1 ?? "", extraLink2: item?.extraLink2 ?? "", businessHours: item?.businessHours ?? "", note: item?.note ?? "" });
+    setForm(initialForm(item, initialDate));
   }, [initialDate, open, item]);
   const suggestions = (key: "category" | "area") => [
     ...new Set(
@@ -34,9 +37,12 @@ export function TravelItemDialog({ open, type, trip, item, items, initialDate, a
   ].sort();
   const set = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const hasFixedEntryDate = !item && Boolean(initialDate);
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent title={`${item ? "編輯" : "新增"}${type === "place" ? "地點" : "美食"}`}>
+  const initialType = item?.type ?? (allowTypeChange ? "place" : type);
+  const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm(item, initialDate)) || type !== initialType;
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesDialog(isDirty, () => onOpenChange(false));
+  return <>
+    <Dialog open={open} onOpenChange={(next) => { if (!next) requestClose(); }}>
+      <DialogContent title={`${item ? "編輯" : "新增"}${type === "place" ? "地點" : "美食"}`} preventOutsideDismiss onEscapeKeyDown={(event) => { event.preventDefault(); requestClose(); }}>
         <form className="space-y-4" onSubmit={(event) => {
           event.preventDefault();
           if (!form.name.trim()) return toast.error(`請填寫${type === "place" ? "景點名稱" : "店名"}`);
@@ -52,11 +58,16 @@ export function TravelItemDialog({ open, type, trip, item, items, initialDate, a
           <Field label="其他連結 2（選填）"><Input type="url" value={form.extraLink2} onChange={(e) => set("extraLink2", e.target.value)} /></Field>
           <Field label="營業時間"><Input value={form.businessHours} placeholder="例如：11:00-22:00" onChange={(e) => set("businessHours", e.target.value)} /></Field>
           <Field label="備註"><Textarea rows={3} value={form.note} onChange={(e) => set("note", e.target.value)} /></Field>
-          <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>取消</Button><Button type="submit">儲存</Button></div>
+          <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="ghost" onClick={requestClose}>取消</Button><Button type="submit">儲存</Button></div>
         </form>
       </DialogContent>
     </Dialog>
-  );
+    {unsavedChangesDialog}
+  </>;
+}
+
+function initialForm(item?: TravelItem, initialDate?: string) {
+  return { category: item?.category ?? "", area: item?.area ?? "", date: item?.date ?? initialDate ?? "", name: item?.name ?? "", googleMapsUrl: item?.googleMapsUrl ?? "", extraLink1: item?.extraLink1 ?? "", extraLink2: item?.extraLink2 ?? "", businessHours: item?.businessHours ?? "", note: item?.note ?? "" };
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

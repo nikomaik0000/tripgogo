@@ -13,6 +13,9 @@
 # production
 /build
 
+# local delivery artifacts
+/diffs/
+
 # misc
 .DS_Store
 *.pem

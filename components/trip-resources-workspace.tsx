@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { AddIconButton } from "@/components/add-icon-button";
 import { AuthControl } from "@/components/auth-control";
 import { ClampedNote } from "@/components/clamped-note";
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ConfirmDialog, useUnsavedChangesDialog } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -148,11 +148,13 @@ function ResourceDialog({ open, resource, initialCategory, tripId, onOpenChange,
   const [saving, setSaving] = useState(false);
   useEffect(() => {
     if (!open) return;
-    setForm({ category: resource?.category ?? initialCategory ?? "note", title: resource?.title ?? "", note: resource?.note ?? "", externalUrl: resource?.externalUrl ?? "", imagePath: resource?.imagePath ?? "" });
+    setForm(initialResourceForm(resource, initialCategory));
     setFile(undefined);
   }, [initialCategory, open, resource]);
   const set = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent title={`${resource ? "編輯" : "新增"}旅途資訊`}><form className="space-y-4" onSubmit={async (event) => {
+  const initial = initialResourceForm(resource, initialCategory);
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesDialog(JSON.stringify(form) !== JSON.stringify(initial) || Boolean(file), () => onOpenChange(false));
+  return <><Dialog open={open} onOpenChange={(next) => { if (!next) requestClose(); }}><DialogContent title={`${resource ? "編輯" : "新增"}旅途資訊`} preventOutsideDismiss onEscapeKeyDown={(event) => { event.preventDefault(); requestClose(); }}><form className="space-y-4" onSubmit={async (event) => {
     event.preventDefault();
     if (!form.title.trim()) return toast.error("請填寫標題");
     setSaving(true);
@@ -172,8 +174,12 @@ function ResourceDialog({ open, resource, initialCategory, tripId, onOpenChange,
     <Field label="備註（選填）"><Textarea rows={4} value={form.note} onChange={(event) => set("note", event.target.value)} /></Field>
     <Field label="外部網址（選填）"><Input type="url" value={form.externalUrl} onChange={(event) => set("externalUrl", event.target.value)} /></Field>
     <div className="space-y-2 text-sm"><span className="font-medium">圖片（選填）</span><ResourceImageUpload file={file} imagePath={form.imagePath} onFileChange={setFile} onRemove={() => { setFile(undefined); set("imagePath", ""); }} /></div>
-    <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>取消</Button><Button type="submit" disabled={saving}>{saving ? "儲存中…" : "儲存"}</Button></div>
-  </form></DialogContent></Dialog>;
+    <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="ghost" onClick={requestClose}>取消</Button><Button type="submit" disabled={saving}>{saving ? "儲存中…" : "儲存"}</Button></div>
+  </form></DialogContent></Dialog>{unsavedChangesDialog}</>;
+}
+
+function initialResourceForm(resource?: TripResource, initialCategory?: TripResourceCategory) {
+  return { category: resource?.category ?? initialCategory ?? "note", title: resource?.title ?? "", note: resource?.note ?? "", externalUrl: resource?.externalUrl ?? "", imagePath: resource?.imagePath ?? "" };
 }
 
 function ResourceImageUpload({ file, imagePath, onFileChange, onRemove }: { file?: File; imagePath: string; onFileChange: (file: File | undefined) => void; onRemove: () => void }) {

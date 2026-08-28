@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { useUnsavedChangesDialog } from "@/components/confirm-dialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input, Textarea } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -24,24 +25,12 @@ export function TransportationDialog({ open, transportation, onOpenChange, onSav
   const [form, setForm] = useState(EMPTY_FORM);
   useEffect(() => {
     if (!open) return;
-    setForm(transportation ? {
-      ...EMPTY_FORM, ...transportation,
-      company: transportation.type === "rental_car" ? transportation.company : "",
-      vehicleModel: transportation.type === "rental_car" ? transportation.vehicleModel : "",
-      routeName: transportation.type === "rail" ? transportation.routeName : "",
-      trainNumber: transportation.type === "rail" ? transportation.trainNumber ?? "" : "",
-      seat: transportation.type === "rail" ? transportation.seat ?? "" : "",
-      carriage: transportation.type === "rail" ? transportation.carriage ?? "" : "",
-      ticket: transportation.type === "rail" ? transportation.ticket ?? "" : "",
-      address: transportation.type === "rental_car" ? transportation.address ?? "" : "",
-      googleMapsUrl: transportation.type === "rental_car" ? transportation.googleMapsUrl ?? "" : "",
-      reservationNumber: transportation.reservationNumber ?? "", cost: transportation.cost ?? "",
-      link: transportation.link ?? "", note: transportation.note ?? "",
-    } : EMPTY_FORM);
+    setForm(initialForm(transportation));
   }, [open, transportation]);
   const set = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const optional = (value: string) => value.trim() || undefined;
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent title={`${transportation ? "編輯" : "新增"}交通`}><form className="space-y-4" onSubmit={(event) => {
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesDialog(JSON.stringify(form) !== JSON.stringify(initialForm(transportation)), () => onOpenChange(false));
+  return <><Dialog open={open} onOpenChange={(next) => { if (!next) requestClose(); }}><DialogContent title={`${transportation ? "編輯" : "新增"}交通`} preventOutsideDismiss onEscapeKeyDown={(event) => { event.preventDefault(); requestClose(); }}><form className="space-y-4" onSubmit={(event) => {
     event.preventDefault();
     const common = { startDate: form.startDate, startTime: form.startTime, endDate: form.endDate, endTime: form.endTime, departurePlace: form.departurePlace.trim(), arrivalPlace: form.arrivalPlace.trim(), reservationNumber: optional(form.reservationNumber), cost: optional(form.cost), link: optional(form.link), note: optional(form.note) };
     if (!common.startDate || !common.startTime || !common.endDate || !common.endTime || !common.departurePlace || !common.arrivalPlace) return toast.error("請完整填寫日期、時間與地點");
@@ -66,8 +55,35 @@ export function TransportationDialog({ open, transportation, onOpenChange, onSav
     {form.type === "rental_car" && <><Field label="地址（選填）"><Input value={form.address} onChange={(event) => set("address", event.target.value)} /></Field><Field label="Google Maps URL（取車地點，選填）"><Input type="url" value={form.googleMapsUrl} onChange={(event) => set("googleMapsUrl", event.target.value)} /></Field></>}
     <Field label="預約 / 官方網址（選填）"><Input type="url" value={form.link} onChange={(event) => set("link", event.target.value)} /></Field>
     <Field label="備註（選填）"><Textarea rows={3} value={form.note} onChange={(event) => set("note", event.target.value)} /></Field>
-    <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>取消</Button><Button type="submit">儲存</Button></div>
-  </form></DialogContent></Dialog>;
+    <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="ghost" onClick={requestClose}>取消</Button><Button type="submit">儲存</Button></div>
+  </form></DialogContent></Dialog>{unsavedChangesDialog}</>;
+}
+
+function initialForm(transportation?: Transportation) {
+  if (!transportation) return EMPTY_FORM;
+  return {
+    ...EMPTY_FORM,
+    type: transportation.type,
+    company: transportation.type === "rental_car" ? transportation.company : "",
+    vehicleModel: transportation.type === "rental_car" ? transportation.vehicleModel : "",
+    routeName: transportation.type === "rail" ? transportation.routeName : "",
+    startDate: transportation.startDate,
+    startTime: transportation.startTime,
+    endDate: transportation.endDate,
+    endTime: transportation.endTime,
+    departurePlace: transportation.departurePlace,
+    arrivalPlace: transportation.arrivalPlace,
+    trainNumber: transportation.type === "rail" ? transportation.trainNumber ?? "" : "",
+    seat: transportation.type === "rail" ? transportation.seat ?? "" : "",
+    carriage: transportation.type === "rail" ? transportation.carriage ?? "" : "",
+    ticket: transportation.type === "rail" ? transportation.ticket ?? "" : "",
+    reservationNumber: transportation.reservationNumber ?? "",
+    cost: transportation.cost ?? "",
+    address: transportation.type === "rental_car" ? transportation.address ?? "" : "",
+    link: transportation.link ?? "",
+    googleMapsUrl: transportation.type === "rental_car" ? transportation.googleMapsUrl ?? "" : "",
+    note: transportation.note ?? "",
+  };
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

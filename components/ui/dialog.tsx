@@ -11,8 +11,10 @@ export function DialogContent({
   className,
   children,
   title,
+  preventOutsideDismiss = false,
+  onInteractOutside,
   ...props
-}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { title: string }) {
+}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { title: string; preventOutsideDismiss?: boolean }) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay
@@ -26,6 +28,10 @@ export function DialogContent({
           "max-h-[85vh] overflow-y-auto",
           className
         )}
+        onInteractOutside={(event) => {
+          onInteractOutside?.(event);
+          if (preventOutsideDismiss) event.preventDefault();
+        }}
         {...props}
       >
         <div className="mb-4 flex items-center justify-between">

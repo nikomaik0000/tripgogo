@@ -52,6 +52,7 @@ export const colors = {
   travelType: {
     food: "#fcefdb",
     place: "#e4efda",
+    shop: "#ffeeee",
   },
 } as const;
 
