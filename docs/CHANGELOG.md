@@ -1,5 +1,11 @@
 # Changelog
 
+## TRIP GOGO — Browser Favicon
+
+Changed
+
+- Pointed the browser favicon, shortcut icon, and Apple touch icon at the existing updated 192px app icon, and removed the App Router SVG icon source that could emit a competing `/icon.svg` favicon.
+
 ## TRIP GOGO — Home Trip Date Ordering
 
 Changed

@@ -22,8 +22,8 @@ export const metadata: Metadata = {
     description: "TRIP GOGO",
   },
   icons: {
-    icon: "/icon.svg",
-    shortcut: "/icon.svg",
+    icon: "/icons/icon-192.png",
+    shortcut: "/icons/icon-192.png",
     apple: "/icons/icon-192.png",
   },
 };
