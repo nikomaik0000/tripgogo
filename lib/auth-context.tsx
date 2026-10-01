@@ -24,18 +24,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data }: { data: { user: User | null } }) => {
-      setUser(data.user);
-      setReady(true);
-      if (data.user) {
-        const returnPath = window.sessionStorage.getItem(AUTH_RETURN_PATH_KEY);
-        if (returnPath) {
-          window.sessionStorage.removeItem(AUTH_RETURN_PATH_KEY);
-          const safePath = safeReturnPath(returnPath);
-          if (safePath !== window.location.pathname + window.location.search) window.location.replace(safePath);
+    void supabase.auth.getUser()
+      .then(({ data }: { data: { user: User | null } }) => {
+        setUser(data.user);
+        if (data.user) {
+          const returnPath = window.sessionStorage.getItem(AUTH_RETURN_PATH_KEY);
+          if (returnPath) {
+            window.sessionStorage.removeItem(AUTH_RETURN_PATH_KEY);
+            const safePath = safeReturnPath(returnPath);
+            if (safePath !== window.location.pathname + window.location.search) window.location.replace(safePath);
+          }
         }
-      }
-    });
+      })
+      .catch(() => undefined)
+      .finally(() => setReady(true));
     const { data } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       setUser(session?.user ?? null);
       setReady(true);

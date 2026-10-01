@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "TRIP GOGO",
     start_url: "/",
     display: "standalone",
-    background_color: "#FAF8F4",
-    theme_color: "#FAF8F4",
+    background_color: "#FFFFFF",
+    theme_color: "#FFFFFF",
     orientation: "portrait",
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

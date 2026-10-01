@@ -7,11 +7,34 @@ import type { Flight, HotelStay, Transportation, TransportationInput, TravelItem
 const RESOURCE_IMAGE_BUCKET = "tg-trip-resources";
 const RESOURCE_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 const RESOURCE_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const TRAVEL_ITEM_IMAGE_BUCKET = "tg-travel-item-images";
+const TRAVEL_ITEM_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 
 function result<T>(data: T | null, error: PostgrestError | null): T {
   if (error) throw new Error(error.message);
   if (data === null) throw new Error("Supabase did not return the requested data");
   return data;
+}
+
+async function uploadTravelItemImage(tripId: string, file: File, itemId?: string) {
+  if (file.type !== "image/webp") throw new Error("圖片必須先轉換為 WebP 格式");
+  if (file.size > TRAVEL_ITEM_IMAGE_MAX_BYTES) throw new Error("圖片大小不可超過 2 MB");
+  const path = `${tripId}/${itemId ? `${itemId}/` : ""}${crypto.randomUUID()}.webp`;
+  const { error } = await createClient().storage.from(TRAVEL_ITEM_IMAGE_BUCKET).upload(path, file, {
+    cacheControl: "31536000", contentType: "image/webp", upsert: false,
+  });
+  if (error) throw new Error(error.message);
+  return path;
+}
+
+async function removeTravelItemImages(paths: string[]) {
+  if (paths.length === 0) return;
+  const { error } = await createClient().storage.from(TRAVEL_ITEM_IMAGE_BUCKET).remove(paths);
+  if (error) throw new Error(error.message);
+}
+
+function cleanupMessage(action: string, error: unknown) {
+  return `${action}，但圖片清理未完成，可能留下 orphan object：${error instanceof Error ? error.message : String(error)}`;
 }
 
 export const travelRepository = {
@@ -129,8 +152,60 @@ export const travelRepository = {
   },
 
   async duplicateTrip(tripId: string) {
-    const { data, error } = await createClient().rpc("tg_duplicate_trip", { p_trip_id: tripId });
-    return result(data, error) as string;
+    const supabase = createClient();
+    const { data: sourceData, error: sourceError } = await supabase.from("tg_travel_items")
+      .select("id, image_path").eq("trip_id", tripId);
+    const sourceItems = result(sourceData, sourceError) as Pick<TgTravelItemRow, "id" | "image_path">[];
+    const { data, error } = await supabase.rpc("tg_duplicate_trip", { p_trip_id: tripId });
+    const newTripId = result(data, error) as string;
+    const copiedPaths: string[] = [];
+
+    try {
+      const { data: destinationData, error: destinationError } = await supabase.from("tg_travel_items")
+        .select("id, duplicate_source_item_id").eq("trip_id", newTripId).not("duplicate_source_item_id", "is", null);
+      const destinationItems = result(destinationData, destinationError) as Pick<TgTravelItemRow, "id" | "duplicate_source_item_id">[];
+      const destinationsBySource = new Map(destinationItems.map((item) => [item.duplicate_source_item_id, item.id]));
+      if (destinationItems.length !== sourceItems.length || destinationsBySource.size !== sourceItems.length || sourceItems.some((item) => !destinationsBySource.has(item.id))) {
+        throw new Error("複製項目的 lineage 對應不完整");
+      }
+
+      for (const source of sourceItems) {
+        if (!source.image_path) continue;
+        const destinationItemId = destinationsBySource.get(source.id);
+        if (!destinationItemId) throw new Error(`找不到來源項目 ${source.id} 的複本`);
+        const destinationPath = `${newTripId}/${destinationItemId}/${crypto.randomUUID()}.webp`;
+        const { error: copyError } = await supabase.storage.from(TRAVEL_ITEM_IMAGE_BUCKET)
+          .copy(source.image_path, destinationPath);
+        if (copyError) throw new Error(copyError.message);
+        copiedPaths.push(destinationPath);
+        const { error: attachError } = await supabase.from("tg_travel_items")
+          .update({ image_path: destinationPath }).eq("id", destinationItemId).is("image_path", null).select("id").single();
+        if (attachError) throw new Error(attachError.message);
+      }
+
+      const { data: clearedLineageData, error: clearLineageError } = await supabase.from("tg_travel_items")
+        .update({ duplicate_source_item_id: null }).eq("trip_id", newTripId).not("duplicate_source_item_id", "is", null).select("id");
+      if (clearLineageError) throw new Error(clearLineageError.message);
+      if (clearedLineageData.length !== destinationItems.length) throw new Error("duplicate lineage 未完全清除");
+      return newTripId;
+    } catch (cause) {
+      const cleanupIssues: string[] = [];
+      if (copiedPaths.length > 0) {
+        const { error: clearReferencesError } = await supabase.from("tg_travel_items")
+          .update({ image_path: null }).eq("trip_id", newTripId).in("image_path", copiedPaths);
+        if (clearReferencesError) cleanupIssues.push(`無法清除 destination DB 圖片參照：${clearReferencesError.message}`);
+        try {
+          await removeTravelItemImages(copiedPaths);
+        } catch (cleanupError) {
+          cleanupIssues.push(`無法刪除 destination Storage objects：${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`);
+        }
+      }
+      const { error: deleteTripError } = await supabase.from("tg_trips").delete().eq("id", newTripId);
+      if (deleteTripError) cleanupIssues.push(`無法刪除未完成的 duplicate trip：${deleteTripError.message}`);
+      const reason = cause instanceof Error ? cause.message : String(cause);
+      const cleanup = cleanupIssues.length > 0 ? `；補償清理不完整：${cleanupIssues.join("；")}` : "；已完成補償清理";
+      throw new Error(`複製旅行圖片失敗：${reason}${cleanup}`);
+    }
   },
 
   async deleteTrip(tripId: string) {
@@ -143,13 +218,15 @@ export const travelRepository = {
     return result(data, error).map((row: unknown) => mapItem(row as TgTravelItemRow));
   },
 
-  async saveItem(input: Omit<TravelItem, "id" | "createdAt" | "updatedAt" | "order"> & { id?: string }) {
+  async saveItem(input: Omit<TravelItem, "id" | "createdAt" | "updatedAt" | "order"> & { id?: string }, imageFile?: File) {
     const supabase = createClient();
     let sortOrder: number | undefined;
+    let previousImagePath: string | undefined;
     if (input.id) {
-      const { data: existing, error } = await supabase.from("tg_travel_items").select("date, sort_order").eq("id", input.id).single();
+      const { data: existing, error } = await supabase.from("tg_travel_items").select("date, sort_order, image_path").eq("id", input.id).single();
       if (error) throw new Error(error.message);
       if (existing.date === input.date) sortOrder = existing.sort_order;
+      previousImagePath = existing.image_path ?? undefined;
     }
     if (sortOrder === undefined) {
       let lastQuery = supabase.from("tg_travel_items").select("sort_order").eq("trip_id", input.tripId);
@@ -158,23 +235,65 @@ export const travelRepository = {
       if (error) throw new Error(error.message);
       sortOrder = (last?.sort_order ?? -1) + 1;
     }
+    let uploadedPath: string | undefined;
+    if (imageFile) uploadedPath = await uploadTravelItemImage(input.tripId, imageFile, input.id);
+    const nextImagePath = uploadedPath ?? input.imagePath ?? null;
     const values = {
       trip_id: input.tripId, type: input.type, category: input.category, area: input.area,
       date: input.date, name: input.name, google_maps_url: input.googleMapsUrl,
       extra_link_1: input.extraLink1 ?? null, extra_link_2: input.extraLink2 ?? null,
-      business_hours: input.businessHours ?? null, note: input.note, sort_order: sortOrder,
+      business_hours: input.businessHours ?? null, note: input.note, image_path: nextImagePath,
+      image_fit: input.imageFit, sort_order: sortOrder,
     };
-    if (input.id) {
-      const { data, error } = await supabase.from("tg_travel_items").update(values).eq("id", input.id).select().single();
-      return mapItem(result(data, error) as TgTravelItemRow);
+    let saved: TravelItem;
+    try {
+      if (input.id) {
+        const { data, error } = await supabase.from("tg_travel_items").update(values).eq("id", input.id).select().single();
+        saved = mapItem(result(data, error) as TgTravelItemRow);
+      } else {
+        const { data, error } = await supabase.from("tg_travel_items").insert(values).select().single();
+        saved = mapItem(result(data, error) as TgTravelItemRow);
+      }
+    } catch (saveError) {
+      if (!uploadedPath) throw saveError;
+      try {
+        await removeTravelItemImages([uploadedPath]);
+      } catch (cleanupError) {
+        throw new Error(`${saveError instanceof Error ? saveError.message : String(saveError)}；${cleanupMessage("資料未儲存", cleanupError)}`);
+      }
+      throw saveError;
     }
-    const { data, error } = await supabase.from("tg_travel_items").insert(values).select().single();
-    return mapItem(result(data, error) as TgTravelItemRow);
+    let cleanupWarning: string | undefined;
+    if (previousImagePath && previousImagePath !== nextImagePath) {
+      try {
+        await removeTravelItemImages([previousImagePath]);
+      } catch (cleanupError) {
+        cleanupWarning = cleanupMessage("資料已儲存", cleanupError);
+      }
+    }
+    return { item: saved, cleanupWarning };
   },
 
   async deleteItem(itemId: string) {
-    const { error } = await createClient().from("tg_travel_items").delete().eq("id", itemId);
+    const supabase = createClient();
+    const { data, error: readError } = await supabase.from("tg_travel_items").select("image_path").eq("id", itemId).single();
+    if (readError) throw new Error(readError.message);
+    const imagePath = (data as Pick<TgTravelItemRow, "image_path">).image_path;
+    const { error } = await supabase.from("tg_travel_items").delete().eq("id", itemId);
     if (error) throw new Error(error.message);
+    if (!imagePath) return {};
+    try {
+      await removeTravelItemImages([imagePath]);
+      return {};
+    } catch (cleanupError) {
+      return { cleanupWarning: cleanupMessage("項目已刪除", cleanupError) };
+    }
+  },
+
+  async getTravelItemImageUrl(path: string) {
+    const { data, error } = await createClient().storage.from(TRAVEL_ITEM_IMAGE_BUCKET).createSignedUrl(path, 60 * 60);
+    if (error) throw new Error(error.message);
+    return data.signedUrl;
   },
 
   async getTripResources(tripId: string) {

@@ -27,7 +27,7 @@ export function PendingInvitationsControl({ onAccepted }: { onAccepted: () => Pr
   if (invitations.length === 0) return null;
 
   return <>
-    <button type="button" onClick={() => setOpen(true)} className="flex h-9 items-center gap-1.5 whitespace-nowrap px-1 text-xs text-muted hover:text-ink" aria-label="查看共同編輯邀請">
+    <button type="button" onClick={() => setOpen(true)} className="flex h-9 items-center gap-1.5 whitespace-nowrap px-1 text-xs text-muted hover:text-[#555555]" aria-label="查看共同編輯邀請">
       <Mail className="h-4 w-4" /><span>{invitations.length} 個邀請</span>
     </button>
     <Dialog open={open} onOpenChange={setOpen}>

@@ -63,7 +63,7 @@ export function TripResourcesWorkspace({ tripId, initialTrip }: { tripId: string
   }, [authReady, tripId, user]);
 
   if (!trip) {
-    return <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6"><Link href="/" className="flex items-center gap-2 text-sm text-muted"><ArrowLeft className="h-5 w-5" />返回</Link><EmptyState title="找不到這趟旅行" description="" /></main>;
+    return <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6"><Link href="/" className="flex items-center gap-2 text-sm text-muted"><ArrowLeft className="h-4 w-4" />返回</Link><EmptyState title="找不到這趟旅行" description="" /></main>;
   }
 
   const canEdit = Boolean(role);
@@ -73,28 +73,22 @@ export function TripResourcesWorkspace({ tripId, initialTrip }: { tripId: string
     target?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   };
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-24 pt-4 sm:px-6">
-      <header className="sticky top-0 z-20 -mx-4 mb-8 border-b border-border bg-bg/90 px-4 pb-4 pt-3 backdrop-blur sm:-mx-6 sm:px-6">
-        <div className="mb-4 flex items-center gap-3">
-          <Link href={`/trip/${tripId}`} aria-label="返回旅行" title="返回旅行" className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-ink sm:h-9 sm:w-9"><ArrowLeft className="h-5 w-5" /></Link>
-          <h1 className="min-w-0 flex-1 truncate text-title font-semibold">{trip.name}</h1>
-          <div className="flex w-[140px] shrink-0 items-center justify-end gap-2">
-            {canEdit ? <AddIconButton context="header" label="新增旅途資訊" onClick={() => setDialog({ open: true })} /> : <span aria-hidden="true" className="h-11 w-11 shrink-0" />}
-            <Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" aria-current="page" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink hover:bg-surface hover:text-ink"><FolderHeart className="h-5 w-5" /></Link>
-            <AuthControl />
-          </div>
-        </div>
-        <TripPrimaryNav tripId={tripId} />
+    <main className="trip-page-shell mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+      <header className="sticky top-0 z-20 -mx-4 flex items-center gap-3 border-b border-border bg-bg/95 px-4 pb-3 pt-3 backdrop-blur sm:-mx-6 sm:gap-4 sm:px-6 sm:py-4">
+        <div className="flex min-w-0 flex-1 items-center gap-3 sm:flex-initial"><Link href={`/trip/${tripId}`} aria-label="返回旅行" title="返回旅行" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-muted hover:bg-searchBackground hover:text-[#555555] sm:h-9 sm:w-9"><ArrowLeft className="h-4 w-4 stroke-[1.5]" /></Link><h1 className="min-w-0 truncate text-title font-semibold">{trip.name}</h1></div>
+        <div aria-hidden="true" className="hidden min-w-4 flex-1 sm:block" />
+        <div className="hidden shrink-0 items-center gap-3 sm:flex"><TripPrimaryNav tripId={tripId} /><div className="flex shrink-0 items-center justify-end gap-1 before:mr-2 before:h-[30px] before:w-px before:shrink-0 before:bg-border before:content-['']">{canEdit && <AddIconButton context="header" label="新增旅途資訊" onClick={() => setDialog({ open: true })} className="border-0 bg-transparent text-muted shadow-none hover:bg-transparent hover:text-ink [&>svg]:h-4 [&>svg]:w-4" />}<Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" aria-current="page" className="flex h-11 w-11 shrink-0 items-center justify-center border-0 bg-transparent text-muted shadow-none hover:bg-transparent hover:text-ink"><FolderHeart className="h-4 w-4 stroke-[1.5]" /></Link><AuthControl className="border-0 bg-transparent text-muted shadow-none hover:bg-transparent hover:text-ink [&>svg]:h-4 [&>svg]:w-4" /></div></div>
+        <div className="flex w-[140px] shrink-0 items-center justify-end gap-2 sm:hidden">{canEdit ? <AddIconButton context="header" label="新增旅途資訊" onClick={() => setDialog({ open: true })} /> : <span aria-hidden="true" className="h-11 w-11 shrink-0" />}<Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" aria-current="page" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-ink hover:bg-searchBackground"><FolderHeart className="h-4 w-4 stroke-[1.5]" /></Link><AuthControl /></div>
       </header>
+      <div className="sm:hidden"><TripPrimaryNav tripId={tripId} /></div>
 
-      <div className="mb-6 flex items-center gap-3"><FolderHeart className="h-5 w-5 text-muted" /><h2 className="text-title font-semibold">旅途資訊</h2></div>
-      <nav id="resource-categories" aria-label="旅途資訊分類快速導覽" className="no-scrollbar mb-6 max-w-full scroll-mt-36 overflow-x-auto"><div className="flex min-w-max flex-nowrap items-center gap-5 pr-4">{RESOURCE_CATEGORIES.map(({ value, label }) => <button key={value} type="button" onClick={() => jumpToCategory(value)} aria-current={activeCategory === value ? "location" : undefined} className={`shrink-0 border-b pb-1 text-xs transition-colors ${activeCategory === value ? "border-muted text-ink" : "border-transparent text-muted hover:text-ink"}`}>{label}</button>)}</div></nav>
+      <nav id="resource-categories" aria-label="旅途資訊分類快速導覽" className="no-scrollbar mb-8 max-w-full scroll-mt-36 overflow-x-auto pt-5 sm:pt-6"><div className="flex min-w-max flex-nowrap items-center gap-5 pr-4">{RESOURCE_CATEGORIES.map(({ value, label }) => <button key={value} type="button" onClick={() => jumpToCategory(value)} aria-current={activeCategory === value ? "location" : undefined} className={`shrink-0 border-b pb-1 text-xs transition-colors ${activeCategory === value ? "border-muted text-ink" : "border-transparent text-muted hover:text-[#555555]"}`}>{label}</button>)}</div></nav>
       {resources.length === 0 && !canEdit
         ? <EmptyState title="尚無旅途資訊" description="" />
         : <div className="space-y-12">{RESOURCE_CATEGORIES.map(({ value, label, icon: Icon }) => {
           const categoryResources = resources.filter((resource) => resource.category === value);
           if (categoryResources.length === 0 && !canEdit) return null;
-          return <section id={`resource-category-${value}`} key={value} className="scroll-mt-36"><header className="mb-4 flex items-center"><Icon className="h-5 w-5 shrink-0 text-muted" /><h2 className="ml-3 whitespace-nowrap text-sm font-semibold tracking-body">{label}</h2>{canEdit && <AddIconButton label={`新增${label}`} onClick={() => setDialog({ open: true, initialCategory: value })} className="ml-auto" />}</header>{categoryResources.length > 0 && <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">{categoryResources.map((resource) => <ResourceCard key={resource.id} resource={resource} canEdit={canEdit} onEdit={() => setDialog({ open: true, resource })} onDelete={() => setDeleting(resource)} />)}</div>}</section>;
+          return <section id={`resource-category-${value}`} key={value} className="scroll-mt-36"><header className="mb-4 flex items-center"><Icon className="h-4 w-4 shrink-0 text-muted" /><h2 className="ml-3 whitespace-nowrap text-sm font-semibold tracking-body">{label}</h2>{canEdit && <AddIconButton label={`新增${label}`} onClick={() => setDialog({ open: true, initialCategory: value })} className="ml-auto" />}</header>{categoryResources.length > 0 && <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">{categoryResources.map((resource) => <ResourceCard key={resource.id} resource={resource} canEdit={canEdit} onEdit={() => setDialog({ open: true, resource })} onDelete={() => setDeleting(resource)} />)}</div>}</section>;
         })}</div>}
 
       <ResourceDialog open={dialog.open} resource={dialog.resource} initialCategory={dialog.initialCategory} tripId={tripId} onOpenChange={(open) => setDialog((current) => ({ ...current, open }))} onSaved={() => { setDialog({ open: false }); refresh(); }} />
@@ -113,7 +107,7 @@ function ResourceCard({ resource, canEdit, onEdit, onDelete }: { resource: TripR
     {resource.imagePath && <ResourceImage path={resource.imagePath} title={resource.title} />}
     {resource.note && <div className={`${resource.imagePath ? "border-t border-divider" : ""} py-5`}><ClampedNote note={resource.note} lines={resource.imagePath ? 2 : 10} linkify /></div>}
     <footer className="mt-auto flex h-14 shrink-0 items-center border-t border-divider">
-      {resource.externalUrl && <a href={resource.externalUrl} target="_blank" rel="noopener noreferrer" aria-label="開啟外部連結" title="開啟外部連結" className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-ink sm:h-9 sm:w-9"><ExternalLink className="h-[18px] w-[18px]" /></a>}
+      {resource.externalUrl && <a href={resource.externalUrl} target="_blank" rel="noopener noreferrer" aria-label="開啟外部連結" title="開啟外部連結" className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-[#555555] sm:h-9 sm:w-9"><ExternalLink className="h-4 w-4" /></a>}
       {canEdit && <div className="ml-auto flex items-center gap-4"><Action label="編輯" onClick={onEdit}><SquarePen /></Action><Action label="刪除" onClick={onDelete}><Trash2 /></Action></div>}
     </footer>
   </article>;
@@ -226,7 +220,7 @@ function ResourceImageUpload({ file, imagePath, onFileChange, onRemove }: { file
       onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; }}
       onDragLeave={(event) => { event.preventDefault(); dragDepth.current = Math.max(0, dragDepth.current - 1); if (dragDepth.current === 0) setIsDragging(false); }}
       onDrop={(event) => { event.preventDefault(); dragDepth.current = 0; setIsDragging(false); choose(event.dataTransfer.files[0]); }}
-      className={`flex min-h-44 w-full min-w-0 flex-col items-center justify-center overflow-hidden rounded-card border border-dashed px-4 py-5 text-center transition-colors ${isDragging ? "border-muted bg-searchBackground text-ink" : "border-border bg-bg text-muted hover:border-muted hover:bg-searchBackground hover:text-ink"}`}
+      className={`flex min-h-44 w-full min-w-0 flex-col items-center justify-center overflow-hidden rounded-card border border-dashed px-4 py-5 text-center transition-colors ${isDragging ? "border-muted bg-searchBackground text-ink" : "border-border bg-bg text-muted hover:border-muted hover:bg-searchBackground hover:text-[#555555]"}`}
     >
       {previewUrl
         ? <>
@@ -252,7 +246,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Action({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactElement<{ className?: string }> }) {
-  return <button type="button" aria-label={label} title={label} onClick={onClick} className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-ink sm:h-9 sm:w-9"><span className="[&>svg]:h-[18px] [&>svg]:w-[18px]">{children}</span></button>;
+  return <button type="button" aria-label={label} title={label} onClick={onClick} className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-[#555555] sm:h-9 sm:w-9"><span className="[&>svg]:h-4 [&>svg]:w-4">{children}</span></button>;
 }
 
 function errorMessage(error: unknown, fallback: string) {

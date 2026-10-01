@@ -1,5 +1,85 @@
 # Changelog
 
+## TRIP GOGO — Home Trip Date Ordering
+
+Changed
+
+- Home Trip cards now show complete `year / month / day` ranges and render later start dates first without changing stored Trip data or repository behavior.
+
+## TRIP GOGO — Trip Creation RLS Return Path
+
+Fixed
+
+- Added an authenticated owner-read policy for `tg_trips` so a newly created public or private Trip can pass the SELECT check required by `INSERT ... RETURNING`, while preserving the existing INSERT policy, anonymous visibility rules, and owner-membership trigger.
+
+## TRIP GOGO — TravelItem Dialog Media Rhythm
+
+Changed
+
+- Unified every TravelItem add/edit Dialog's note textarea and image upload, loading, error, and preview footprint at 140px across desktop and mobile without changing resizing, upload behavior, or image presentation logic.
+
+## TRIP GOGO — Place/Food Dialog Balance
+
+Changed
+
+- Balanced the Place/Food desktop Dialog's full-width note and image sections around matching 180px content frames while preserving mobile sizing, textarea resizing, and the complete image interaction lifecycle.
+
+## TRIP GOGO — Form and Mobile Note Consistency
+
+Changed
+
+- Made the Place/Food desktop date selector fill its grid column while leaving Daily and unrelated Select controls unchanged.
+- Reused the established Place/Food desktop note typography across Place/Food and Daily mobile cards without changing clamps, `more+`, spacing, or card structure.
+
+## TRIP GOGO — Place/Food Creation and Dialog Refinement
+
+Changed
+
+- Moved the desktop Place/Food create action from the Trip Header into the existing area/search/sort toolbar while preserving the mobile Header action and existing create callbacks.
+- Reflowed the shared Place/Food form into a shorter two-column desktop layout and kept its mobile field order single-column without changing validation, save behavior, image handling, or unsaved-change protection.
+- Stabilized existing-image preview height and contained TravelItem Dialog overscroll so asynchronous signed-image previews no longer reposition the centered Dialog or chain scrolling into the page.
+- Added a private-bucket SELECT policy helper that lets anonymous visitors read only TravelItem images referenced by Trips they can already read; authenticated image mutation policies remain unchanged.
+
+## TRIP GOGO — Auth Initialization Recovery
+
+Changed
+
+- Auth initialization now always leaves its loading state after `getUser()` settles, so a transient initialization failure cannot permanently hide Login or suppress permission-dependent controls; successful user, OAuth return-path, and auth subscription behavior remain unchanged.
+
+## TRIP GOGO — Mobile Daily Gestures
+
+Added
+
+- Added mobile-only Daily card swipe actions that reveal the existing Edit and confirmed Delete flows in a restrained 112px grayscale action rail.
+- Reused the existing same-day dnd-kit reorder pipeline on mobile with its 350ms long-press activation, while direction locking keeps horizontal swipe, vertical page scrolling, and nested links/actions independent.
+
+## TRIP GOGO — Phase 2 TravelItem Images
+
+Added
+
+- Added one optional private image to shared Place/Food TravelItems, with browser-side WebP resize/compression, immediate preview, and per-image cover or contain presentation.
+- Added an isolated `tg-travel-item-images` Storage bucket with reference-aware reads, member-only uploads, and deletion restricted to unreferenced objects.
+- Added safe image replace, remove, and TravelItem-delete cleanup ordering, including explicit orphan warnings when Storage cleanup fails after a successful database mutation.
+- Kept the existing `tg_duplicate_trip(uuid) → uuid` contract while adding temporary internal item lineage so duplicated images are copied to independent paths and compensated safely on partial failure.
+
+Changed
+
+- Place/Food cards render a fixed 210 × 140 desktop image only when an image exists, use one column below 1024px, and add a minimal full-width 3:2 image to the existing mobile card without restructuring its content or actions.
+
+## TRIP GOGO — Phase 1A UI Refresh
+
+Changed
+
+- Aligned the shared light-theme tokens and controls with the E_card visual language: white surfaces, `#222` primary text, `#777` secondary text, `#e5e5e5` borders, `#f6f6f6` quiet surfaces, smaller radii, restrained shadows, and tighter interface letter spacing.
+- Separated the Trip header from primary navigation. The existing four tabs remain unchanged: navigation is fixed to the bottom with safe-area spacing on mobile and returns below the header as a horizontal desktop row.
+- Kept the FolderHeart Trip Resources entry in the header with its existing route and behavior.
+- Refined Place/Food search, sort, and cards without changing their filtering or sorting implementation; lists are single-column on mobile and fixed at two columns on desktop.
+- Updated shared Button, Input, Select, and Dialog presentation without changing callbacks, unsaved-change protection, CRUD, permissions, or repository behavior.
+- Refined the desktop sticky shell with a compact, content-width primary navigation row and removed decorative backgrounds from mobile navigation icons.
+- Moved desktop primary navigation into the single-row sticky header before the Trip Resources and auth actions; mobile keeps navigation exclusively in the fixed bottom bar. Secondary menus remain in content with a 32px gap before the first heading or control group.
+- Added data-derived Place/Food area menus. Options come from the complete item collection for the active type, remain independent of search/sort results, and filter cards only in browser state.
+- Replaced general coffee-colored link/icon hover states with the neutral `#555` interaction color while preserving semantic status colors.
+
 ## TRIP GOGO — Transportation Details
 
 Added

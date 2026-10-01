@@ -79,7 +79,7 @@ function MemberList({ title, empty, children }: { title: string; empty: string; 
 }
 
 function MemberRow({ email, label, actionLabel, onAction, disabled }: { email: string; label?: string; actionLabel: string; onAction: () => void; disabled?: boolean }) {
-  return <div className="flex min-w-0 items-center gap-3 py-3"><UserRound className="h-4 w-4 shrink-0 text-muted" /><div className="min-w-0 flex-1"><p className="truncate text-sm">{email}</p>{label && <p className="mt-0.5 truncate text-xs text-muted">{label}</p>}</div><button type="button" disabled={disabled} onClick={onAction} aria-label={actionLabel} title={actionLabel} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-ink disabled:opacity-30"><Trash2 className="h-[18px] w-[18px]" /></button></div>;
+  return <div className="flex min-w-0 items-center gap-3 py-3"><UserRound className="h-4 w-4 shrink-0 text-muted" /><div className="min-w-0 flex-1"><p className="truncate text-sm">{email}</p>{label && <p className="mt-0.5 truncate text-xs text-muted">{label}</p>}</div><button type="button" disabled={disabled} onClick={onAction} aria-label={actionLabel} title={actionLabel} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-[#555555] disabled:opacity-30"><Trash2 className="h-4 w-4" /></button></div>;
 }
 
 function errorMessage(error: unknown, fallback: string) {

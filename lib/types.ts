@@ -1,4 +1,5 @@
 export type TravelItemType = "place" | "food";
+export type TravelItemImageFit = "cover" | "contain";
 export type TripRole = "owner" | "editor";
 export type TripResourceCategory = "transportation" | "coupon" | "note";
 
@@ -56,6 +57,8 @@ export interface TravelItem {
   extraLink2?: string;
   businessHours?: string;
   note: string;
+  imagePath?: string;
+  imageFit: TravelItemImageFit;
   order: number;
   createdAt: string;
   updatedAt: string;

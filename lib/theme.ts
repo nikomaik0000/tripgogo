@@ -15,20 +15,17 @@
  */
 
 export const colors = {
-  bg: "#FAF8F4",
+  bg: "#FFFFFF",
   surface: "#FFFFFF",
-  ink: "#555555",
-  muted: "#8A817C",
+  ink: "#222222",
+  muted: "#777777",
   accent: {
-    coffee: "#A9967F",
+    coffee: "#7B664F",
     green: "#8FA68E",
     blue: "#8CA3B5",
   },
-  // Phase 4C v2: one consistent neutral accent for active/selected/toggled
-  // UI states across the whole site (view toggle, selected filter chips,
-  // active pills) — replaces the previously mixed dark-ink / coffee-tinted
-  // active states.
-  accentSoft: "#DDD5CC",
+  // Neutral active/selected surface shared by controls and navigation.
+  accentSoft: "#F6F6F6",
   tag: {
     drink: "#DCEBDD",
     "drink-fg": "#4C6B52",
@@ -41,24 +38,22 @@ export const colors = {
     expiring: "#F0C9A0",
     "expiring-fg": "#7A4A1D",
   },
-  border: "#EAE6DD",
-  // Phase 4C v2: unified badge border/text, and the reward-card divider,
-  // which intentionally shares the badge border color — both are a touch
-  // lighter than the general-purpose `border` token above.
-  badgeBorder: "#EFEAE4",
-  badgeText: "#BCAE9F",
-  divider: "#EFEAE4",
-  searchBackground: "#F2EFEB",
+  border: "#E5E5E5",
+  // Quiet supporting colors for badges, dividers, and input backgrounds.
+  badgeBorder: "#E5E5E5",
+  badgeText: "#777777",
+  divider: "#EEEEEE",
+  searchBackground: "#F6F6F6",
   travelType: {
-    food: "#fcefdb",
-    place: "#e4efda",
-    shop: "#ffeeee",
+    food: "#fff6b6",
+    place: "#cfedf9",
+    shop: "#ffe9ee",
   },
 } as const;
 
 export const borderRadius = {
-  card: "14px",
-  pill: "999px",
+  card: "6px",
+  pill: "6px",
 } as const;
 
 export const layout = {
@@ -72,9 +67,8 @@ export const layout = {
 } as const;
 
 export const boxShadow = {
-  // Phase 4C v2: slightly softer/lighter than before for a cleaner feel.
-  soft: "0 1px 2px rgba(0,0,0,0.03), 0 1px 6px rgba(0,0,0,0.02)",
-  pop: "0 4px 24px rgba(0,0,0,0.08)",
+  soft: "0 1px 3px rgba(0,0,0,0.04)",
+  pop: "0 8px 30px rgba(0,0,0,0.10)",
 } as const;
 
 export const typography = {
@@ -116,18 +110,14 @@ export const typography = {
     ],
   },
   letterSpacing: {
-    // Phase 4C: generous tracking for the light-weight serif wordmark.
-    // Phase 4C v2: widened further per feedback; the wordmark keeps its
-    // own spacing, distinct from the general interface-text value below.
+    // Wordmark spacing stays distinct from ordinary interface text.
     wordmark: "0.2em",
     // Phase 4D: a tighter tracking value used only below the `sm` breakpoint,
     // paired with a smaller font-size, so "BIRTHDAY REWARDS" always fits on
     // one line on narrow screens without truncating or wrapping.
     wordmarkCompact: "0.04em",
-    // Phase 4C v2: the consistent typography rhythm applied to normal
-    // interface text app-wide (see the `body` rule in globals.css) — store
-    // names, descriptions, notes, search/filter/sort UI, buttons, badges.
-    body: "0.075em",
+    // Compact interface rhythm shared across body copy and controls.
+    body: "0.025em",
   },
 } as const;
 

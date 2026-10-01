@@ -11,7 +11,6 @@ import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { TripFormDialog } from "@/components/trip-form-dialog";
 import { useAuth } from "@/lib/auth-context";
-import { displayDate } from "@/lib/travel-dates";
 import { travelRepository } from "@/lib/travel-repository";
 import type { Trip, TripRole } from "@/lib/types";
 
@@ -45,6 +44,10 @@ export function TripList({ initialTrips }: { initialTrips: Trip[] }) {
     if (!authReady) return;
     refreshRoles().catch((error) => toast.error(message(error, "無法確認編輯權限")));
   }, [authReady, refreshRoles]);
+  const sortedTrips = trips
+    .map((trip, index) => ({ trip, index }))
+    .sort((left, right) => right.trip.startDate.localeCompare(left.trip.startDate) || left.index - right.index)
+    .map(({ trip }) => trip);
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24 pt-4 sm:px-6">
@@ -63,12 +66,12 @@ export function TripList({ initialTrips }: { initialTrips: Trip[] }) {
       <h2 className="mb-4 text-base font-semibold tracking-[0.16em]">旅行列表</h2>
       {trips.length === 0 ? <EmptyState title="尚未建立旅行" description="" icon="map" /> : (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {trips.map((trip) => {
+          {sortedTrips.map((trip) => {
             const canEdit = roles.has(trip.id);
             return <article key={trip.id} className="flex h-[260px] flex-col rounded-card border border-border bg-surface px-6 pt-6 shadow-soft">
-              <Link href={`/trip/${trip.id}`} className="flex items-center gap-2 pb-5 text-sm text-muted hover:text-ink"><MapPin className="h-5 w-5 shrink-0" />{displayDate(trip.startDate)} – {displayDate(trip.endDate)}</Link>
+              <Link href={`/trip/${trip.id}`} className="flex items-center gap-2 pb-5 text-sm text-muted hover:text-[#555555]"><MapPin className="h-4 w-4 shrink-0" />{displayHomeDate(trip.startDate)} – {displayHomeDate(trip.endDate)}</Link>
               <div className="border-t border-divider" />
-              <Link href={`/trip/${trip.id}`} className={`flex min-w-0 flex-1 items-center text-storeName font-normal hover:text-accent-coffee ${HOME_CARD_SPACING}`}><span className="line-clamp-2 min-h-[3.25rem]">{trip.name}</span></Link>
+              <Link href={`/trip/${trip.id}`} className={`flex min-w-0 flex-1 items-center text-storeName font-normal hover:text-[#555555] ${HOME_CARD_SPACING}`}><span className="line-clamp-2 min-h-[3.25rem]">{trip.name}</span></Link>
               <div className="border-t border-divider" />
               <footer className="mt-auto flex h-14 shrink-0 items-center justify-end gap-4 pr-1">
                 {canEdit && <><IconButton label="編輯" onClick={() => { setEditing(trip); setOpen(true); }}><SquarePen /></IconButton><IconButton label="複製" onClick={() => {
@@ -104,9 +107,14 @@ export function TripList({ initialTrips }: { initialTrips: Trip[] }) {
 }
 
 function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactElement<{ className?: string }> }) {
-  return <button type="button" aria-label={label} title={label} onClick={onClick} className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-ink sm:h-9 sm:w-9"><span className="[&>svg]:h-5 [&>svg]:w-5">{children}</span></button>;
+  return <button type="button" aria-label={label} title={label} onClick={onClick} className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-[#555555] sm:h-9 sm:w-9"><span className="[&>svg]:h-4 [&>svg]:w-4">{children}</span></button>;
 }
 
 function message(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
+}
+
+function displayHomeDate(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  return `${year} / ${month} / ${day}`;
 }

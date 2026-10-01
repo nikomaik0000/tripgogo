@@ -4,6 +4,17 @@
 
 ### Done
 
+- Home Trip cards show full-year date ranges and sort by start date from newest to oldest
+- Restored authenticated Trip creation with an owner-only SELECT path for the `INSERT ... RETURNING` row
+- Unified TravelItem Dialog note and image content footprints at 140px across item types and viewport sizes
+- Balanced Place/Food desktop note and image-upload content heights without changing mobile or image behavior
+- Place/Food date-control width and cross-page mobile card-note typography consistency
+- Place/Food desktop toolbar creation entry, responsive shared Dialog layout, stable image-preview scrolling, and visibility-aware anonymous TravelItem image reads
+- Auth initialization failure recovery keeps Login usable without inventing a user or edit role
+- Phase 1A E_card-aligned design tokens, responsive header/navigation shell, two-column desktop Place/Food cards, and shared control styling
+- Phase 2A data-derived Place/Food area filters with stable complete-type option lists and search/sort composition
+- Phase 2B optional Place/Food TravelItem images with private Storage, WebP compression, cover/contain presentation, safe lifecycle cleanup, and independent duplicate paths
+- Phase 3 mobile Daily swipe actions with a single-open action rail and vertical-scroll/long-press drag gesture protection
 - Idempotent Supabase migration restoring member-protected Daily TravelItem reordering
 - Data-entry Dialog outside-dismiss prevention and unsaved-change confirmation
 - Trip primary navigation falls back to icon-only presentation when its container cannot fit the four enlarged labels
@@ -22,6 +33,7 @@
 
 ### Future
 
+- Phase 1B primary navigation information architecture: add 機酒 for the existing flight, accommodation, and transportation views, then reduce 大綱 to a trip summary/overview
 - Add one-time localStorage migration/import flow (Phase 4)
 - Add drag-and-drop itinerary ordering
 - Design a Resource image reference/cleanup mechanism after the Phase 1 shared-image model.

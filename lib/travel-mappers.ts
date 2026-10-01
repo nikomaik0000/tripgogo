@@ -11,7 +11,8 @@ export const mapItem = (row: TgTravelItemRow): TravelItem => ({
   category: row.category, area: row.area, date: row.date, name: row.name,
   googleMapsUrl: row.google_maps_url, extraLink1: row.extra_link_1 ?? undefined,
   extraLink2: row.extra_link_2 ?? undefined, businessHours: row.business_hours ?? undefined,
-  note: row.note, order: row.sort_order, createdAt: row.created_at, updatedAt: row.updated_at,
+  note: row.note, imagePath: row.image_path ?? undefined, imageFit: row.image_fit ?? "cover",
+  order: row.sort_order, createdAt: row.created_at, updatedAt: row.updated_at,
 });
 
 export const mapTripResource = (row: TgTripResourceRow): TripResource => ({

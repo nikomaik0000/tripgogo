@@ -23,7 +23,8 @@ export type TgTravelItemRow = {
   id: string; trip_id: string; created_by: string | null; type: "place" | "food";
   category: string; area: string; date: string | null; name: string; google_maps_url: string;
   extra_link_1: string | null; extra_link_2: string | null; business_hours: string | null;
-  note: string; sort_order: number; created_at: string; updated_at: string;
+  note: string; image_path: string | null; image_fit: "cover" | "contain";
+  duplicate_source_item_id: string | null; sort_order: number; created_at: string; updated_at: string;
 };
 
 export type TgTripResourceRow = {

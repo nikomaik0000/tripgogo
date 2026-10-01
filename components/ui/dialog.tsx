@@ -23,9 +23,9 @@ export function DialogContent({
       <DialogPrimitive.Content
         className={cn(
           "fixed left-1/2 top-1/2 z-50 w-[calc(100%-32px)] max-w-lg -translate-x-1/2 -translate-y-1/2",
-          "rounded-card bg-surface p-6 shadow-pop",
+          "rounded-card border border-border bg-surface p-5 shadow-pop sm:p-6",
           "data-[state=closed]:animate-dialogContentOut data-[state=open]:animate-dialogContentIn",
-          "max-h-[85vh] overflow-y-auto",
+          "max-h-[calc(100dvh-32px)] overflow-y-auto",
           className
         )}
         onInteractOutside={(event) => {
@@ -36,8 +36,8 @@ export function DialogContent({
       >
         <div className="mb-4 flex items-center justify-between">
           <DialogPrimitive.Title className="text-title font-semibold">{title}</DialogPrimitive.Title>
-          <DialogPrimitive.Close aria-label="關閉" title="關閉" className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg sm:h-9 sm:w-9">
-            <X className="h-4 w-4" />
+          <DialogPrimitive.Close aria-label="關閉" title="關閉" className="flex h-11 w-11 items-center justify-center rounded-card text-muted hover:bg-searchBackground sm:h-9 sm:w-9">
+            <X className="h-4 w-4 stroke-[1.5]" />
           </DialogPrimitive.Close>
         </div>
         {children}
