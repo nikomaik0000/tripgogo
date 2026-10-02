@@ -14,7 +14,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ClampedNote } from "@/components/clamped-note";
 import { FlightDialog } from "@/components/flight-dialog";
 import { HotelStayDialog } from "@/components/hotel-stay-dialog";
-import { isDailyCardInteractiveTarget, MobileDailySwipeActions } from "@/components/mobile-daily-swipe-actions";
+import { isDailyCardInteractiveTarget, MobileDailySwipeActions, MobileSwipeActions, useMobileSwipeGroup } from "@/components/mobile-daily-swipe-actions";
 import { TransportationDialog } from "@/components/transportation-dialog";
 import { TravelItemDialog } from "@/components/travel-item-dialog";
 import { TripPrimaryNav, type TripPrimaryTab } from "@/components/trip-primary-nav";
@@ -136,8 +136,10 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
 
 function ItemList({ type, items, query, sort, canEdit, onQuery, onSort, onAdd, onEdit, onDelete }: { type: TravelItemType; items: TravelItem[]; query: string; sort: TravelItemSort; canEdit: boolean; onQuery: (value: string) => void; onSort: (value: TravelItemSort) => void; onAdd: () => void; onEdit: (item: TravelItem) => void; onDelete: (item: TravelItem) => void }) {
   const [area, setArea] = useState("");
+  const { openItemId, open: openSwipe, close: closeSwipe } = useMobileSwipeGroup();
   const areas = useMemo(() => [...new Set(items.filter((item) => item.type === type).map((item) => item.area.trim()).filter(Boolean))], [items, type]);
   useEffect(() => setArea(""), [type]);
+  useEffect(() => closeSwipe(), [area, closeSwipe, query, sort, type]);
   useEffect(() => {
     if (area && !areas.includes(area)) setArea("");
   }, [area, areas]);
@@ -157,16 +159,18 @@ function ItemList({ type, items, query, sort, canEdit, onQuery, onSort, onAdd, o
       <nav aria-label={`${type === "place" ? "地點" : "美食"}區域篩選`} className="no-scrollbar flex h-[42px] w-full flex-none items-center overflow-x-auto pt-0.5 lg:min-w-0 lg:flex-1">{renderAreaMenu()}</nav>
       <div className="ml-auto flex shrink-0 items-center gap-2 lg:ml-0">{renderControls(true)}{canEdit && <AddIconButton label={`新增${type === "place" ? "地點" : "美食"}`} onClick={onAdd} className="h-8 w-8 bg-transparent hover:bg-transparent" />}</div>
     </div>
-    {visible.length === 0 ? <EmptyState title={`尚無${type === "place" ? "地點" : "美食"}`} description="" icon="map" /> : <div className="grid grid-cols-1 gap-6 sm:gap-7 lg:grid-cols-2">{visible.map((item) => <ItemCard key={item.id} item={item} canEdit={canEdit} listLayout onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />)}</div>}
+    {visible.length === 0 ? <EmptyState title={`尚無${type === "place" ? "地點" : "美食"}`} description="" icon="map" /> : <div className="grid grid-cols-1 gap-6 sm:gap-7 lg:grid-cols-2">{visible.map((item) => <ItemCard key={item.id} item={item} canEdit={canEdit} listLayout swipeOpen={openItemId === item.id} onSwipeOpen={() => openSwipe(item.id)} onSwipeClose={closeSwipe} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />)}</div>}
   </>;
 }
 
-function ItemCard({ item, canEdit, onEdit, onDelete, controls, compactBusiness = false, listLayout = false }: { item: TravelItem; canEdit: boolean; onEdit: () => void; onDelete: () => void; controls?: React.ReactNode; compactBusiness?: boolean; listLayout?: boolean }) {
+function ItemCard({ item, canEdit, onEdit, onDelete, controls, compactBusiness = false, listLayout = false, swipeOpen = false, onSwipeOpen = () => undefined, onSwipeClose = () => undefined }: { item: TravelItem; canEdit: boolean; onEdit: () => void; onDelete: () => void; controls?: React.ReactNode; compactBusiness?: boolean; listLayout?: boolean; swipeOpen?: boolean; onSwipeOpen?: () => void; onSwipeClose?: () => void }) {
   const imageUrl = useTravelItemImageUrl(listLayout ? item.imagePath : undefined);
   if (listLayout) {
+    const hasMobileFooterLinks = Boolean(item.extraLink1 || item.extraLink2);
     return (
       <>
-      <article className="flex min-w-0 flex-col self-start rounded-card border border-border bg-surface px-4 pt-4 sm:hidden">
+      <MobileSwipeActions itemId={item.id} canEdit={canEdit} canDelete={canEdit} open={swipeOpen} onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete} className="shadow-soft">
+      <article className="flex min-w-0 flex-col self-start rounded-card border border-border bg-surface px-4 pt-4">
         <header className="flex min-w-0 items-start justify-between gap-4 pb-4">
           <div className="min-w-0 flex-1">
           {item.googleMapsUrl
@@ -180,19 +184,14 @@ function ItemCard({ item, canEdit, onEdit, onDelete, controls, compactBusiness =
           <ItemCompactBusinessHours item={item} />
           {item.note && <ClampedNote note={item.note} lines={3} showMarker={false} textClassName={CARD_NOTE_TYPOGRAPHY} />}
         </section>
-        <footer className="mt-auto flex min-h-12 shrink-0 items-center border-t border-divider">
-          {(item.extraLink1 || item.extraLink2) && (
-            <div className="flex items-center gap-4">
-              {item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} />}
-              {item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} />}
-            </div>
-          )}
+        {hasMobileFooterLinks && <footer className="mt-auto flex min-h-12 shrink-0 items-center border-t border-divider">
           <div className="ml-auto flex items-center gap-4">
-            {item.googleMapsUrl && <a href={item.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label="開啟 Google Maps" title="開啟 Google Maps" className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-[#555555] sm:h-9 sm:w-9"><Navigation className="h-4 w-4" /></a>}
-            {canEdit && <><Action label="編輯" smallIcon onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onClick={onDelete}><Trash2 /></Action></>}
+            {item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} />}
+            {item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} />}
           </div>
-        </footer>
+        </footer>}
       </article>
+      </MobileSwipeActions>
       <article className="hidden min-h-[220px] min-w-0 flex-col self-stretch rounded-card border border-border bg-surface px-5 pt-5 sm:flex">
         <header className="flex min-w-0 items-start justify-between gap-5 pb-5">
           <div className="min-w-0 flex-1">
@@ -358,6 +357,7 @@ function Outline({ trip, items, canEdit, initialFlights, initialHotelStays, init
   const [transportationDialog, setTransportationDialog] = useState<{ open: boolean; transportation?: Transportation }>({ open: false });
   const [deleting, setDeleting] = useState<{ kind: "flight"; value: Flight } | { kind: "hotel"; value: HotelStay } | { kind: "transportation"; value: Transportation }>();
   const [activeSection, setActiveSection] = useState("flight");
+  const { openItemId, open: openSwipe, close: closeSwipe } = useMobileSwipeGroup();
   const refresh = useCallback(async () => {
     try {
       const [nextFlights, nextHotels, nextTransportations] = await Promise.all([travelRepository.getFlights(trip.id), travelRepository.getHotelStays(trip.id), travelRepository.getTransportations(trip.id)]);
@@ -381,13 +381,13 @@ function Outline({ trip, items, canEdit, initialFlights, initialHotelStays, init
     <nav aria-label="大綱快速導覽" className="no-scrollbar mb-8 max-w-full overflow-x-auto pt-5 sm:pt-6"><div className="flex min-w-max flex-nowrap items-center gap-5 pr-4">{navigation.map(({ value, label }) => <button key={value} type="button" onClick={() => jumpToSection(value)} aria-current={activeSection === value ? "location" : undefined} className={`shrink-0 border-b pb-1 text-xs transition-colors ${activeSection === value ? "border-muted text-ink" : "border-transparent text-muted hover:text-[#555555]"}`}>{label}</button>)}</div></nav>
     <div className="space-y-12">
       <OutlineDetailsSection id="outline-flight" icon={Plane} label="機票" addLabel="新增機票" canEdit={canEdit} onAdd={() => setFlightDialog({ open: true })}>
-        {sortedFlights.length > 0 && <div className="grid grid-cols-1 gap-6 md:grid-cols-2">{sortedFlights.map((flight) => <FlightCard key={flight.id} flight={flight} canEdit={canEdit} onEdit={() => setFlightDialog({ open: true, flight })} onDelete={() => setDeleting({ kind: "flight", value: flight })} />)}</div>}
+        {sortedFlights.length > 0 && <div className="grid grid-cols-1 gap-6 md:grid-cols-2">{sortedFlights.map((flight) => <FlightCard key={flight.id} flight={flight} canEdit={canEdit} swipeOpen={openItemId === `flight-${flight.id}`} onSwipeOpen={() => openSwipe(`flight-${flight.id}`)} onSwipeClose={closeSwipe} onEdit={() => setFlightDialog({ open: true, flight })} onDelete={() => setDeleting({ kind: "flight", value: flight })} />)}</div>}
       </OutlineDetailsSection>
       <OutlineDetailsSection id="outline-hotel" icon={Hotel} label="住宿" addLabel="新增飯店" canEdit={canEdit} onAdd={() => setHotelDialog({ open: true })}>
-        {sortedStays.length > 0 && <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">{sortedStays.map((stay) => <HotelStayCard key={stay.id} stay={stay} canEdit={canEdit} onEdit={() => setHotelDialog({ open: true, stay })} onDelete={() => setDeleting({ kind: "hotel", value: stay })} />)}</div>}
+        {sortedStays.length > 0 && <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">{sortedStays.map((stay) => <HotelStayCard key={stay.id} stay={stay} canEdit={canEdit} swipeOpen={openItemId === `hotel-${stay.id}`} onSwipeOpen={() => openSwipe(`hotel-${stay.id}`)} onSwipeClose={closeSwipe} onEdit={() => setHotelDialog({ open: true, stay })} onDelete={() => setDeleting({ kind: "hotel", value: stay })} />)}</div>}
       </OutlineDetailsSection>
       <OutlineDetailsSection id="outline-transportation" icon={CarFront} label="交通" addLabel="新增交通" canEdit={canEdit} onAdd={() => setTransportationDialog({ open: true })}>
-        {sortedTransportations.length > 0 && <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">{sortedTransportations.map((transportation) => <TransportationCard key={transportation.id} transportation={transportation} canEdit={canEdit} onEdit={() => setTransportationDialog({ open: true, transportation })} onDelete={() => setDeleting({ kind: "transportation", value: transportation })} />)}</div>}
+        {sortedTransportations.length > 0 && <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">{sortedTransportations.map((transportation) => <TransportationCard key={transportation.id} transportation={transportation} canEdit={canEdit} swipeOpen={openItemId === `transportation-${transportation.id}`} onSwipeOpen={() => openSwipe(`transportation-${transportation.id}`)} onSwipeClose={closeSwipe} onEdit={() => setTransportationDialog({ open: true, transportation })} onDelete={() => setDeleting({ kind: "transportation", value: transportation })} />)}</div>}
       </OutlineDetailsSection>
       <section id="outline-itinerary" className="scroll-mt-36"><header className="mb-6 flex items-center"><CalendarDays className="h-4 w-4 text-muted" /><h2 className="ml-3 text-sm font-semibold tracking-body">行程</h2></header><div className="space-y-8">{sections.filter((section) => section.items.length > 0).map((section) => <section key={section.date ?? "undated"}><h3 className="mb-4 text-title font-semibold">{section.date ? <DailyDateLabel date={section.date} /> : "未定"}</h3><div className="rounded-card border border-border bg-surface px-6 shadow-soft">{section.items.sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt)).map((item, index) => <div key={item.id} className={`flex items-center gap-3 py-4 ${index ? "border-t border-divider" : ""}`}>{item.type === "place" ? <MapPin className="h-4 w-4 text-muted" /> : <UtensilsCrossed className="h-4 w-4 text-muted" />}<ItemName item={item} /></div>)}</div></section>)}</div></section>
     </div>
@@ -402,31 +402,36 @@ function OutlineDetailsSection({ id, icon: Icon, label, addLabel, canEdit, onAdd
   return <section id={id} className="scroll-mt-36"><header className="mb-4 flex items-center"><Icon className="h-4 w-4 text-muted" /><h2 className="ml-3 text-sm font-semibold tracking-body">{label}</h2>{canEdit && <AddIconButton label={addLabel} onClick={onAdd} className="ml-auto" />}</header>{children}</section>;
 }
 
-function FlightCard({ flight, canEdit, onEdit, onDelete }: { flight: Flight; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
+function FlightCard({ flight, canEdit, swipeOpen, onSwipeOpen, onSwipeClose, onEdit, onDelete }: { flight: Flight; canEdit: boolean; swipeOpen: boolean; onSwipeOpen: () => void; onSwipeClose: () => void; onEdit: () => void; onDelete: () => void }) {
   const crossesDate = flight.departureDate !== flight.arrivalDate;
-  return <article className="flex min-w-0 flex-col rounded-card border border-border bg-surface px-6 pt-6 shadow-soft">
+  return <MobileSwipeActions itemId={`flight-${flight.id}`} canEdit={canEdit} canDelete={canEdit} open={swipeOpen} desktopPassthrough onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete} className="shadow-soft">
+  <article className="flex min-w-0 flex-col rounded-card border border-border bg-surface px-6 pt-6 shadow-soft">
     <header className="flex min-w-0 items-center justify-between gap-4 pb-5"><div className="flex min-w-0 items-center gap-4"><span className="truncate font-medium">{flight.airline}</span><span className="shrink-0 text-sm text-muted">{flight.flightNumber}</span></div><div className="flex min-w-0 shrink-0 items-center gap-2 text-sm text-muted"><span className="max-w-20 truncate sm:max-w-none">{flight.departurePlace}</span><ChevronRight className="h-4 w-4 shrink-0" /><span className="max-w-20 truncate sm:max-w-none">{flight.arrivalPlace}</span></div></header>
     <div className="border-t border-divider" />
     <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2 py-6"><div className="shrink-0 text-sm text-muted"><time dateTime={flight.departureDate}><DailyDateLabel date={flight.departureDate} /></time>{crossesDate && <><span className="mx-2">–</span><time dateTime={flight.arrivalDate}><DailyDateLabel date={flight.arrivalDate} /></time></>}</div><div className="flex items-center gap-3 text-title font-medium"><time dateTime={flight.departureTime}>{flight.departureTime}</time><ChevronRight className="h-4 w-4 text-muted" /><time dateTime={flight.arrivalTime}>{flight.arrivalTime}</time></div></div>
     {flight.note && <div className="pb-5"><ClampedNote note={flight.note} lines={2} /></div>}
-    <footer className="mt-auto flex h-14 items-center border-t border-divider"><div>{flight.link && <ExternalLinkAction href={flight.link} index={1} />}</div>{canEdit && <div className="ml-auto flex items-center gap-4"><Action label="編輯" smallIcon onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onClick={onDelete}><Trash2 /></Action></div>}</footer>
-  </article>;
+    <footer className={`${flight.link ? "flex" : "hidden"} mt-auto h-14 items-center border-t border-divider sm:flex`}><div>{flight.link && <ExternalLinkAction href={flight.link} index={1} />}</div>{canEdit && <div className="ml-auto hidden items-center gap-4 sm:flex"><Action label="編輯" smallIcon onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onClick={onDelete}><Trash2 /></Action></div>}</footer>
+  </article>
+  </MobileSwipeActions>;
 }
 
-function HotelStayCard({ stay, canEdit, onEdit, onDelete }: { stay: HotelStay; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
+function HotelStayCard({ stay, canEdit, swipeOpen, onSwipeOpen, onSwipeClose, onEdit, onDelete }: { stay: HotelStay; canEdit: boolean; swipeOpen: boolean; onSwipeOpen: () => void; onSwipeClose: () => void; onEdit: () => void; onDelete: () => void }) {
   const hasTimes = stay.checkInTime || stay.checkOutTime;
-  return <article className="flex min-w-0 flex-col rounded-card border border-border bg-surface px-6 pt-6 shadow-soft">
-    <h3 className="line-clamp-2 font-medium">{stay.name}</h3>
+  return <MobileSwipeActions itemId={`hotel-${stay.id}`} canEdit={canEdit} canDelete={canEdit} open={swipeOpen} desktopPassthrough onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete} className="shadow-soft">
+  <article className="flex min-w-0 flex-col rounded-card border border-border bg-surface px-6 pt-6 shadow-soft">
+    {stay.googleMapsUrl && <a href={stay.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label={`在 Google Maps 開啟${stay.name}`} title="開啟 Google Maps" className="line-clamp-2 font-medium text-ink no-underline focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-ink sm:hidden">{stay.name}</a>}
+    <h3 className={`line-clamp-2 font-medium ${stay.googleMapsUrl ? "hidden sm:block" : ""}`}>{stay.name}</h3>
     <div className="mt-5 border-t border-divider" />
     <div className="space-y-4 py-6"><p className="text-center font-medium"><time dateTime={stay.checkInDate}><DailyDateLabel date={stay.checkInDate} /></time><span className="mx-3 text-muted">–</span><time dateTime={stay.checkOutDate}><DailyDateLabel date={stay.checkOutDate} /></time></p>
       {hasTimes && <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 rounded-pill bg-searchBackground px-4 py-2 text-sm text-muted">{stay.checkInTime && <span>入住&nbsp; {stay.checkInTime}</span>}{stay.checkOutTime && <span>退房&nbsp; {stay.checkOutTime}</span>}</div>}
       {stay.address && <ContactRow label="地址" value={stay.address} />}{stay.phone && <ContactRow label="電話" value={stay.phone} />}{stay.note && <ClampedNote note={stay.note} lines={2} />}
     </div>
-    <footer className="mt-auto flex h-14 items-center border-t border-divider"><div className="flex items-center gap-4">{stay.link && <ExternalLinkAction href={stay.link} index={1} />}{stay.googleMapsUrl && <a href={stay.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label="開啟 Google Maps" title="開啟 Google Maps" className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-[#555555] sm:h-9 sm:w-9"><Navigation className="h-4 w-4" /></a>}</div>{canEdit && <div className="ml-auto flex items-center gap-4"><Action label="編輯" smallIcon onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onClick={onDelete}><Trash2 /></Action></div>}</footer>
-  </article>;
+    <footer className={`${stay.link ? "flex" : "hidden"} mt-auto h-14 items-center border-t border-divider sm:flex`}><div className="ml-auto flex items-center gap-4 sm:ml-0">{stay.link && <ExternalLinkAction href={stay.link} index={1} />}{stay.googleMapsUrl && <a href={stay.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label="開啟 Google Maps" title="開啟 Google Maps" className="hidden h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-[#555555] sm:flex sm:h-9 sm:w-9"><Navigation className="h-4 w-4" /></a>}</div>{canEdit && <div className="ml-auto hidden items-center gap-4 sm:flex"><Action label="編輯" smallIcon onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onClick={onDelete}><Trash2 /></Action></div>}</footer>
+  </article>
+  </MobileSwipeActions>;
 }
 
-function TransportationCard({ transportation, canEdit, onEdit, onDelete }: { transportation: Transportation; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
+function TransportationCard({ transportation, canEdit, swipeOpen, onSwipeOpen, onSwipeClose, onEdit, onDelete }: { transportation: Transportation; canEdit: boolean; swipeOpen: boolean; onSwipeOpen: () => void; onSwipeClose: () => void; onEdit: () => void; onDelete: () => void }) {
   const isRental = transportation.type === "rental_car";
   const title = isRental ? transportation.company : transportation.routeName;
   const secondary = isRental ? transportation.vehicleModel : transportation.trainNumber;
@@ -435,14 +440,16 @@ function TransportationCard({ transportation, canEdit, onEdit, onDelete }: { tra
     ? [["地址", transportation.address], ["費用", transportation.cost]]
     : [["座位", transportation.seat], ["車廂", transportation.carriage], ["車票", transportation.ticket], ["費用", transportation.cost]])
     .filter((detail): detail is [string, string] => Boolean(detail[1]));
-  return <article className="flex min-w-0 flex-col rounded-card border border-border bg-surface px-6 pt-6 shadow-soft">
+  return <MobileSwipeActions itemId={`transportation-${transportation.id}`} canEdit={canEdit} canDelete={canEdit} open={swipeOpen} desktopPassthrough onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete} className="shadow-soft">
+  <article className="flex min-w-0 flex-col rounded-card border border-border bg-surface px-6 pt-6 shadow-soft">
     <header className="flex min-w-0 items-center justify-between gap-4 pb-5"><div className="flex min-w-0 items-center gap-4"><h3 className="min-w-0 truncate font-medium">{title}</h3>{secondary && <span className="min-w-0 truncate text-sm text-muted">{secondary}</span>}</div>{transportation.reservationNumber && <span className="max-w-24 shrink-0 truncate text-sm text-muted sm:max-w-40">{transportation.reservationNumber}</span>}</header>
     <div className="border-t border-divider" />
     <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2 py-6"><div className="shrink-0 text-sm text-muted"><time dateTime={transportation.startDate}><DailyDateLabel date={transportation.startDate} /></time></div><div className="flex items-center gap-3 text-title font-medium"><time dateTime={transportation.startTime}>{transportation.startTime}</time><ChevronRight className="h-4 w-4 text-muted" />{crossesDate && <time dateTime={transportation.endDate} className="text-sm font-normal text-muted"><DailyDateLabel date={transportation.endDate} /></time>}<time dateTime={transportation.endTime}>{transportation.endTime}</time></div></div>
     <div className="flex min-w-0 items-center justify-between gap-4 rounded-pill bg-searchBackground px-4 py-2 text-sm text-muted"><span className="min-w-0 truncate">{transportation.departurePlace}</span><span className="min-w-0 truncate text-right">{transportation.arrivalPlace}</span></div>
     <div className="space-y-4 py-6">{details.map(([label, value]) => <ContactRow key={label} label={label} value={value} />)}{transportation.note && <ClampedNote note={transportation.note} lines={2} />}</div>
-    <footer className="mt-auto flex h-14 items-center border-t border-divider"><div className="flex items-center gap-4">{transportation.link && <ExternalLinkAction href={transportation.link} index={1} />}{isRental && transportation.googleMapsUrl && <a href={transportation.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label="開啟取車地點 Google Maps" title="開啟取車地點 Google Maps" className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-[#555555] sm:h-9 sm:w-9"><Navigation className="h-4 w-4" /></a>}</div>{canEdit && <div className="ml-auto flex items-center gap-4"><Action label="編輯" smallIcon onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onClick={onDelete}><Trash2 /></Action></div>}</footer>
-  </article>;
+    <footer className={`${transportation.link || (isRental && transportation.googleMapsUrl) ? "flex" : "hidden"} mt-auto h-14 items-center border-t border-divider sm:flex`}><div className="flex items-center gap-4">{transportation.link && <ExternalLinkAction href={transportation.link} index={1} />}{isRental && transportation.googleMapsUrl && <a href={transportation.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label="開啟取車地點 Google Maps" title="開啟取車地點 Google Maps" className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-[#555555] sm:h-9 sm:w-9"><Navigation className="h-4 w-4" /></a>}</div>{canEdit && <div className="ml-auto hidden items-center gap-4 sm:flex"><Action label="編輯" smallIcon onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onClick={onDelete}><Trash2 /></Action></div>}</footer>
+  </article>
+  </MobileSwipeActions>;
 }
 
 function deleteLabel(deleting: { kind: "flight"; value: Flight } | { kind: "hotel"; value: HotelStay } | { kind: "transportation"; value: Transportation }) {

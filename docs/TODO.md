@@ -4,6 +4,8 @@
 
 ### Done
 
+- Shared permission-aware Mobile edit/delete swipe actions across Trip, Place/Food, Outline, and Resource cards
+- Mobile Place/Food footer link consolidation with conditional empty-footer removal
 - Safari/iPhone TravelItem image compression fallback with MIME-safe WebP/JPEG Storage and duplicate paths
 - Browser favicon now reuses the updated 192px app icon without changing PWA manifest icons
 - Home Trip cards show full-year date ranges and sort by start date from newest to oldest

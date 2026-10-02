@@ -1,5 +1,20 @@
 # Changelog
 
+## TRIP GOGO — Shared Mobile Swipe Actions
+
+Changed
+
+- Extended the proven Daily horizontal swipe interaction to editable Mobile Trip, Place/Food, Outline, and Resource cards without changing desktop actions or CRUD callbacks.
+- Preserved Homepage Copy and persistent external-link actions while hiding Mobile edit/delete controls behind permission-aware swipe rails.
+- Made Mobile Hotel names open Google Maps directly, removed their duplicate Maps footer icon, and omitted empty Mobile card footers.
+
+## TRIP GOGO — Mobile Place/Food Footer Links
+
+Changed
+
+- Removed the redundant Mobile Place/Food Google Maps footer action while keeping mapped item names clickable.
+- Right-aligned optional external links with existing edit/delete actions and removed the empty footer when no actions are available.
+
 ## TRIP GOGO — Safari TravelItem Image Compatibility
 
 Changed

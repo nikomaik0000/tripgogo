@@ -9,6 +9,7 @@ import { AuthControl } from "@/components/auth-control";
 import { ClampedNote } from "@/components/clamped-note";
 import { ConfirmDialog, useUnsavedChangesDialog } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
+import { MobileSwipeActions, useMobileSwipeGroup } from "@/components/mobile-daily-swipe-actions";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input, Textarea } from "@/components/ui/input";
@@ -38,6 +39,7 @@ export function TripResourcesWorkspace({ tripId, initialTrip }: { tripId: string
   const [activeCategory, setActiveCategory] = useState<TripResourceCategory>("transportation");
   const [dialog, setDialog] = useState<{ open: boolean; resource?: TripResource; initialCategory?: TripResourceCategory }>({ open: false });
   const [deleting, setDeleting] = useState<TripResource>();
+  const { openItemId, open: openSwipe, close: closeSwipe } = useMobileSwipeGroup();
 
   const refresh = useCallback(async () => {
     try {
@@ -88,7 +90,7 @@ export function TripResourcesWorkspace({ tripId, initialTrip }: { tripId: string
         : <div className="space-y-12">{RESOURCE_CATEGORIES.map(({ value, label, icon: Icon }) => {
           const categoryResources = resources.filter((resource) => resource.category === value);
           if (categoryResources.length === 0 && !canEdit) return null;
-          return <section id={`resource-category-${value}`} key={value} className="scroll-mt-36"><header className="mb-4 flex items-center"><Icon className="h-4 w-4 shrink-0 text-muted" /><h2 className="ml-3 whitespace-nowrap text-sm font-semibold tracking-body">{label}</h2>{canEdit && <AddIconButton label={`新增${label}`} onClick={() => setDialog({ open: true, initialCategory: value })} className="ml-auto" />}</header>{categoryResources.length > 0 && <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">{categoryResources.map((resource) => <ResourceCard key={resource.id} resource={resource} canEdit={canEdit} onEdit={() => setDialog({ open: true, resource })} onDelete={() => setDeleting(resource)} />)}</div>}</section>;
+          return <section id={`resource-category-${value}`} key={value} className="scroll-mt-36"><header className="mb-4 flex items-center"><Icon className="h-4 w-4 shrink-0 text-muted" /><h2 className="ml-3 whitespace-nowrap text-sm font-semibold tracking-body">{label}</h2>{canEdit && <AddIconButton label={`新增${label}`} onClick={() => setDialog({ open: true, initialCategory: value })} className="ml-auto" />}</header>{categoryResources.length > 0 && <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">{categoryResources.map((resource) => <ResourceCard key={resource.id} resource={resource} canEdit={canEdit} swipeOpen={openItemId === resource.id} onSwipeOpen={() => openSwipe(resource.id)} onSwipeClose={closeSwipe} onEdit={() => setDialog({ open: true, resource })} onDelete={() => setDeleting(resource)} />)}</div>}</section>;
         })}</div>}
 
       <ResourceDialog open={dialog.open} resource={dialog.resource} initialCategory={dialog.initialCategory} tripId={tripId} onOpenChange={(open) => setDialog((current) => ({ ...current, open }))} onSaved={() => { setDialog({ open: false }); refresh(); }} />
@@ -100,17 +102,19 @@ export function TripResourcesWorkspace({ tripId, initialTrip }: { tripId: string
   );
 }
 
-function ResourceCard({ resource, canEdit, onEdit, onDelete }: { resource: TripResource; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
-  return <article className="flex min-w-0 flex-col self-start rounded-card border border-border bg-surface px-6 pt-6 shadow-soft sm:h-full sm:self-stretch">
+function ResourceCard({ resource, canEdit, swipeOpen, onSwipeOpen, onSwipeClose, onEdit, onDelete }: { resource: TripResource; canEdit: boolean; swipeOpen: boolean; onSwipeOpen: () => void; onSwipeClose: () => void; onEdit: () => void; onDelete: () => void }) {
+  return <MobileSwipeActions itemId={resource.id} canEdit={canEdit} canDelete={canEdit} open={swipeOpen} desktopPassthrough onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete} className="shadow-soft">
+  <article className="flex min-w-0 flex-col self-start rounded-card border border-border bg-surface px-6 pt-6 shadow-soft sm:h-full sm:self-stretch">
     <header className="pb-5"><h3 className="line-clamp-2 font-medium">{resource.title}</h3><p className="mt-1 text-xs text-muted">{CATEGORY_LABELS[resource.category]}</p></header>
     {(resource.imagePath || resource.note) && <div className="border-t border-divider" />}
     {resource.imagePath && <ResourceImage path={resource.imagePath} title={resource.title} />}
     {resource.note && <div className={`${resource.imagePath ? "border-t border-divider" : ""} py-5`}><ClampedNote note={resource.note} lines={resource.imagePath ? 2 : 10} linkify /></div>}
-    <footer className="mt-auto flex h-14 shrink-0 items-center border-t border-divider">
+    <footer className={`${resource.externalUrl ? "flex" : "hidden"} mt-auto h-14 shrink-0 items-center border-t border-divider sm:flex`}>
       {resource.externalUrl && <a href={resource.externalUrl} target="_blank" rel="noopener noreferrer" aria-label="開啟外部連結" title="開啟外部連結" className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-[#555555] sm:h-9 sm:w-9"><ExternalLink className="h-4 w-4" /></a>}
-      {canEdit && <div className="ml-auto flex items-center gap-4"><Action label="編輯" onClick={onEdit}><SquarePen /></Action><Action label="刪除" onClick={onDelete}><Trash2 /></Action></div>}
+      {canEdit && <div className="ml-auto hidden items-center gap-4 sm:flex"><Action label="編輯" onClick={onEdit}><SquarePen /></Action><Action label="刪除" onClick={onDelete}><Trash2 /></Action></div>}
     </footer>
-  </article>;
+  </article>
+  </MobileSwipeActions>;
 }
 
 function ResourceImage({ path, title }: { path: string; title: string }) {

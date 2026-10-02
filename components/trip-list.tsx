@@ -9,6 +9,7 @@ import { AddIconButton } from "@/components/add-icon-button";
 import { PendingInvitationsControl } from "@/components/pending-invitations-control";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { MobileSwipeActions, useMobileSwipeGroup } from "@/components/mobile-daily-swipe-actions";
 import { TripFormDialog } from "@/components/trip-form-dialog";
 import { useAuth } from "@/lib/auth-context";
 import { travelRepository } from "@/lib/travel-repository";
@@ -23,6 +24,7 @@ export function TripList({ initialTrips }: { initialTrips: Trip[] }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Trip>();
   const [deleting, setDeleting] = useState<Trip>();
+  const { openItemId, open: openSwipe, close: closeSwipe } = useMobileSwipeGroup();
 
   const refresh = useCallback(async () => {
     try {
@@ -68,17 +70,12 @@ export function TripList({ initialTrips }: { initialTrips: Trip[] }) {
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {sortedTrips.map((trip) => {
             const canEdit = roles.has(trip.id);
-            return <article key={trip.id} className="flex h-[260px] flex-col rounded-card border border-border bg-surface px-6 pt-6 shadow-soft">
-              <Link href={`/trip/${trip.id}`} className="flex items-center gap-2 pb-5 text-sm text-muted hover:text-[#555555]"><MapPin className="h-4 w-4 shrink-0" />{displayHomeDate(trip.startDate)} – {displayHomeDate(trip.endDate)}</Link>
-              <div className="border-t border-divider" />
-              <Link href={`/trip/${trip.id}`} className={`flex min-w-0 flex-1 items-center text-storeName font-normal hover:text-[#555555] ${HOME_CARD_SPACING}`}><span className="line-clamp-2 min-h-[3.25rem]">{trip.name}</span></Link>
-              <div className="border-t border-divider" />
-              <footer className="mt-auto flex h-14 shrink-0 items-center justify-end gap-4 pr-1">
-                {canEdit && <><IconButton label="編輯" onClick={() => { setEditing(trip); setOpen(true); }}><SquarePen /></IconButton><IconButton label="複製" onClick={() => {
-                  travelRepository.duplicateTrip(trip.id).then(() => Promise.all([refresh(), refreshRoles()])).then(() => toast.success("已複製旅行")).catch((error) => toast.error(message(error, "複製失敗")));
-                }}><Copy /></IconButton>{roles.get(trip.id) === "owner" && <IconButton label="刪除" onClick={() => setDeleting(trip)}><Trash2 /></IconButton>}</>}
-              </footer>
-            </article>;
+            const canDelete = roles.get(trip.id) === "owner";
+            const editTrip = () => { setEditing(trip); setOpen(true); };
+            const copyTrip = () => {
+              travelRepository.duplicateTrip(trip.id).then(() => Promise.all([refresh(), refreshRoles()])).then(() => toast.success("已複製旅行")).catch((error) => toast.error(message(error, "複製失敗")));
+            };
+            return <TripCard key={trip.id} trip={trip} canEdit={canEdit} canDelete={canDelete} swipeOpen={openItemId === `trip-${trip.id}`} onSwipeOpen={() => openSwipe(`trip-${trip.id}`)} onSwipeClose={closeSwipe} onEdit={editTrip} onCopy={copyTrip} onDelete={() => setDeleting(trip)} />;
           })}
         </div>
       )}
@@ -104,6 +101,20 @@ export function TripList({ initialTrips }: { initialTrips: Trip[] }) {
       }} />
     </main>
   );
+}
+
+function TripCard({ trip, canEdit, canDelete, swipeOpen, onSwipeOpen, onSwipeClose, onEdit, onCopy, onDelete }: { trip: Trip; canEdit: boolean; canDelete: boolean; swipeOpen: boolean; onSwipeOpen: () => void; onSwipeClose: () => void; onEdit: () => void; onCopy: () => void; onDelete: () => void }) {
+  return <MobileSwipeActions itemId={`trip-${trip.id}`} canEdit={canEdit} canDelete={canDelete} open={swipeOpen} desktopPassthrough onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete} className="shadow-soft">
+  <article className="flex h-[260px] flex-col rounded-card border border-border bg-surface px-6 pt-6 shadow-soft">
+    <Link href={`/trip/${trip.id}`} className="flex items-center gap-2 pb-5 text-sm text-muted hover:text-[#555555]"><MapPin className="h-4 w-4 shrink-0" />{displayHomeDate(trip.startDate)} – {displayHomeDate(trip.endDate)}</Link>
+    <div className="border-t border-divider" />
+    <Link href={`/trip/${trip.id}`} className={`flex min-w-0 flex-1 items-center text-storeName font-normal hover:text-[#555555] ${HOME_CARD_SPACING}`}><span className="line-clamp-2 min-h-[3.25rem]">{trip.name}</span></Link>
+    <div className="border-t border-divider" />
+    <footer className="mt-auto flex h-14 shrink-0 items-center justify-end gap-4 pr-1">
+      {canEdit && <><span className="hidden sm:contents"><IconButton label="編輯" onClick={onEdit}><SquarePen /></IconButton></span><IconButton label="複製" onClick={onCopy}><Copy /></IconButton>{canDelete && <span className="hidden sm:contents"><IconButton label="刪除" onClick={onDelete}><Trash2 /></IconButton></span>}</>}
+    </footer>
+  </article>
+  </MobileSwipeActions>;
 }
 
 function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactElement<{ className?: string }> }) {
