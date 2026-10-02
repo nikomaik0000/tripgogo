@@ -12,6 +12,7 @@
 - Google sign-in (Phase 2 complete)
 - Supabase repository adapter (Phase 2 complete)
 - Family sharing (Phase 3 invitation, acceptance, and member-management UI complete)
+- Platform Admin authorization across Trips, content, membership management, and private Storage (Phase A1 complete)
 - One-time localStorage import (Phase 4 pending)
 - Drag-and-drop itinerary ordering
 

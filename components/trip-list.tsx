@@ -18,7 +18,7 @@ import type { Trip, TripRole } from "@/lib/types";
 const HOME_CARD_SPACING = "py-5";
 
 export function TripList({ initialTrips }: { initialTrips: Trip[] }) {
-  const { user, ready: authReady } = useAuth();
+  const { user, isAdmin, ready: authReady } = useAuth();
   const [trips, setTrips] = useState<Trip[]>(initialTrips);
   const [roles, setRoles] = useState<Map<string, TripRole>>(new Map());
   const [open, setOpen] = useState(false);
@@ -69,8 +69,8 @@ export function TripList({ initialTrips }: { initialTrips: Trip[] }) {
       {trips.length === 0 ? <EmptyState title="尚未建立旅行" description="" icon="map" /> : (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {sortedTrips.map((trip) => {
-            const canEdit = roles.has(trip.id);
-            const canDelete = roles.get(trip.id) === "owner";
+            const canEdit = isAdmin || roles.has(trip.id);
+            const canDelete = isAdmin || roles.get(trip.id) === "owner";
             const editTrip = () => { setEditing(trip); setOpen(true); };
             const copyTrip = () => {
               travelRepository.duplicateTrip(trip.id).then(() => Promise.all([refresh(), refreshRoles()])).then(() => toast.success("已複製旅行")).catch((error) => toast.error(message(error, "複製失敗")));
@@ -79,10 +79,10 @@ export function TripList({ initialTrips }: { initialTrips: Trip[] }) {
           })}
         </div>
       )}
-      <TripFormDialog open={open} trip={editing} role={editing ? roles.get(editing.id) : undefined} onOpenChange={setOpen} onSave={(value) => {
+      <TripFormDialog open={open} trip={editing} role={editing ? roles.get(editing.id) : undefined} canManage={Boolean(editing && (isAdmin || roles.get(editing.id) === "owner"))} onOpenChange={setOpen} onSave={(value) => {
         const save = async () => {
           const saved = await travelRepository.saveTrip({ ...value, id: editing?.id, ownerId: editing?.ownerId });
-          if (editing && roles.get(editing.id) === "owner" && value.isPublic !== editing.isPublic) {
+          if (editing && (isAdmin || roles.get(editing.id) === "owner") && value.isPublic !== editing.isPublic) {
             await travelRepository.setTripVisibility(editing.id, value.isPublic);
           }
           return saved;

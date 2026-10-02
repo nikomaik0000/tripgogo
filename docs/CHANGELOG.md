@@ -1,5 +1,17 @@
 # Changelog
 
+## TRIP GOGO — Platform Admin Authorization
+
+Added
+
+- Added a profile-backed Platform Admin role with fail-closed client hydration and protected role assignment that cannot be changed through authenticated browser clients.
+- Added explicit read, edit, and manage authorization helpers so Admin access does not alter real Trip ownership or membership records.
+
+Changed
+
+- Extended Trip, content, member-management, visibility, reorder, duplicate, and private-image authorization to Platform Admin while preserving existing owner/editor/guest behavior.
+- Made Homepage, Trip Workspace, Resources, visibility, and member controls honor Admin authorization while continuing to display actual owner/editor membership.
+
 ## TRIP GOGO — Mobile Swipe Card Frame Consistency
 
 Changed

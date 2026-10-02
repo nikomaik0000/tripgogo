@@ -4,6 +4,7 @@
 
 ### Done
 
+- Platform Admin authorization with profile-backed roles, protected assignment, explicit RLS helpers, and owner/member identity preservation
 - Mobile swipe cards share Daily's complete stationary border and rounded frame across Trip, Place/Food, Outline, and Resource cards
 - Shared permission-aware Mobile edit/delete swipe actions across Trip, Place/Food, Outline, and Resource cards
 - Mobile Place/Food footer link consolidation with conditional empty-footer removal

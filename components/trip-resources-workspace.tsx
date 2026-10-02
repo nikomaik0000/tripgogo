@@ -32,7 +32,7 @@ const RESOURCE_CATEGORIES = [
 ];
 
 export function TripResourcesWorkspace({ tripId, initialTrip }: { tripId: string; initialTrip?: Trip }) {
-  const { user, ready: authReady } = useAuth();
+  const { user, isAdmin, ready: authReady } = useAuth();
   const [trip, setTrip] = useState(initialTrip);
   const [resources, setResources] = useState<TripResource[]>([]);
   const [role, setRole] = useState<TripRole>();
@@ -68,7 +68,7 @@ export function TripResourcesWorkspace({ tripId, initialTrip }: { tripId: string
     return <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6"><Link href="/" className="flex items-center gap-2 text-sm text-muted"><ArrowLeft className="h-4 w-4" />返回</Link><EmptyState title="找不到這趟旅行" description="" /></main>;
   }
 
-  const canEdit = Boolean(role);
+  const canEdit = isAdmin || Boolean(role);
   const jumpToCategory = (category: TripResourceCategory) => {
     setActiveCategory(category);
     const target = document.getElementById(`resource-category-${category}`) ?? document.getElementById("resource-categories");

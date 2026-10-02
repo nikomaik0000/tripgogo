@@ -10,10 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import type { Trip, TripRole } from "@/lib/types";
 
-export function TripFormDialog({ open, trip, role, onOpenChange, onSave }: {
+export function TripFormDialog({ open, trip, role, canManage = role === "owner", onOpenChange, onSave }: {
   open: boolean;
   trip?: Trip;
   role?: TripRole;
+  canManage?: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (value: Pick<Trip, "name" | "startDate" | "endDate" | "isPublic">) => void;
 }) {
@@ -45,7 +46,7 @@ export function TripFormDialog({ open, trip, role, onOpenChange, onSave }: {
           <Field label="旅遊名稱"><Input required value={name} onChange={(e) => setName(e.target.value)} /></Field>
           <Field label="開始日期"><Input required type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></Field>
           <Field label="結束日期"><Input required type="date" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} /></Field>
-          {(!trip || role === "owner") && (
+          {(!trip || canManage) && (
             <div className="space-y-1">
               <div className="flex items-center justify-between gap-4 text-sm">
                 <span className="font-medium">公開旅行</span>
@@ -61,7 +62,7 @@ export function TripFormDialog({ open, trip, role, onOpenChange, onSave }: {
             <Button type="submit">儲存</Button>
           </div>
         </form>
-        {trip && role === "owner" && <TripMembersManager tripId={trip.id} />}
+        {trip && canManage && <TripMembersManager tripId={trip.id} />}
       </DialogContent>
     </Dialog>
     {unsavedChangesDialog}

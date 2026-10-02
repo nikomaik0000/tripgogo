@@ -14,8 +14,10 @@ export type TgTripInvitationRow = {
   expires_at: string | null;
 };
 
+export type PlatformRole = "user" | "admin";
+
 export type TgProfileRow = {
-  id: string; email: string; display_name: string | null;
+  id: string; email: string; display_name: string | null; platform_role: PlatformRole;
   created_at: string; updated_at: string;
 };
 

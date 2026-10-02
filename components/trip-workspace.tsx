@@ -37,7 +37,7 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
   initialHotelStays: HotelStay[];
   initialTransportations: Transportation[];
 }) {
-  const { user, ready: authReady } = useAuth();
+  const { user, isAdmin, ready: authReady } = useAuth();
   const [trip, setTrip] = useState<Trip | undefined>(initialTrip);
   const [items, setItems] = useState<TravelItem[]>(initialItems);
   const [role, setRole] = useState<TripRole>();
@@ -69,7 +69,7 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
   const edit = (item: TravelItem) => setDialog({ open: true, type: item.type, item });
   const editListItem = (item: TravelItem) => setDialog({ open: true, type: item.type, item, desktopTwoColumn: true });
   const remove = (item: TravelItem) => setDeleting(item);
-  const canEdit = Boolean(role);
+  const canEdit = isAdmin || Boolean(role);
 
   const reorder = async (activeId: string, overId: string) => {
     const active = items.find((item) => item.id === activeId);
