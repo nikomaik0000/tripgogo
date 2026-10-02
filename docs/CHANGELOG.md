@@ -1,5 +1,13 @@
 # Changelog
 
+## TRIP GOGO — Safari TravelItem Image Compatibility
+
+Changed
+
+- Added browser-side JPEG compression fallback when Canvas cannot encode WebP, while preserving the existing resize, 20 MB source, and 2 MB processed-image limits.
+- Added HTMLImageElement decode fallback when Safari exposes `createImageBitmap()` but rejects a selected image.
+- Kept processed-image MIME metadata, Storage paths, and duplicated-image extensions consistent for both WebP and JPEG files.
+
 ## TRIP GOGO — Browser Favicon
 
 Changed

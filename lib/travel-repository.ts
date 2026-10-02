@@ -2,6 +2,7 @@ import type { PostgrestError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import type { TgFlightRow, TgHotelStayRow, TgProfileRow, TgTransportationRow, TgTravelItemRow, TgTripInvitationRow, TgTripMemberRow, TgTripResourceRow, TgTripRow } from "@/lib/database.types";
 import { mapFlight, mapHotelStay, mapItem, mapTransportation, mapTrip, mapTripResource } from "@/lib/travel-mappers";
+import { getTravelItemImageExtensionFromPath, getTravelItemImageFormat } from "@/lib/travel-item-image";
 import type { Flight, HotelStay, Transportation, TransportationInput, TravelItem, Trip, TripEditor, TripInvitation, TripResource, TripRole } from "@/lib/types";
 
 const RESOURCE_IMAGE_BUCKET = "tg-trip-resources";
@@ -17,11 +18,12 @@ function result<T>(data: T | null, error: PostgrestError | null): T {
 }
 
 async function uploadTravelItemImage(tripId: string, file: File, itemId?: string) {
-  if (file.type !== "image/webp") throw new Error("圖片必須先轉換為 WebP 格式");
+  const format = getTravelItemImageFormat(file.type);
+  if (!format) throw new Error("圖片必須先轉換為 WebP 或 JPEG 格式");
   if (file.size > TRAVEL_ITEM_IMAGE_MAX_BYTES) throw new Error("圖片大小不可超過 2 MB");
-  const path = `${tripId}/${itemId ? `${itemId}/` : ""}${crypto.randomUUID()}.webp`;
+  const path = `${tripId}/${itemId ? `${itemId}/` : ""}${crypto.randomUUID()}.${format.extension}`;
   const { error } = await createClient().storage.from(TRAVEL_ITEM_IMAGE_BUCKET).upload(path, file, {
-    cacheControl: "31536000", contentType: "image/webp", upsert: false,
+    cacheControl: "31536000", contentType: file.type, upsert: false,
   });
   if (error) throw new Error(error.message);
   return path;
@@ -173,7 +175,8 @@ export const travelRepository = {
         if (!source.image_path) continue;
         const destinationItemId = destinationsBySource.get(source.id);
         if (!destinationItemId) throw new Error(`找不到來源項目 ${source.id} 的複本`);
-        const destinationPath = `${newTripId}/${destinationItemId}/${crypto.randomUUID()}.webp`;
+        const extension = getTravelItemImageExtensionFromPath(source.image_path);
+        const destinationPath = `${newTripId}/${destinationItemId}/${crypto.randomUUID()}.${extension}`;
         const { error: copyError } = await supabase.storage.from(TRAVEL_ITEM_IMAGE_BUCKET)
           .copy(source.image_path, destinationPath);
         if (copyError) throw new Error(copyError.message);

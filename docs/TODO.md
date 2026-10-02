@@ -4,6 +4,7 @@
 
 ### Done
 
+- Safari/iPhone TravelItem image compression fallback with MIME-safe WebP/JPEG Storage and duplicate paths
 - Browser favicon now reuses the updated 192px app icon without changing PWA manifest icons
 - Home Trip cards show full-year date ranges and sort by start date from newest to oldest
 - Restored authenticated Trip creation with an owner-only SELECT path for the `INSERT ... RETURNING` row
