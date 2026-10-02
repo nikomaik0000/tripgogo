@@ -169,8 +169,8 @@ function ItemCard({ item, canEdit, onEdit, onDelete, controls, compactBusiness =
     const hasMobileFooterLinks = Boolean(item.extraLink1 || item.extraLink2);
     return (
       <>
-      <MobileSwipeActions itemId={item.id} canEdit={canEdit} canDelete={canEdit} open={swipeOpen} onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete} className="shadow-soft">
-      <article className="flex min-w-0 flex-col self-start rounded-card border border-border bg-surface px-4 pt-4">
+      <MobileSwipeActions itemId={item.id} canEdit={canEdit} canDelete={canEdit} open={swipeOpen} mobileFrame onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete}>
+      <article className="flex min-w-0 flex-col self-start bg-surface px-4 pt-4">
         <header className="flex min-w-0 items-start justify-between gap-4 pb-4">
           <div className="min-w-0 flex-1">
           {item.googleMapsUrl
@@ -404,8 +404,8 @@ function OutlineDetailsSection({ id, icon: Icon, label, addLabel, canEdit, onAdd
 
 function FlightCard({ flight, canEdit, swipeOpen, onSwipeOpen, onSwipeClose, onEdit, onDelete }: { flight: Flight; canEdit: boolean; swipeOpen: boolean; onSwipeOpen: () => void; onSwipeClose: () => void; onEdit: () => void; onDelete: () => void }) {
   const crossesDate = flight.departureDate !== flight.arrivalDate;
-  return <MobileSwipeActions itemId={`flight-${flight.id}`} canEdit={canEdit} canDelete={canEdit} open={swipeOpen} desktopPassthrough onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete} className="shadow-soft">
-  <article className="flex min-w-0 flex-col rounded-card border border-border bg-surface px-6 pt-6 shadow-soft">
+  return <MobileSwipeActions itemId={`flight-${flight.id}`} canEdit={canEdit} canDelete={canEdit} open={swipeOpen} desktopPassthrough mobileFrame onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete}>
+  <article className="flex min-w-0 flex-col bg-surface px-6 pt-6 sm:rounded-card sm:border sm:border-border sm:shadow-soft">
     <header className="flex min-w-0 items-center justify-between gap-4 pb-5"><div className="flex min-w-0 items-center gap-4"><span className="truncate font-medium">{flight.airline}</span><span className="shrink-0 text-sm text-muted">{flight.flightNumber}</span></div><div className="flex min-w-0 shrink-0 items-center gap-2 text-sm text-muted"><span className="max-w-20 truncate sm:max-w-none">{flight.departurePlace}</span><ChevronRight className="h-4 w-4 shrink-0" /><span className="max-w-20 truncate sm:max-w-none">{flight.arrivalPlace}</span></div></header>
     <div className="border-t border-divider" />
     <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2 py-6"><div className="shrink-0 text-sm text-muted"><time dateTime={flight.departureDate}><DailyDateLabel date={flight.departureDate} /></time>{crossesDate && <><span className="mx-2">–</span><time dateTime={flight.arrivalDate}><DailyDateLabel date={flight.arrivalDate} /></time></>}</div><div className="flex items-center gap-3 text-title font-medium"><time dateTime={flight.departureTime}>{flight.departureTime}</time><ChevronRight className="h-4 w-4 text-muted" /><time dateTime={flight.arrivalTime}>{flight.arrivalTime}</time></div></div>
@@ -417,8 +417,8 @@ function FlightCard({ flight, canEdit, swipeOpen, onSwipeOpen, onSwipeClose, onE
 
 function HotelStayCard({ stay, canEdit, swipeOpen, onSwipeOpen, onSwipeClose, onEdit, onDelete }: { stay: HotelStay; canEdit: boolean; swipeOpen: boolean; onSwipeOpen: () => void; onSwipeClose: () => void; onEdit: () => void; onDelete: () => void }) {
   const hasTimes = stay.checkInTime || stay.checkOutTime;
-  return <MobileSwipeActions itemId={`hotel-${stay.id}`} canEdit={canEdit} canDelete={canEdit} open={swipeOpen} desktopPassthrough onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete} className="shadow-soft">
-  <article className="flex min-w-0 flex-col rounded-card border border-border bg-surface px-6 pt-6 shadow-soft">
+  return <MobileSwipeActions itemId={`hotel-${stay.id}`} canEdit={canEdit} canDelete={canEdit} open={swipeOpen} desktopPassthrough mobileFrame onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete}>
+  <article className="flex min-w-0 flex-col bg-surface px-6 pt-6 sm:rounded-card sm:border sm:border-border sm:shadow-soft">
     {stay.googleMapsUrl && <a href={stay.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label={`在 Google Maps 開啟${stay.name}`} title="開啟 Google Maps" className="line-clamp-2 font-medium text-ink no-underline focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-ink sm:hidden">{stay.name}</a>}
     <h3 className={`line-clamp-2 font-medium ${stay.googleMapsUrl ? "hidden sm:block" : ""}`}>{stay.name}</h3>
     <div className="mt-5 border-t border-divider" />
@@ -440,8 +440,8 @@ function TransportationCard({ transportation, canEdit, swipeOpen, onSwipeOpen, o
     ? [["地址", transportation.address], ["費用", transportation.cost]]
     : [["座位", transportation.seat], ["車廂", transportation.carriage], ["車票", transportation.ticket], ["費用", transportation.cost]])
     .filter((detail): detail is [string, string] => Boolean(detail[1]));
-  return <MobileSwipeActions itemId={`transportation-${transportation.id}`} canEdit={canEdit} canDelete={canEdit} open={swipeOpen} desktopPassthrough onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete} className="shadow-soft">
-  <article className="flex min-w-0 flex-col rounded-card border border-border bg-surface px-6 pt-6 shadow-soft">
+  return <MobileSwipeActions itemId={`transportation-${transportation.id}`} canEdit={canEdit} canDelete={canEdit} open={swipeOpen} desktopPassthrough mobileFrame onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete}>
+  <article className="flex min-w-0 flex-col bg-surface px-6 pt-6 sm:rounded-card sm:border sm:border-border sm:shadow-soft">
     <header className="flex min-w-0 items-center justify-between gap-4 pb-5"><div className="flex min-w-0 items-center gap-4"><h3 className="min-w-0 truncate font-medium">{title}</h3>{secondary && <span className="min-w-0 truncate text-sm text-muted">{secondary}</span>}</div>{transportation.reservationNumber && <span className="max-w-24 shrink-0 truncate text-sm text-muted sm:max-w-40">{transportation.reservationNumber}</span>}</header>
     <div className="border-t border-divider" />
     <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2 py-6"><div className="shrink-0 text-sm text-muted"><time dateTime={transportation.startDate}><DailyDateLabel date={transportation.startDate} /></time></div><div className="flex items-center gap-3 text-title font-medium"><time dateTime={transportation.startTime}>{transportation.startTime}</time><ChevronRight className="h-4 w-4 text-muted" />{crossesDate && <time dateTime={transportation.endDate} className="text-sm font-normal text-muted"><DailyDateLabel date={transportation.endDate} /></time>}<time dateTime={transportation.endTime}>{transportation.endTime}</time></div></div>

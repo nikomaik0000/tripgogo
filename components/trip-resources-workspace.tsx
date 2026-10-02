@@ -103,8 +103,8 @@ export function TripResourcesWorkspace({ tripId, initialTrip }: { tripId: string
 }
 
 function ResourceCard({ resource, canEdit, swipeOpen, onSwipeOpen, onSwipeClose, onEdit, onDelete }: { resource: TripResource; canEdit: boolean; swipeOpen: boolean; onSwipeOpen: () => void; onSwipeClose: () => void; onEdit: () => void; onDelete: () => void }) {
-  return <MobileSwipeActions itemId={resource.id} canEdit={canEdit} canDelete={canEdit} open={swipeOpen} desktopPassthrough onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete} className="shadow-soft">
-  <article className="flex min-w-0 flex-col self-start rounded-card border border-border bg-surface px-6 pt-6 shadow-soft sm:h-full sm:self-stretch">
+  return <MobileSwipeActions itemId={resource.id} canEdit={canEdit} canDelete={canEdit} open={swipeOpen} desktopPassthrough mobileFrame onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete}>
+  <article className="flex min-w-0 flex-col self-start bg-surface px-6 pt-6 sm:h-full sm:self-stretch sm:rounded-card sm:border sm:border-border sm:shadow-soft">
     <header className="pb-5"><h3 className="line-clamp-2 font-medium">{resource.title}</h3><p className="mt-1 text-xs text-muted">{CATEGORY_LABELS[resource.category]}</p></header>
     {(resource.imagePath || resource.note) && <div className="border-t border-divider" />}
     {resource.imagePath && <ResourceImage path={resource.imagePath} title={resource.title} />}

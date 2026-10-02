@@ -4,6 +4,7 @@
 
 ### Done
 
+- Mobile swipe cards share Daily's complete stationary border and rounded frame across Trip, Place/Food, Outline, and Resource cards
 - Shared permission-aware Mobile edit/delete swipe actions across Trip, Place/Food, Outline, and Resource cards
 - Mobile Place/Food footer link consolidation with conditional empty-footer removal
 - Safari/iPhone TravelItem image compression fallback with MIME-safe WebP/JPEG Storage and duplicate paths

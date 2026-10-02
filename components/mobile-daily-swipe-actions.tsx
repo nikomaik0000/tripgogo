@@ -30,13 +30,14 @@ export function MobileDailySwipeActions({ itemId, enabled, open, dragging, onOpe
   return <MobileSwipeActions itemId={itemId} canEdit={enabled} canDelete={enabled} open={open} dragging={dragging} onOpen={onOpen} onClose={onClose} onEdit={onEdit} onDelete={onDelete}>{children}</MobileSwipeActions>;
 }
 
-export function MobileSwipeActions({ itemId, canEdit, canDelete, open, dragging = false, desktopPassthrough = false, onOpen, onClose, onEdit, onDelete, children, className = "" }: {
+export function MobileSwipeActions({ itemId, canEdit, canDelete, open, dragging = false, desktopPassthrough = false, mobileFrame = false, onOpen, onClose, onEdit, onDelete, children, className = "" }: {
   itemId: string;
   canEdit: boolean;
   canDelete: boolean;
   open: boolean;
   dragging?: boolean;
   desktopPassthrough?: boolean;
+  mobileFrame?: boolean;
   onOpen: () => void;
   onClose: () => void;
   onEdit: () => void;
@@ -113,7 +114,7 @@ export function MobileSwipeActions({ itemId, canEdit, canDelete, open, dragging 
     if (current.direction === "pending" && open) onClose();
   };
 
-  return <div data-mobile-swipe-card={itemId} className={`relative overflow-hidden rounded-card ${desktopPassthrough ? "sm:contents" : "sm:hidden"} ${className}`}>
+  return <div data-mobile-swipe-card={itemId} className={`relative overflow-hidden rounded-card ${mobileFrame ? "border border-border bg-surface shadow-soft" : ""} ${desktopPassthrough ? "sm:contents" : "sm:hidden"} ${className}`}>
     {enabled && <div aria-hidden={!open} className="absolute inset-y-0 right-0 flex border-l border-divider/60 bg-surface sm:hidden" style={{ width: actionRailWidth }}>
       {canEdit && <button type="button" aria-label="編輯" title="編輯" tabIndex={open ? 0 : -1} data-no-dnd onClick={() => { onClose(); onEdit(); }} className={`flex w-14 items-center justify-center bg-searchBackground text-muted transition-colors hover:text-ink focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-2px] focus-visible:outline-ink ${canDelete ? "border-r border-divider/60" : ""}`}><SquarePen className="h-4 w-4" /></button>}
       {canDelete && <button type="button" aria-label="刪除" title="刪除" tabIndex={open ? 0 : -1} data-no-dnd onClick={() => { onClose(); onDelete(); }} className="flex w-14 items-center justify-center bg-surface text-[#8a666d] transition-colors hover:bg-[#f9f4f5] hover:text-[#5f3f46] focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-2px] focus-visible:outline-ink"><Trash2 className="h-4 w-4" /></button>}

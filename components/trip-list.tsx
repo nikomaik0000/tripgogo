@@ -104,8 +104,8 @@ export function TripList({ initialTrips }: { initialTrips: Trip[] }) {
 }
 
 function TripCard({ trip, canEdit, canDelete, swipeOpen, onSwipeOpen, onSwipeClose, onEdit, onCopy, onDelete }: { trip: Trip; canEdit: boolean; canDelete: boolean; swipeOpen: boolean; onSwipeOpen: () => void; onSwipeClose: () => void; onEdit: () => void; onCopy: () => void; onDelete: () => void }) {
-  return <MobileSwipeActions itemId={`trip-${trip.id}`} canEdit={canEdit} canDelete={canDelete} open={swipeOpen} desktopPassthrough onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete} className="shadow-soft">
-  <article className="flex h-[260px] flex-col rounded-card border border-border bg-surface px-6 pt-6 shadow-soft">
+  return <MobileSwipeActions itemId={`trip-${trip.id}`} canEdit={canEdit} canDelete={canDelete} open={swipeOpen} desktopPassthrough mobileFrame onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete}>
+  <article className="flex h-[260px] flex-col bg-surface px-6 pt-6 sm:rounded-card sm:border sm:border-border sm:shadow-soft">
     <Link href={`/trip/${trip.id}`} className="flex items-center gap-2 pb-5 text-sm text-muted hover:text-[#555555]"><MapPin className="h-4 w-4 shrink-0" />{displayHomeDate(trip.startDate)} – {displayHomeDate(trip.endDate)}</Link>
     <div className="border-t border-divider" />
     <Link href={`/trip/${trip.id}`} className={`flex min-w-0 flex-1 items-center text-storeName font-normal hover:text-[#555555] ${HOME_CARD_SPACING}`}><span className="line-clamp-2 min-h-[3.25rem]">{trip.name}</span></Link>

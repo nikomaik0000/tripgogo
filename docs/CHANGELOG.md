@@ -1,5 +1,12 @@
 # Changelog
 
+## TRIP GOGO — Mobile Swipe Card Frame Consistency
+
+Changed
+
+- Aligned Place/Food, Homepage, Outline, and Resource swipe actions with Daily by keeping the complete Mobile card border and radius on the stationary swipe frame.
+- Preserved all swipe gestures, permissions, callbacks, Daily drag-and-drop behavior, and desktop card presentation.
+
 ## TRIP GOGO — Shared Mobile Swipe Actions
 
 Changed
