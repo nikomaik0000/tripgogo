@@ -12,6 +12,7 @@ Changed
 - Shortened Homepage Trip/Collection cards and vertically centered their titles while preserving Desktop actions and Mobile swipe behavior.
 - Reused the independent Storage image-copy lifecycle for Collection-to-Trip copies, including destination cleanup after failures.
 - Standardized Collection add-to-Trip actions on `MapPinPlus` and aligned Desktop ordering with Mobile by placing the action first.
+- Matched the Mobile add-to-Trip swipe action to the other icon-only actions while retaining its full accessible label and tooltip.
 
 ## TRIP GOGO — Outer Management Permissions and Mobile Overlay Refinement
 
