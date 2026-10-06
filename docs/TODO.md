@@ -4,6 +4,14 @@
 
 ### Done
 
+- Collection Place/Food to Trip copying with dual edit authorization, date selection, independent images, and compact vertically centered Homepage cards
+- Owner/Admin-only outer Trip/Collection management, Food-first Collection navigation, shared Mobile Select state cleanup, and iOS Dialog scroll containment
+- Post-release Collection Outline links/layout, Trip reviews, standalone refresh, safe item duplication, unified Mobile swipe actions, and compact Mobile toolbar
+- Unified Desktop/Mobile Trip/Collection Place/Food footer order as Ellipsis, external links, then edit/delete
+- Shared Trip/Collection Place/Food overflow measurement, footer Ellipsis action, and full-content Dialog
+- Collection Resource navigation restoration, mode-specific category order/default, single-line Mobile sort, and compact card details
+- Collection card/toolbar/Outline refinement with direct status changes, 100-point ratings, inline note expansion, area-grouped summary tags, and nullable-date hardening
+- Date-free Collection mode reusing shared Place/Food records, cards, search, area filters, status/ratings, and a derived read-only Outline
 - Platform Admin authorization with profile-backed roles, protected assignment, explicit RLS helpers, and owner/member identity preservation
 - Mobile swipe cards share Daily's complete stationary border and rounded frame across Trip, Place/Food, Outline, and Resource cards
 - Shared permission-aware Mobile edit/delete swipe actions across Trip, Place/Food, Outline, and Resource cards

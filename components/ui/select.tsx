@@ -15,13 +15,13 @@ export function SelectTrigger({
   return (
     <SelectPrimitive.Trigger
       className={cn(
-        "form-control flex h-[42px] items-center justify-between gap-2 rounded-card border border-border bg-surface px-3 text-sm",
+        "form-control group/select flex h-[42px] items-center justify-between gap-2 rounded-card border border-border bg-surface px-3 text-sm",
         className
       )}
       {...props}
     >
       {children}
-      <SelectPrimitive.Icon>
+      <SelectPrimitive.Icon className="group-data-[state=open]/select:hidden">
         <ChevronDown className="h-4 w-4 text-muted" />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
@@ -48,14 +48,14 @@ export function SelectItem({ children, className, ...props }: React.ComponentPro
   return (
     <SelectPrimitive.Item
       className={cn(
-        "relative flex cursor-pointer select-none items-center rounded-card px-3 py-2 text-sm outline-none",
+        "relative flex cursor-pointer select-none items-center rounded-card py-2 pl-3 pr-10 text-left text-sm outline-none",
         "data-[highlighted]:bg-searchBackground",
         className
       )}
       {...props}
     >
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
-      <SelectPrimitive.ItemIndicator className="absolute right-3">
+      <SelectPrimitive.ItemIndicator className="absolute right-3 flex items-center justify-center">
         <Check className="h-4 w-4" />
       </SelectPrimitive.ItemIndicator>
     </SelectPrimitive.Item>

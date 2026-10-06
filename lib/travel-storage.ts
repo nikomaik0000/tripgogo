@@ -26,7 +26,7 @@ function id() {
 export const travelRepository = {
   getTrips: () => read<Trip>(TRIPS_KEY),
   getTrip: (tripId: string) => read<Trip>(TRIPS_KEY).find((trip) => trip.id === tripId),
-  saveTrip(input: Pick<Trip, "name" | "startDate" | "endDate" | "ownerId"> & { id?: string; isPublic?: boolean }) {
+  saveTrip(input: Pick<Trip, "name" | "mode" | "startDate" | "endDate" | "ownerId"> & { id?: string; isPublic?: boolean }) {
     const trips = read<Trip>(TRIPS_KEY);
     const existing = input.id ? trips.find((trip) => trip.id === input.id) : undefined;
     const now = new Date().toISOString();
@@ -46,6 +46,7 @@ export const travelRepository = {
     if (!trip) return;
     const copy = this.saveTrip({
       name: `${trip.name} - 複製`,
+      mode: trip.mode,
       startDate: trip.startDate,
       endDate: trip.endDate,
       ownerId: trip.ownerId,

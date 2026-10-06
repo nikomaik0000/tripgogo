@@ -4,34 +4,74 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { Link2 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
-export function ClampedNote({ note, lines, textClassName = "", linkify = false, showMarker = true, moreLabel = "+ more", inlineMore = false }: { note: string; lines: 1 | 2 | 3 | 4 | 10; textClassName?: string; linkify?: boolean; showMarker?: boolean; moreLabel?: string; inlineMore?: boolean }) {
+export function ClampedNote({ note, lines, textClassName = "", linkify = false, showMarker = true, moreLabel = "+ More", lessLabel = "−", inlineExpand = false, hideMoreAction = false, onOverflowChange }: { note: string; lines: 1 | 2 | 3 | 4 | 5 | 10; textClassName?: string; linkify?: boolean; showMarker?: boolean; moreLabel?: string; lessLabel?: string; inlineMore?: boolean; inlineExpand?: boolean; hideMoreAction?: boolean; onOverflowChange?: (overflow: boolean) => void }) {
   const textRef = useRef<HTMLParagraphElement>(null);
-  const [isTruncated, setIsTruncated] = useState(false);
+  const onOverflowChangeRef = useRef(onOverflowChange);
+  const [preview, setPreview] = useState<string>();
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  onOverflowChangeRef.current = onOverflowChange;
 
   useLayoutEffect(() => {
     const element = textRef.current;
     if (!element) return;
-    const measure = () => setIsTruncated(element.scrollHeight > element.clientHeight + 1);
+    const measure = () => {
+      const width = element.clientWidth;
+      if (!width) return;
+      const computed = window.getComputedStyle(element);
+      const lineHeight = Number.parseFloat(computed.lineHeight) || Number.parseFloat(computed.fontSize) * 1.65;
+      const measuring = element.cloneNode(false) as HTMLParagraphElement;
+      measuring.removeAttribute("id");
+      measuring.style.position = "fixed";
+      measuring.style.visibility = "hidden";
+      measuring.style.pointerEvents = "none";
+      measuring.style.left = "-10000px";
+      measuring.style.top = "0";
+      measuring.style.width = `${width}px`;
+      measuring.style.display = "block";
+      measuring.style.overflow = "visible";
+      measuring.style.setProperty("-webkit-line-clamp", "unset");
+      measuring.style.setProperty("-webkit-box-orient", "unset");
+      document.body.appendChild(measuring);
+      const fits = (value: string) => {
+        measuring.textContent = value;
+        return measuring.scrollHeight <= lineHeight * lines + 1;
+      };
+      if (fits(note)) {
+        setPreview(undefined);
+        onOverflowChangeRef.current?.(false);
+      } else {
+        const suffix = hideMoreAction ? "…" : `…  ${moreLabel}`;
+        let low = 0;
+        let high = note.length;
+        while (low < high) {
+          const middle = Math.ceil((low + high) / 2);
+          if (fits(`${note.slice(0, middle).trimEnd()}${suffix}`)) low = middle;
+          else high = middle - 1;
+        }
+        setPreview(`${note.slice(0, low).trimEnd()}…`);
+        onOverflowChangeRef.current?.(true);
+      }
+      measuring.remove();
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [note, lines]);
+  }, [hideMoreAction, moreLabel, note, lines]);
+
+  useLayoutEffect(() => setExpanded(false), [note, lines]);
 
   return <>
     <div className={showMarker ? "grid min-w-0 grid-cols-[16px_minmax(0,1fr)] items-start gap-x-2 text-sm text-muted" : "min-w-0 text-sm text-muted"}>
       {showMarker && <span aria-hidden="true" className="flex h-4 w-4 items-center justify-center leading-4">✦</span>}
-      <div className={`min-w-0 ${inlineMore ? "flex items-start gap-3" : ""}`}>
-        <p ref={textRef} className={`${lines === 1 ? "line-clamp-1" : lines === 2 ? "line-clamp-2" : lines === 3 ? "line-clamp-3" : lines === 4 ? "line-clamp-4" : "line-clamp-[10]"} min-w-0 whitespace-pre-wrap break-words ${inlineMore ? "flex-1" : ""} ${textClassName}`}>{linkify ? <LinkifiedText text={note} /> : note}</p>
-        {isTruncated && <button type="button" aria-label="查看完整備註" title="查看完整備註" onMouseDown={stopPropagation} onTouchStart={stopPropagation} onPointerDown={stopPropagation} onClick={() => setOpen(true)} className={`${inlineMore ? "shrink-0" : "mt-1 block"} text-xs leading-4 text-muted/90 transition-colors hover:text-muted`}>{moreLabel}</button>}
-      </div>
+      <p ref={textRef} className={`min-w-0 whitespace-pre-wrap break-words ${textClassName}`}>{expanded || !preview ? (linkify ? <LinkifiedText text={note} /> : note) : preview}{preview && !hideMoreAction && <> <button type="button" aria-label={expanded ? "收合備註" : "查看完整備註"} title={expanded ? "收合備註" : "查看完整備註"} onMouseDown={stopPropagation} onTouchStart={stopPropagation} onPointerDown={stopPropagation} onClick={() => inlineExpand ? setExpanded((value) => !value) : setOpen(true)} className="inline px-1 text-xs leading-[inherit] text-muted/90 transition-colors hover:text-muted">{expanded ? lessLabel : moreLabel}</button></>}</p>
     </div>
-    <Dialog open={open} onOpenChange={setOpen}>
+    {!inlineExpand && <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent title="備註">
         <p className="min-w-0 whitespace-pre-wrap break-words text-sm text-ink">{linkify ? <LinkifiedText text={note} /> : note}</p>
       </DialogContent>
-    </Dialog>
+    </Dialog>}
   </>;
 }
 

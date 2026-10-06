@@ -2,6 +2,7 @@ import { eachDayOfInterval, format, parseISO } from "date-fns";
 import type { Trip } from "@/lib/types";
 
 export function tripDates(trip: Trip) {
+  if (!trip.startDate || !trip.endDate) return [];
   try {
     return eachDayOfInterval({ start: parseISO(trip.startDate), end: parseISO(trip.endDate) }).map((date) => format(date, "yyyy-MM-dd"));
   } catch {
@@ -9,8 +10,13 @@ export function tripDates(trip: Trip) {
   }
 }
 
-export function displayDate(date: string) {
-  return format(parseISO(date), "M/d");
+export function displayDate(date?: string | null) {
+  if (!date) return "";
+  try {
+    return format(parseISO(date), "M/d");
+  } catch {
+    return "";
+  }
 }
 
 export function dateOptions(trip: Trip) {

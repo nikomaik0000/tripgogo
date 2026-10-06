@@ -1,5 +1,7 @@
 export type TravelItemType = "place" | "food";
 export type TravelItemImageFit = "cover" | "contain";
+export type TripMode = "trip" | "collection";
+export type CollectionItemStatus = "planned" | "completed";
 export type TripRole = "owner" | "editor";
 export type TripResourceCategory = "transportation" | "coupon" | "note";
 
@@ -23,8 +25,9 @@ export interface Trip {
   id: string;
   ownerId?: string;
   name: string;
-  startDate: string;
-  endDate: string;
+  mode: TripMode;
+  startDate: string | null;
+  endDate: string | null;
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;
@@ -57,6 +60,11 @@ export interface TravelItem {
   extraLink2?: string;
   businessHours?: string;
   note: string;
+  status: CollectionItemStatus | null;
+  rating: number | null;
+  completedDate: string | null;
+  experienceNote: string;
+  consumedItems: string;
   imagePath?: string;
   imageFit: TravelItemImageFit;
   order: number;
@@ -64,7 +72,7 @@ export interface TravelItem {
   updatedAt: string;
 }
 
-export type TravelItemSort = "date" | "category" | "area";
+export type TravelItemSort = "date" | "category" | "area" | "status" | "rating";
 
 export interface Flight {
   id: string;

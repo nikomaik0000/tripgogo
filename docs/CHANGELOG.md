@@ -1,5 +1,87 @@
 # Changelog
 
+## TRIP GOGO — Collection Item to Trip
+
+Added
+
+- Added permission-aware Collection Place/Food actions that copy an item into an editable Trip on a selected itinerary date without changing the source Collection item.
+- Added an additive RPC that validates edit access to both the source Collection and target Trip, enforces the Trip date range, preserves same-day ordering, and creates the destination with Trip-only status semantics.
+
+Changed
+
+- Shortened Homepage Trip/Collection cards and vertically centered their titles while preserving Desktop actions and Mobile swipe behavior.
+- Reused the independent Storage image-copy lifecycle for Collection-to-Trip copies, including destination cleanup after failures.
+- Standardized Collection add-to-Trip actions on `MapPinPlus` and aligned Desktop ordering with Mobile by placing the action first.
+
+## TRIP GOGO — Outer Management Permissions and Mobile Overlay Refinement
+
+Changed
+
+- Restricted top-level Trip/Collection creation to Platform Admins and top-level metadata updates, whole-item duplication, deletion, and member management to owners or Platform Admins, while preserving Editor access to internal content.
+- Reordered Collection navigation to Food, Place, Outline and made Food the default Collection workspace.
+- Refined shared Mobile Select indicators and isolated shared Dialog scrolling to prevent background scroll chaining on iOS and standalone PWA surfaces.
+
+## TRIP GOGO — Post-release Mobile and Item Workflow Refinement
+
+Added
+
+- Added independent-image Place/Food item duplication with shared Desktop actions and three-action Mobile swipe rails for Trip, Collection, and Homepage cards.
+- Added optional collapsed 100-point ratings and experience details to Trip Place/Food items using the existing shared fields.
+- Added a standalone-only PWA refresh action to Trip and Resource headers.
+
+Changed
+
+- Linked Collection Outline tags directly to Google Maps, aligned multi-row area groups, and added completed dates beneath Collection scores.
+- Removed duplicated header add actions, fixed Mobile date-input containment and card metadata alignment, and consolidated the Mobile search/status/sort/add controls into one toolbar without changing Desktop controls.
+
+## TRIP GOGO — Card Footer Action Order
+
+Changed
+
+- Standardized Trip and Collection Place/Food card footers so the overflow-only Ellipsis action precedes optional external-link actions on both Desktop and Mobile, while edit/delete actions remain unchanged.
+
+## TRIP GOGO — Card Full-content Dialog
+
+Changed
+
+- Replaced inline card-note expansion with a single overflow-measured Ellipsis action beside existing footer links for Trip and Collection Place/Food cards.
+- Added a shared full-content Dialog that renders only populated Note, Consumed Items, and Experience sections without line clamping.
+- Strengthened completed-detail hierarchy by rendering consumed items in `#333333` while keeping general notes and experience text muted.
+
+## TRIP GOGO — Collection Resource Navigation and Card Density
+
+Changed
+
+- Kept the Mobile Place/Food sort control on one line while allowing the search field to shrink first.
+- Adjusted card notes to five lines without completion details and one line with them; combined completed food/details into a shared two-line preview with inline `＋` / `−` expansion.
+- Restored the existing Resource page for Collections, ordered as Note, Coupon, Transportation with Note as the default, while Trips retain Transportation, Coupon, Note with Transportation as the default.
+
+## TRIP GOGO — Collection Card and Outline Refinement
+
+Added
+
+- Added one-tap Collection status changes directly in Place/Food card metadata while preserving all stored completion details when returning an item to planned status.
+- Added an additive 100-point rating migration that proportionally converts existing 0–5 ratings.
+
+Changed
+
+- Unified card metadata separators and moved Mobile Place/Food creation into the shared search/filter/sort action row.
+- Refined Collection filters, completed-detail presentation, four-line notes with inline `+ More`, and lightweight area-grouped Outline tags.
+- Hardened nullable Trip and item date formatting so Collection rows never enter date parsing paths.
+
+## TRIP GOGO — Collection Mode
+
+Added
+
+- Added date-free Collection creation alongside the existing Trip flow, with Place/Food status tracking for planned and completed items.
+- Added optional half-star ratings, completion dates, experience notes, and food-specific consumed-item notes that remain stored when an item returns to planned status.
+- Added composable area/status filters, Collection-specific sorting, and a read-only data-derived Collection Outline with live counts and completed-item summaries.
+
+Changed
+
+- Extended the existing `tg_trips` and shared `tg_travel_items` models through an additive migration; existing Trips remain `trip` mode and keep their current dates, navigation, content, and UI behavior.
+- Collection navigation reuses the existing Place, Food, and Outline surfaces while omitting Daily and date-based sorting.
+
 ## TRIP GOGO — Platform Admin Authorization
 
 Added

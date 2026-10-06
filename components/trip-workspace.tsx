@@ -1,14 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowUpDown, CalendarDays, CarFront, ChevronRight, Clock3, FolderHeart, Hotel, Link2, MapPin, MapPinned, Navigation, Plane, Search, SquarePen, Trash2, UtensilsCrossed, X } from "lucide-react";
+import { ArrowLeft, ArrowUpDown, CalendarDays, CarFront, ChevronRight, Clock3, Copy, Ellipsis, FolderHeart, Hotel, Link2, MapPin, MapPinned, MapPinPlus, Navigation, Plane, Search, SquarePen, Trash2, UtensilsCrossed, X } from "lucide-react";
 import { closestCenter, DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
 import { AuthControl } from "@/components/auth-control";
 import { AddIconButton } from "@/components/add-icon-button";
+import { AddCollectionItemToTripDialog } from "@/components/add-collection-item-to-trip-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ClampedNote } from "@/components/clamped-note";
@@ -17,14 +18,16 @@ import { HotelStayDialog } from "@/components/hotel-stay-dialog";
 import { isDailyCardInteractiveTarget, MobileDailySwipeActions, MobileSwipeActions, useMobileSwipeGroup } from "@/components/mobile-daily-swipe-actions";
 import { TransportationDialog } from "@/components/transportation-dialog";
 import { TravelItemDialog } from "@/components/travel-item-dialog";
+import { StandaloneRefreshAction } from "@/components/standalone-refresh-action";
 import { TripPrimaryNav, type TripPrimaryTab } from "@/components/trip-primary-nav";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { displayDate, tripDates } from "@/lib/travel-dates";
 import { getBusinessStatus, type BusinessStatus } from "@/lib/business-hours";
 import { useAuth } from "@/lib/auth-context";
 import { travelRepository } from "@/lib/travel-repository";
-import type { Flight, HotelStay, Transportation, TravelItem, TravelItemSort, TravelItemType, Trip, TripRole } from "@/lib/types";
+import type { CollectionItemStatus, Flight, HotelStay, Transportation, TravelItem, TravelItemSort, TravelItemType, Trip, TripRole } from "@/lib/types";
 
 type Tab = TripPrimaryTab;
 const CARD_NOTE_TYPOGRAPHY = "text-xs font-normal leading-[1.65] tracking-body text-muted";
@@ -41,11 +44,13 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
   const [trip, setTrip] = useState<Trip | undefined>(initialTrip);
   const [items, setItems] = useState<TravelItem[]>(initialItems);
   const [role, setRole] = useState<TripRole>();
-  const [tab, setTab] = useState<Tab>("daily");
+  const [tab, setTab] = useState<Tab>(initialTrip?.mode === "collection" ? "food" : "daily");
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<TravelItemSort>("date");
+  const [sort, setSort] = useState<TravelItemSort>(initialTrip?.mode === "collection" ? "area" : "date");
   const [dialog, setDialog] = useState<{ open: boolean; type: TravelItemType; item?: TravelItem; initialDate?: string; allowTypeChange?: boolean; desktopTwoColumn?: boolean }>({ open: false, type: "place" });
   const [deleting, setDeleting] = useState<TravelItem>();
+  const [addingToTrip, setAddingToTrip] = useState<TravelItem>();
+  const [editableTrips, setEditableTrips] = useState<Trip[]>([]);
   const refresh = useCallback(async () => {
     try {
       const [nextTrip, nextItems] = await Promise.all([travelRepository.getTrip(tripId), travelRepository.getItems(tripId)]);
@@ -58,18 +63,47 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
   useEffect(() => {
     if (!authReady || !user) {
       setRole(undefined);
+      setEditableTrips([]);
       return;
     }
     travelRepository.getTripRole(tripId).then(setRole).catch((error) => toast.error(errorMessage(error, "無法確認編輯權限")));
-  }, [authReady, tripId, user]);
+    if (trip?.mode === "collection") {
+      travelRepository.getEditableTrips().then(setEditableTrips).catch((error) => toast.error(errorMessage(error, "無法載入可加入的旅程")));
+    } else {
+      setEditableTrips([]);
+    }
+  }, [authReady, trip?.mode, tripId, user]);
   useEffect(() => {
     const requestedTab = new URLSearchParams(window.location.search).get("tab");
-    if (requestedTab === "daily" || requestedTab === "place" || requestedTab === "food" || requestedTab === "outline") setTab(requestedTab);
-  }, []);
+    if (requestedTab === "daily" || requestedTab === "place" || requestedTab === "food" || requestedTab === "outline") {
+      setTab(initialTrip?.mode === "collection" && requestedTab === "daily" ? "food" : requestedTab);
+    }
+  }, [initialTrip?.mode]);
   const edit = (item: TravelItem) => setDialog({ open: true, type: item.type, item });
   const editListItem = (item: TravelItem) => setDialog({ open: true, type: item.type, item, desktopTwoColumn: true });
   const remove = (item: TravelItem) => setDeleting(item);
+  const duplicate = async (item: TravelItem) => {
+    try {
+      await travelRepository.duplicateItem(item.id);
+      await refresh();
+      toast.success(`已複製${item.type === "food" ? "美食" : "地點"}`);
+    } catch (error) {
+      toast.error(errorMessage(error, "複製失敗"));
+    }
+  };
   const canEdit = isAdmin || Boolean(role);
+  const toggleCollectionStatus = async (item: TravelItem) => {
+    if (!item.status) return;
+    const nextStatus: CollectionItemStatus = item.status === "completed" ? "planned" : "completed";
+    setItems((current) => current.map((value) => value.id === item.id ? { ...value, status: nextStatus } : value));
+    try {
+      const saved = await travelRepository.updateItemStatus(item.id, nextStatus);
+      setItems((current) => current.map((value) => value.id === saved.id ? saved : value));
+    } catch (error) {
+      setItems((current) => current.map((value) => value.id === item.id ? item : value));
+      toast.error(errorMessage(error, "狀態更新失敗"));
+    }
+  };
 
   const reorder = async (activeId: string, overId: string) => {
     const active = items.find((item) => item.id === activeId);
@@ -96,13 +130,13 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
       <header className="sticky top-0 z-20 -mx-4 flex items-center gap-3 border-b border-border bg-bg/95 px-4 pb-3 pt-3 backdrop-blur sm:-mx-6 sm:gap-4 sm:px-6 sm:py-4">
         <div className="flex min-w-0 flex-1 items-center gap-3 sm:flex-initial"><Link href="/" aria-label="返回" title="返回" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-muted hover:bg-searchBackground hover:text-[#555555] sm:h-9 sm:w-9"><ArrowLeft className="h-4 w-4 stroke-[1.5]" /></Link><h1 className="min-w-0 truncate text-title font-semibold">{trip.name}</h1></div>
         <div aria-hidden="true" className="hidden min-w-4 flex-1 sm:block" />
-        <div className="hidden shrink-0 items-center gap-3 sm:flex"><TripPrimaryNav activeTab={tab} onTabChange={setTab} /><div className="flex shrink-0 items-center justify-end gap-1 before:mr-2 before:h-[30px] before:w-px before:shrink-0 before:bg-border before:content-['']"><Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" className="flex h-11 w-11 shrink-0 items-center justify-center border-0 bg-transparent text-muted shadow-none hover:bg-transparent hover:text-ink"><FolderHeart className="h-4 w-4 stroke-[1.5]" /></Link><AuthControl className="border-0 bg-transparent text-muted shadow-none hover:bg-transparent hover:text-ink [&>svg]:h-4 [&>svg]:w-4" /></div></div>
-        <div className="flex w-[140px] shrink-0 items-center justify-end gap-2 sm:hidden">{canEdit && tab !== "outline" ? <AddIconButton context="header" label={tab === "daily" ? "新增行程" : `新增${tab === "place" ? "地點" : "美食"}`} onClick={() => setDialog({ open: true, type: tab === "food" ? "food" : "place", allowTypeChange: tab === "daily", desktopTwoColumn: tab !== "daily" })} /> : <span aria-hidden="true" className="h-11 w-11 shrink-0" />}<Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-muted hover:bg-searchBackground hover:text-[#555555]"><FolderHeart className="h-4 w-4 stroke-[1.5]" /></Link><AuthControl /></div>
+        <div className="hidden shrink-0 items-center gap-3 sm:flex"><TripPrimaryNav activeTab={tab} onTabChange={setTab} collection={trip.mode === "collection"} /><div className="flex shrink-0 items-center justify-end gap-1 before:mr-2 before:h-[30px] before:w-px before:shrink-0 before:bg-border before:content-['']"><StandaloneRefreshAction className="border-0 bg-transparent shadow-none hover:bg-transparent" /><Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" className="flex h-11 w-11 shrink-0 items-center justify-center border-0 bg-transparent text-muted shadow-none hover:bg-transparent hover:text-ink"><FolderHeart className="h-4 w-4 stroke-[1.5]" /></Link><AuthControl className="border-0 bg-transparent text-muted shadow-none hover:bg-transparent hover:text-ink [&>svg]:h-4 [&>svg]:w-4" /></div></div>
+        <div className="flex shrink-0 items-center justify-end gap-2 sm:hidden"><StandaloneRefreshAction /><Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-muted hover:bg-searchBackground hover:text-[#555555]"><FolderHeart className="h-4 w-4 stroke-[1.5]" /></Link><AuthControl /></div>
       </header>
-      <div className="sm:hidden"><TripPrimaryNav activeTab={tab} onTabChange={setTab} /></div>
-      {tab === "daily" && <Daily trip={trip} items={items} canEdit={canEdit} onAdd={(date) => setDialog({ open: true, type: "place", initialDate: date, allowTypeChange: true })} onEdit={edit} onDelete={remove} onReorder={reorder} />}
-      {(tab === "place" || tab === "food") && <ItemList type={tab} items={items} query={query} sort={sort} canEdit={canEdit} onQuery={setQuery} onSort={setSort} onAdd={() => setDialog({ open: true, type: tab, desktopTwoColumn: true })} onEdit={editListItem} onDelete={remove} />}
-      {tab === "outline" && <Outline trip={trip} items={items} canEdit={canEdit} initialFlights={initialFlights} initialHotelStays={initialHotelStays} initialTransportations={initialTransportations} />}
+      <div className="sm:hidden"><TripPrimaryNav activeTab={tab} onTabChange={setTab} collection={trip.mode === "collection"} /></div>
+      {trip.mode === "trip" && tab === "daily" && <Daily trip={trip} items={items} canEdit={canEdit} onAdd={(date) => setDialog({ open: true, type: "place", initialDate: date, allowTypeChange: true })} onEdit={edit} onDelete={remove} onReorder={reorder} />}
+      {(tab === "place" || tab === "food") && <ItemList type={tab} items={items} query={query} sort={sort} collection={trip.mode === "collection"} canEdit={canEdit} canAddToTrip={trip.mode === "collection" && canEdit && editableTrips.length > 0} onQuery={setQuery} onSort={setSort} onAdd={() => setDialog({ open: true, type: tab, desktopTwoColumn: true })} onEdit={editListItem} onAddToTrip={setAddingToTrip} onDuplicate={duplicate} onDelete={remove} onToggleStatus={toggleCollectionStatus} />}
+      {tab === "outline" && (trip.mode === "collection" ? <CollectionOutline items={items} /> : <Outline trip={trip} items={items} canEdit={canEdit} initialFlights={initialFlights} initialHotelStays={initialHotelStays} initialTransportations={initialTransportations} />)}
       <TravelItemDialog open={dialog.open} type={dialog.type} trip={trip} item={dialog.item} items={items} initialDate={dialog.initialDate} allowTypeChange={dialog.allowTypeChange} desktopTwoColumn={dialog.desktopTwoColumn} onTypeChange={(type) => setDialog((value) => ({ ...value, type }))} onOpenChange={(open) => setDialog((value) => ({ ...value, open }))} onSave={async (value) => {
         const { imageFile, ...itemValue } = value;
         try {
@@ -115,6 +149,22 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
           toast.error(errorMessage(error, "儲存失敗"));
         }
       }} />
+      <AddCollectionItemToTripDialog
+        open={Boolean(addingToTrip)}
+        item={addingToTrip}
+        trips={editableTrips}
+        onOpenChange={(open) => { if (!open) setAddingToTrip(undefined); }}
+        onConfirm={async (targetTripId, date) => {
+          if (!addingToTrip) return;
+          try {
+            await travelRepository.addCollectionItemToTrip(addingToTrip, targetTripId, date);
+            setAddingToTrip(undefined);
+            toast.success("已加入旅程");
+          } catch (error) {
+            toast.error(errorMessage(error, "加入旅程失敗"));
+          }
+        }}
+      />
       <ConfirmDialog
         open={Boolean(deleting)}
         title={`刪除${deleting?.type === "food" ? "美食" : "地點"}`}
@@ -134,58 +184,90 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
   );
 }
 
-function ItemList({ type, items, query, sort, canEdit, onQuery, onSort, onAdd, onEdit, onDelete }: { type: TravelItemType; items: TravelItem[]; query: string; sort: TravelItemSort; canEdit: boolean; onQuery: (value: string) => void; onSort: (value: TravelItemSort) => void; onAdd: () => void; onEdit: (item: TravelItem) => void; onDelete: (item: TravelItem) => void }) {
+function ItemList({ type, items, query, sort, collection, canEdit, canAddToTrip, onQuery, onSort, onAdd, onEdit, onAddToTrip, onDuplicate, onDelete, onToggleStatus }: { type: TravelItemType; items: TravelItem[]; query: string; sort: TravelItemSort; collection: boolean; canEdit: boolean; canAddToTrip: boolean; onQuery: (value: string) => void; onSort: (value: TravelItemSort) => void; onAdd: () => void; onEdit: (item: TravelItem) => void; onAddToTrip: (item: TravelItem) => void; onDuplicate: (item: TravelItem) => void; onDelete: (item: TravelItem) => void; onToggleStatus: (item: TravelItem) => void }) {
   const [area, setArea] = useState("");
+  const [status, setStatus] = useState<CollectionItemStatus | "">("");
   const { openItemId, open: openSwipe, close: closeSwipe } = useMobileSwipeGroup();
   const areas = useMemo(() => [...new Set(items.filter((item) => item.type === type).map((item) => item.area.trim()).filter(Boolean))], [items, type]);
-  useEffect(() => setArea(""), [type]);
-  useEffect(() => closeSwipe(), [area, closeSwipe, query, sort, type]);
+  useEffect(() => { setArea(""); setStatus(""); }, [type]);
+  useEffect(() => closeSwipe(), [area, closeSwipe, query, sort, status, type]);
   useEffect(() => {
     if (area && !areas.includes(area)) setArea("");
   }, [area, areas]);
-  const visible = useMemo(() => items.filter((item) => item.type === type && (!area || item.area.trim() === area) && [item.name, item.category, item.area, item.note].some((value) => value.toLowerCase().includes(query.trim().toLowerCase()))).sort((a, b) => {
-    const value = sort === "date" ? (a.date ?? "9999-99-99") : a[sort];
-    const other = sort === "date" ? (b.date ?? "9999-99-99") : b[sort];
-    return value.localeCompare(other, "zh-Hant") || a.createdAt.localeCompare(b.createdAt);
-  }), [area, items, query, sort, type]);
+  const visible = useMemo(() => items.filter((item) => item.type === type && (!area || item.area.trim() === area) && (!status || item.status === status) && [item.name, item.category, item.area, item.note, item.experienceNote, item.consumedItems].some((value) => value.toLowerCase().includes(query.trim().toLowerCase()))).sort((a, b) => compareItems(a, b, sort)), [area, items, query, sort, status, type]);
   const renderAreaMenu = () => <div className="flex min-w-max flex-nowrap items-center gap-5 pr-4">{["", ...areas].map((value) => <button key={value || "all"} type="button" onClick={() => setArea(value)} aria-pressed={area === value} className={`shrink-0 border-b pb-1 text-xs transition-colors ${area === value ? "border-ink text-ink" : "border-transparent text-muted hover:text-[#555555]"}`}>{value || "全部"}</button>)}</div>;
-  const renderControls = (desktop = false) => <><div className="relative min-w-0 flex-1 sm:w-[290px] sm:flex-none"><Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 stroke-[1.5] text-muted" /><Input value={query} onChange={(e) => onQuery(e.target.value)} className={`bg-surface pl-11 pr-10 ${desktop ? "h-8" : ""}`} aria-label="搜尋" /><button type="button" onClick={() => onQuery("")} aria-label="清除搜尋" aria-hidden={!query} tabIndex={query ? 0 : -1} disabled={!query} className={`absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-card text-muted transition-[color,opacity] hover:bg-searchBackground hover:text-[#555555] ${query ? "visible opacity-100" : "invisible pointer-events-none opacity-0"}`}><X className="h-4 w-4 stroke-[1.5]" /></button></div><Select value={sort} onValueChange={(value) => onSort(value as TravelItemSort)}><SelectTrigger className={`${desktop ? "h-8 min-w-[112px] w-auto" : "w-[112px]"} shrink-0`}><ArrowUpDown className="h-4 w-4 stroke-[1.5]" /><SelectValue /></SelectTrigger><SelectContent><SelectItem value="date">日期</SelectItem><SelectItem value="category">分類</SelectItem><SelectItem value="area">地點</SelectItem></SelectContent></Select></>;
+  const renderStatusMenu = () => collection && <div className="flex h-10 shrink-0 items-stretch overflow-hidden rounded-[5px] border border-border bg-surface sm:h-8">{(["", "planned", "completed"] as const).map((value, index) => <button key={value || "all"} type="button" onClick={() => setStatus(value)} aria-pressed={status === value} className={`min-w-0 whitespace-nowrap px-2 text-[10px] transition-colors sm:px-3 sm:text-xs ${index ? "border-l border-divider" : ""} ${status === value ? "bg-searchBackground text-ink" : "text-muted hover:text-[#555555]"}`}>{value === "" ? "全部" : value === "planned" ? (type === "place" ? "想去" : "想吃") : (type === "place" ? "去過" : "吃過")}</button>)}</div>;
+  const statusLabel = (value: CollectionItemStatus | "") => value === "" ? "全部" : value === "planned" ? (type === "place" ? "想去" : "想吃") : (type === "place" ? "去過" : "吃過");
+  const renderMobileStatus = () => collection && <Select value={status || "all"} onValueChange={(value) => setStatus(value === "all" ? "" : value as CollectionItemStatus)}><SelectTrigger aria-label="狀態篩選" className="h-10 w-auto min-w-[64px] shrink-0 flex-nowrap whitespace-nowrap rounded-none border-0 bg-transparent px-2 text-[11px] shadow-none focus:ring-0 [&>svg]:shrink-0 [&>span]:whitespace-nowrap"><SelectValue /></SelectTrigger><SelectContent>{(["", "planned", "completed"] as const).map((value) => <SelectItem key={value || "all"} value={value || "all"}>{statusLabel(value)}</SelectItem>)}</SelectContent></Select>;
+  const renderSearch = (desktop = false) => <div className="relative min-w-[72px] flex-1 sm:w-[290px] sm:flex-none"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 stroke-[1.5] text-muted sm:left-4" /><Input value={query} onChange={(e) => onQuery(e.target.value)} className={`bg-surface pl-9 pr-8 sm:pl-11 sm:pr-10 ${desktop ? "h-8" : ""}`} aria-label="搜尋" /><button type="button" onClick={() => onQuery("")} aria-label="清除搜尋" aria-hidden={!query} tabIndex={query ? 0 : -1} disabled={!query} className={`absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-card text-muted transition-[color,opacity] hover:bg-searchBackground hover:text-[#555555] sm:right-3 ${query ? "visible opacity-100" : "invisible pointer-events-none opacity-0"}`}><X className="h-4 w-4 stroke-[1.5]" /></button></div>;
+  const renderSort = (desktop = false, unified = false) => <Select value={sort} onValueChange={(value) => onSort(value as TravelItemSort)}><SelectTrigger aria-label="排序" className={`${desktop ? "h-8 min-w-[112px] w-auto" : unified ? "h-10 w-[88px] rounded-none border-0 bg-transparent text-[11px] shadow-none focus:ring-0" : "h-10 w-[88px] text-[11px]"} shrink-0 flex-nowrap whitespace-nowrap px-2 sm:px-3 [&>svg]:shrink-0 [&>span]:whitespace-nowrap`}><ArrowUpDown className="h-4 w-4 shrink-0 stroke-[1.5]" /><SelectValue /></SelectTrigger><SelectContent>{!collection && <SelectItem value="date">日期</SelectItem>}<SelectItem value="area">地點</SelectItem><SelectItem value="category">分類</SelectItem>{collection && <><SelectItem value="status">狀態</SelectItem><SelectItem value="rating">評分</SelectItem></>}</SelectContent></Select>;
+  const renderAdd = (desktop = false) => canEdit && <AddIconButton label={`新增${type === "place" ? "地點" : "美食"}`} onClick={onAdd} className={`${desktop ? "h-8 w-8" : "h-10 w-10"} shrink-0 bg-transparent hover:bg-transparent`} />;
   return <>
-    <div className="sm:hidden">
-      <nav aria-label={`${type === "place" ? "地點" : "美食"}區域篩選`} className="no-scrollbar mb-8 max-w-full overflow-x-auto pt-5">{renderAreaMenu()}</nav>
-      <div className="mb-7 flex gap-2">{renderControls()}</div>
+    <div className="pt-5 sm:hidden">
+      <div className="mb-5 flex h-10 min-w-0 items-center overflow-hidden rounded-[5px] border border-border bg-surface">
+        <div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 stroke-[1.5] text-muted" /><Input value={query} onChange={(event) => onQuery(event.target.value)} className="h-10 min-w-0 rounded-none border-0 bg-transparent pl-9 pr-8 shadow-none focus-visible:ring-0" aria-label="搜尋" /><button type="button" onClick={() => onQuery("")} aria-label="清除搜尋" aria-hidden={!query} tabIndex={query ? 0 : -1} disabled={!query} className={`absolute right-0 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center text-muted transition-opacity ${query ? "visible opacity-100" : "invisible pointer-events-none opacity-0"}`}><X className="h-4 w-4 stroke-[1.5]" /></button></div>
+        {collection && <div className="shrink-0 border-l border-divider">{renderMobileStatus()}</div>}
+        <div className="shrink-0 border-l border-divider">{renderSort(false, true)}</div>
+        {canEdit && <div className="flex h-full shrink-0 items-center border-l border-divider">{renderAdd()}</div>}
+      </div>
+      <nav aria-label={`${type === "place" ? "地點" : "美食"}區域篩選`} className="no-scrollbar mb-8 max-w-full overflow-x-auto">{renderAreaMenu()}</nav>
     </div>
-    <div className="mb-8 hidden flex-wrap items-center justify-between gap-x-6 gap-y-4 pt-8 sm:flex lg:flex-nowrap">
-      <nav aria-label={`${type === "place" ? "地點" : "美食"}區域篩選`} className="no-scrollbar flex h-[42px] w-full flex-none items-center overflow-x-auto pt-0.5 lg:min-w-0 lg:flex-1">{renderAreaMenu()}</nav>
-      <div className="ml-auto flex shrink-0 items-center gap-2 lg:ml-0">{renderControls(true)}{canEdit && <AddIconButton label={`新增${type === "place" ? "地點" : "美食"}`} onClick={onAdd} className="h-8 w-8 bg-transparent hover:bg-transparent" />}</div>
+    <div className="mb-8 hidden pt-8 sm:block">
+      <div className="mb-5 flex min-w-0 items-center justify-between gap-6"><div>{renderStatusMenu()}</div><div className="ml-auto flex min-w-0 items-center gap-2">{renderSearch(true)}{renderSort(true)}{renderAdd(true)}</div></div>
+      <nav aria-label={`${type === "place" ? "地點" : "美食"}區域篩選`} className="no-scrollbar max-w-full overflow-x-auto">{renderAreaMenu()}</nav>
     </div>
-    {visible.length === 0 ? <EmptyState title={`尚無${type === "place" ? "地點" : "美食"}`} description="" icon="map" /> : <div className="grid grid-cols-1 gap-6 sm:gap-7 lg:grid-cols-2">{visible.map((item) => <ItemCard key={item.id} item={item} canEdit={canEdit} listLayout swipeOpen={openItemId === item.id} onSwipeOpen={() => openSwipe(item.id)} onSwipeClose={closeSwipe} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />)}</div>}
+    {visible.length === 0 ? <EmptyState title={`尚無${type === "place" ? "地點" : "美食"}`} description="" icon="map" /> : <div className="grid grid-cols-1 gap-6 sm:gap-7 lg:grid-cols-2">{visible.map((item) => <ItemCard key={item.id} item={item} canEdit={canEdit} canAddToTrip={canAddToTrip} collection={collection} listLayout swipeOpen={openItemId === item.id} onSwipeOpen={() => openSwipe(item.id)} onSwipeClose={closeSwipe} onEdit={() => onEdit(item)} onAddToTrip={() => onAddToTrip(item)} onDuplicate={() => onDuplicate(item)} onDelete={() => onDelete(item)} onToggleStatus={() => onToggleStatus(item)} />)}</div>}
   </>;
 }
 
-function ItemCard({ item, canEdit, onEdit, onDelete, controls, compactBusiness = false, listLayout = false, swipeOpen = false, onSwipeOpen = () => undefined, onSwipeClose = () => undefined }: { item: TravelItem; canEdit: boolean; onEdit: () => void; onDelete: () => void; controls?: React.ReactNode; compactBusiness?: boolean; listLayout?: boolean; swipeOpen?: boolean; onSwipeOpen?: () => void; onSwipeClose?: () => void }) {
+function compareItems(a: TravelItem, b: TravelItem, sort: TravelItemSort) {
+  if (sort === "rating") return (b.rating ?? -1) - (a.rating ?? -1) || a.createdAt.localeCompare(b.createdAt);
+  const value = sort === "date" ? (a.date ?? "9999-99-99") : (a[sort] ?? "");
+  const other = sort === "date" ? (b.date ?? "9999-99-99") : (b[sort] ?? "");
+  return value.localeCompare(other, "zh-Hant") || a.createdAt.localeCompare(b.createdAt);
+}
+
+function ItemCard({ item, canEdit, canAddToTrip = false, collection = false, onEdit, onAddToTrip = () => undefined, onDuplicate = () => undefined, onDelete, onToggleStatus = () => undefined, controls, compactBusiness = false, listLayout = false, swipeOpen = false, onSwipeOpen = () => undefined, onSwipeClose = () => undefined }: { item: TravelItem; canEdit: boolean; canAddToTrip?: boolean; collection?: boolean; onEdit: () => void; onAddToTrip?: () => void; onDuplicate?: () => void; onDelete: () => void; onToggleStatus?: () => void; controls?: React.ReactNode; compactBusiness?: boolean; listLayout?: boolean; swipeOpen?: boolean; onSwipeOpen?: () => void; onSwipeClose?: () => void }) {
   const imageUrl = useTravelItemImageUrl(listLayout ? item.imagePath : undefined);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [mobileOverflow, setMobileOverflow] = useState({ note: false, completed: false });
+  const [desktopOverflow, setDesktopOverflow] = useState({ note: false, completed: false });
+  const reviewVisible = hasReviewInfo(item, collection);
+  useEffect(() => {
+    if (!item.note) {
+      setMobileOverflow((current) => current.note ? { ...current, note: false } : current);
+      setDesktopOverflow((current) => current.note ? { ...current, note: false } : current);
+    }
+    if (!reviewVisible) {
+      setMobileOverflow((current) => current.completed ? { ...current, completed: false } : current);
+      setDesktopOverflow((current) => current.completed ? { ...current, completed: false } : current);
+    }
+  }, [item.note, reviewVisible]);
   if (listLayout) {
-    const hasMobileFooterLinks = Boolean(item.extraLink1 || item.extraLink2);
+    const hasMobileMore = mobileOverflow.note || (reviewVisible && mobileOverflow.completed);
+    const hasDesktopMore = desktopOverflow.note || (reviewVisible && desktopOverflow.completed);
+    const hasMobileFooterActions = Boolean(item.extraLink1 || item.extraLink2 || hasMobileMore);
     return (
       <>
-      <MobileSwipeActions itemId={item.id} canEdit={canEdit} canDelete={canEdit} open={swipeOpen} mobileFrame onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete}>
+      <MobileSwipeActions itemId={item.id} canAddToTrip={canAddToTrip} canEdit={canEdit} canDuplicate={canEdit} canDelete={canEdit} open={swipeOpen} mobileFrame onOpen={onSwipeOpen} onClose={onSwipeClose} onAddToTrip={onAddToTrip} onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete}>
       <article className="flex min-w-0 flex-col self-start bg-surface px-4 pt-4">
-        <header className="flex min-w-0 items-start justify-between gap-4 pb-4">
+        <header className="flex min-w-0 items-center justify-between gap-4 pb-4">
           <div className="min-w-0 flex-1">
           {item.googleMapsUrl
             ? <a href={item.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label={`在 Google Maps 開啟${item.name}`} title="開啟 Google Maps" className="line-clamp-2 font-medium hover:text-[#555555]">{item.name}</a>
             : <p className="line-clamp-2 font-medium">{item.name}</p>}
           </div>
-          <div className="flex max-w-[58%] shrink-0 items-center gap-2 text-xs text-ink"><LocationCategory item={item} />{item.date && <><span aria-hidden="true" className="text-border">｜</span><time dateTime={item.date} className="whitespace-nowrap">{displayDate(item.date)}</time></>}</div>
+          <CardMetadata item={item} collection={collection} canEdit={canEdit} onToggleStatus={onToggleStatus} mobile />
         </header>
         {item.imagePath && <TravelItemCardImage item={item} url={imageUrl} mobile />}
         <section className="flex min-w-0 flex-1 flex-col justify-start gap-3 pb-4">
           <ItemCompactBusinessHours item={item} />
-          {item.note && <ClampedNote note={item.note} lines={3} showMarker={false} textClassName={CARD_NOTE_TYPOGRAPHY} />}
+          {item.note && <ClampedNote note={item.note} lines={reviewVisible ? 1 : 5} showMarker={false} hideMoreAction onOverflowChange={(overflow) => setMobileOverflow((current) => current.note === overflow ? current : { ...current, note: overflow })} textClassName={CARD_NOTE_TYPOGRAPHY} />}
+          {reviewVisible && <ReviewInfo item={item} collection={collection} onOverflowChange={(overflow) => setMobileOverflow((current) => current.completed === overflow ? current : { ...current, completed: overflow })} />}
         </section>
-        {hasMobileFooterLinks && <footer className="mt-auto flex min-h-12 shrink-0 items-center border-t border-divider">
-          <div className="ml-auto flex items-center gap-4">
+        {hasMobileFooterActions && <footer className="mt-auto flex min-h-12 shrink-0 items-center border-t border-divider">
+          <div className="flex items-center gap-4">
+            {hasMobileMore && <MoreDetailsAction onClick={() => setDetailsOpen(true)} />}
             {item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} />}
             {item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} />}
           </div>
@@ -199,27 +281,103 @@ function ItemCard({ item, canEdit, onEdit, onDelete, controls, compactBusiness =
               ? <a href={item.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label={`在 Google Maps 開啟${item.name}`} title="開啟 Google Maps" className="line-clamp-2 cursor-pointer font-medium text-ink no-underline transition-colors hover:text-[#666666] hover:no-underline focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-ink">{item.name}</a>
               : <p className="line-clamp-2 font-medium text-ink">{item.name}</p>}
           </div>
-          {(item.area || item.category || item.date) && <div className="flex max-w-[58%] shrink-0 items-center gap-2 text-xs font-normal leading-4 text-muted"><LocationCategory item={item} />{item.date && <><span aria-hidden="true" className="text-border">｜</span><time dateTime={item.date} className="whitespace-nowrap"><DailyDateLabel date={item.date} /></time></>}</div>}
+          {(item.area || item.category || item.date || collection) && <CardMetadata item={item} collection={collection} canEdit={canEdit} onToggleStatus={onToggleStatus} />}
         </header>
         <div className="flex min-w-0 flex-1 gap-4 pb-5">
           <section className="flex min-w-0 flex-1 flex-col gap-3">
             <ItemCompactBusinessHours item={item} />
-            {item.note && <ClampedNote note={item.note} lines={4} showMarker={false} textClassName={CARD_NOTE_TYPOGRAPHY} />}
+            {item.note && <ClampedNote note={item.note} lines={reviewVisible ? 1 : 5} showMarker={false} hideMoreAction onOverflowChange={(overflow) => setDesktopOverflow((current) => current.note === overflow ? current : { ...current, note: overflow })} textClassName={CARD_NOTE_TYPOGRAPHY} />}
+            {reviewVisible && <ReviewInfo item={item} collection={collection} onOverflowChange={(overflow) => setDesktopOverflow((current) => current.completed === overflow ? current : { ...current, completed: overflow })} />}
           </section>
           {item.imagePath && <TravelItemCardImage item={item} url={imageUrl} />}
         </div>
         <footer className="mt-auto flex min-h-12 shrink-0 items-center border-t border-divider/60">
           <div className="flex items-center gap-4">
+            {hasDesktopMore && <MoreDetailsAction onClick={() => setDetailsOpen(true)} quiet />}
             {item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} quiet />}
             {item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} quiet />}
           </div>
-          {canEdit && <div className="ml-auto flex items-center gap-4"><Action label="編輯" quiet onClick={onEdit}><SquarePen /></Action><Action label="刪除" quiet onClick={onDelete}><Trash2 /></Action></div>}
+          {canEdit && <div className="ml-auto flex items-center gap-4">{canAddToTrip && <Action label="加入旅程" quiet onClick={onAddToTrip}><MapPinPlus /></Action>}<Action label="編輯" quiet onClick={onEdit}><SquarePen /></Action><Action label="複製" quiet onClick={onDuplicate}><Copy /></Action><Action label="刪除" quiet onClick={onDelete}><Trash2 /></Action></div>}
         </footer>
       </article>
+      <ItemDetailsDialog item={item} open={detailsOpen} onOpenChange={setDetailsOpen} />
       </>
     );
   }
   return <article className="rounded-card border border-border bg-surface p-6 shadow-soft"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><ItemName item={item} /><p className="mt-2 text-xs text-muted">{item.date ? displayDate(item.date) : "未定"} · {item.category || (item.type === "place" ? "地點" : "美食")}</p></div>{canEdit && <div className="flex shrink-0">{controls}<Action label="編輯" onClick={onEdit}><SquarePen /></Action><Action label="刪除" onClick={onDelete}><Trash2 /></Action></div>}</div><div className="my-4 border-t border-divider" />{item.area && <p className="text-sm text-muted">{item.area}</p>}<BusinessHours item={item} compact={compactBusiness} />{item.note && <p className="mt-3 whitespace-pre-wrap text-sm text-muted">{item.note}</p>}</article>;
+}
+
+function CardMetadata({ item, collection, canEdit, onToggleStatus, mobile = false }: { item: TravelItem; collection: boolean; canEdit: boolean; onToggleStatus: () => void; mobile?: boolean }) {
+  const values = [item.area, item.category].filter(Boolean);
+  const separator = <span aria-hidden="true">｜</span>;
+  return <div className={`flex max-w-[62%] shrink-0 items-center gap-2 text-xs font-normal leading-4 ${mobile ? "text-ink" : "text-muted"}`}>
+    {values.map((value, index) => <span key={`${value}-${index}`} className="contents">{index > 0 && separator}<span className="min-w-0 truncate">{value}</span></span>)}
+    {collection && <>{values.length > 0 && separator}<CollectionStatus item={item} canEdit={canEdit} onToggle={onToggleStatus} /></>}
+    {!collection && item.date && <>{values.length > 0 && separator}<time dateTime={item.date} className="whitespace-nowrap">{mobile ? displayDate(item.date) : <DailyDateLabel date={item.date} />}</time></>}
+  </div>;
+}
+
+function CollectionStatus({ item, canEdit, onToggle }: { item: TravelItem; canEdit: boolean; onToggle: () => void }) {
+  const label = `${item.status === "completed" ? "✓" : "☐"} ${collectionStatusLabel(item)}`;
+  if (!canEdit) return <span className="whitespace-nowrap">{label}</span>;
+  return <button type="button" aria-label={`切換為${item.status === "completed" ? (item.type === "place" ? "想去" : "想吃") : (item.type === "place" ? "去過" : "吃過")}`} className="-m-2 whitespace-nowrap p-2 transition-colors hover:text-ink" onPointerDown={stopDrag} onClick={(event) => { event.stopPropagation(); onToggle(); }}>{label}</button>;
+}
+
+function ReviewInfo({ item, collection, onOverflowChange }: { item: TravelItem; collection: boolean; onOverflowChange: (overflow: boolean) => void }) {
+  const hasScore = item.rating !== null;
+  const hasDetails = Boolean(item.consumedItems || item.experienceNote);
+  useEffect(() => {
+    if (!hasDetails) onOverflowChange(false);
+  }, [hasDetails, onOverflowChange]);
+  return <div className={`flex min-w-0 items-stretch bg-[#f9f9f9] p-3 ${hasScore && hasDetails ? "gap-3" : ""}`} style={{ borderRadius: 5 }}>
+    {hasScore && <div className="flex min-w-14 shrink-0 items-center justify-center px-2 text-center"><div className="flex flex-col items-center justify-center gap-0.5"><span className="text-2xl font-medium text-ink">{formatRating(item.rating!)}</span>{collection && item.completedDate && <time dateTime={item.completedDate} className="text-[10px] font-normal leading-4 text-muted">{formatCompletedDate(item.completedDate)}</time>}</div></div>}
+    {hasScore && hasDetails && <div aria-hidden="true" className="w-px shrink-0 bg-border" />}
+    {hasDetails && <CompletedTextPreview item={item} onOverflowChange={onOverflowChange} />}
+  </div>;
+}
+
+function CompletedTextPreview({ item, onOverflowChange }: { item: TravelItem; onOverflowChange: (overflow: boolean) => void }) {
+  const textRef = useRef<HTMLParagraphElement>(null);
+  const onOverflowChangeRef = useRef(onOverflowChange);
+  onOverflowChangeRef.current = onOverflowChange;
+  useLayoutEffect(() => {
+    const element = textRef.current;
+    if (!element) return;
+    const measure = () => onOverflowChangeRef.current(element.scrollHeight > element.clientHeight + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [item.consumedItems, item.experienceNote]);
+  return <p ref={textRef} className="line-clamp-2 min-w-0 flex-1 whitespace-pre-wrap break-words text-xs font-normal leading-[1.65] tracking-body">
+    {item.consumedItems && <span className="text-[#333333]">{item.consumedItems}</span>}
+    {item.consumedItems && item.experienceNote && "\n"}
+    {item.experienceNote && <span className="text-muted">{item.experienceNote}</span>}
+  </p>;
+}
+
+function MoreDetailsAction({ onClick, quiet = false }: { onClick: () => void; quiet?: boolean }) {
+  return <Action label="顯示完整內容" quiet={quiet} onPointerDown={stopDrag} onClick={onClick}><Ellipsis className="stroke-[1.5]" /></Action>;
+}
+
+function ItemDetailsDialog({ item, open, onOpenChange }: { item: TravelItem; open: boolean; onOpenChange: (open: boolean) => void }) {
+  const reviewVisible = item.status !== "planned";
+  const sections = [
+    { label: "備註", value: item.note, className: "text-muted" },
+    { label: "吃了什麼", value: reviewVisible ? item.consumedItems : "", className: "text-[#333333]" },
+    { label: "心得", value: reviewVisible ? item.experienceNote : "", className: "text-muted" },
+  ].filter((section) => Boolean(section.value));
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent title="完整內容"><div className="divide-y divide-divider">{sections.map((section) => <section key={section.label} className="py-4 first:pt-0 last:pb-0"><h3 className="mb-2 text-xs font-medium text-ink">{section.label}</h3><p className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${section.className}`}>{section.value}</p></section>)}</div></DialogContent></Dialog>;
+}
+
+function hasReviewInfo(item: TravelItem, collection: boolean) {
+  const hasContent = item.rating !== null || Boolean(item.consumedItems) || Boolean(item.experienceNote);
+  return hasContent && (!collection || item.status === "completed");
+}
+
+function formatCompletedDate(date: string) {
+  const [year, month, day] = date.split("-");
+  return year && month && day ? `${year}/${month}/${day}` : date;
 }
 
 function useTravelItemImageUrl(path?: string) {
@@ -247,9 +405,9 @@ function TravelItemCardImage({ item, url, mobile = false }: { item: TravelItem; 
 
 function Daily({ trip, items, canEdit, onAdd, onEdit, onDelete, onReorder }: { trip: Trip; items: TravelItem[]; canEdit: boolean; onAdd: (date: string) => void; onEdit: (item: TravelItem) => void; onDelete: (item: TravelItem) => void; onReorder: (activeId: string, overId: string) => void }) {
   const dates = tripDates(trip);
-  const [activeDate, setActiveDate] = useState(trip.startDate);
+  const [activeDate, setActiveDate] = useState(trip.startDate ?? "");
   const [openSwipeItemId, setOpenSwipeItemId] = useState<string>();
-  useEffect(() => setActiveDate(trip.startDate), [trip.startDate]);
+  useEffect(() => setActiveDate(trip.startDate ?? ""), [trip.startDate]);
   useEffect(() => {
     if (!openSwipeItemId) return;
     const closeFromOutside = (event: PointerEvent) => {
@@ -274,8 +432,10 @@ function Daily({ trip, items, canEdit, onAdd, onEdit, onDelete, onReorder }: { t
   return <><nav aria-label="快速跳轉日期" className="no-scrollbar mb-8 max-w-full overflow-x-auto pt-5 sm:pt-6"><div className="flex min-w-max flex-nowrap items-center gap-5 pr-4">{dates.map((date) => <button key={date} type="button" onClick={() => jumpToDate(date)} aria-current={activeDate === date ? "date" : undefined} className={`shrink-0 border-b pb-1 text-xs transition-colors ${activeDate === date ? "border-muted text-ink" : "border-transparent text-muted hover:text-[#555555]"}`}><DailyDateLabel date={date} /></button>)}</div></nav><div className="space-y-8">{dates.map((date) => { const day = items.filter((item) => item.date === date).sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt)); return <section id={`daily-${date}`} className="scroll-mt-36" key={date}><div className="mb-4 flex items-center justify-between"><h2 className="text-title font-semibold"><DailyDateLabel date={date} /></h2>{canEdit && <AddIconButton label={`新增 ${displayDate(date)} 行程`} onClick={() => onAdd(date)} />}</div>{day.length === 0 ? <EmptyState title="今天尚未安排" description="" /> : canEdit ? <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={() => setOpenSwipeItemId(undefined)} onDragEnd={handleDragEnd}><SortableContext items={day.map((item) => item.id)} strategy={verticalListSortingStrategy}><div className="space-y-3">{day.map((item) => <SortableDailyCard key={item.id} item={item} swipeOpen={openSwipeItemId === item.id} onSwipeOpen={() => setOpenSwipeItemId(item.id)} onSwipeClose={() => setOpenSwipeItemId((current) => current === item.id ? undefined : current)} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />)}</div></SortableContext></DndContext> : <div className="space-y-3">{day.map((item) => <DailyCard key={item.id} item={item} canEdit={false} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />)}</div>}</section>; })}</div></>;
 }
 
-function DailyDateLabel({ date }: { date: string }) {
-  const [month, day] = displayDate(date).split("/");
+function DailyDateLabel({ date }: { date?: string | null }) {
+  const formatted = displayDate(date);
+  if (!formatted) return null;
+  const [month, day] = formatted.split("/");
   return <span className="inline-flex whitespace-nowrap"><span>{month}</span><span aria-hidden="true" className="mx-1">/</span><span>{day}</span></span>;
 }
 
@@ -347,6 +507,47 @@ function DailyDesktopManageActions({ canEdit, onEdit, onDelete }: { canEdit: boo
 }
 
 function stopDrag(event: React.SyntheticEvent) { event.stopPropagation(); }
+
+function collectionStatusLabel(item: TravelItem) {
+  if (item.status === "completed") return item.type === "place" ? "去過" : "吃過";
+  return item.type === "place" ? "想去" : "想吃";
+}
+
+function formatRating(rating: number) {
+  return Number.isInteger(rating) ? String(rating) : String(Number(rating.toFixed(2)));
+}
+
+function CollectionOutline({ items }: { items: TravelItem[] }) {
+  const food = items.filter((item) => item.type === "food");
+  const places = items.filter((item) => item.type === "place");
+  return <div className="space-y-10 pb-24 pt-8">
+    <CollectionSummary label="美食" items={food} plannedLabel="想吃" completedLabel="吃過" />
+    <CollectionSummary label="地點" items={places} plannedLabel="想去" completedLabel="去過" />
+  </div>;
+}
+
+function CollectionSummary({ label, items, plannedLabel, completedLabel }: { label: string; items: TravelItem[]; plannedLabel: string; completedLabel: string }) {
+  const planned = items.filter((item) => item.status === "planned");
+  const completed = items.filter((item) => item.status === "completed");
+  return <section>
+    <header className="mb-5 flex flex-wrap items-baseline justify-between gap-3"><h2 className="text-title font-semibold">{label}</h2><p className="text-xs text-muted">{label} {items.length}｜{plannedLabel} {planned.length}｜{completedLabel} {completed.length}</p></header>
+    <div className="space-y-5">
+      <CollectionOutlineGroup label={plannedLabel} items={planned} />
+      <CollectionOutlineGroup label={completedLabel} items={completed} completed />
+    </div>
+  </section>;
+}
+
+function CollectionOutlineGroup({ label, items, completed = false }: { label: string; items: TravelItem[]; completed?: boolean }) {
+  const groups = [...new Set(items.map((item) => item.area.trim() || "未分類"))].map((area) => ({ area, items: items.filter((item) => (item.area.trim() || "未分類") === area) }));
+  const tagClassName = "inline-flex min-h-7 items-center rounded-[5px] bg-searchBackground px-3 py-1 text-[11px] font-normal text-ink";
+  return <section className="rounded-card border border-border bg-surface px-5 py-4 shadow-soft"><h3 className="mb-4 text-sm font-semibold">{label}</h3>{groups.length === 0 ? <p className="text-sm text-muted">尚無項目</p> : <div className="space-y-4">{groups.map((group) => <div key={group.area} className="grid grid-cols-[auto_1px_minmax(0,1fr)] items-stretch gap-4"><p className="flex items-center text-xs leading-7 text-ink">{group.area}</p><span aria-hidden="true" className="h-full min-h-7 bg-divider" /><div className="flex min-w-0 flex-wrap content-center gap-2">{group.items.map((item) => {
+    const content = <>{item.name}{completed && item.rating !== null ? `｜${formatRating(item.rating)}` : ""}</>;
+    return item.googleMapsUrl
+      ? <a key={item.id} href={item.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label={`在 Google Maps 開啟${item.name}`} className={`${tagClassName} transition-colors hover:text-[#555555]`}>{content}</a>
+      : <span key={item.id} className={tagClassName}>{content}</span>;
+  })}</div></div>)}</div>}</section>;
+}
 
 function Outline({ trip, items, canEdit, initialFlights, initialHotelStays, initialTransportations }: { trip: Trip; items: TravelItem[]; canEdit: boolean; initialFlights: Flight[]; initialHotelStays: HotelStay[]; initialTransportations: Transportation[] }) {
   const [flights, setFlights] = useState<Flight[]>(initialFlights);

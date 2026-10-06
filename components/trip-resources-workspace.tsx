@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input, Textarea } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { StandaloneRefreshAction } from "@/components/standalone-refresh-action";
 import { TripPrimaryNav } from "@/components/trip-primary-nav";
 import { useAuth } from "@/lib/auth-context";
 import { travelRepository } from "@/lib/travel-repository";
@@ -25,10 +26,16 @@ const CATEGORY_LABELS: Record<TripResourceCategory, string> = {
   note: "備忘",
 };
 
-const RESOURCE_CATEGORIES = [
+const TRIP_RESOURCE_CATEGORIES = [
   { value: "transportation" as const, label: "交通", icon: CarFront },
   { value: "coupon" as const, label: "優惠券", icon: TicketPercent },
   { value: "note" as const, label: "備忘", icon: StickyNote },
+];
+
+const COLLECTION_RESOURCE_CATEGORIES = [
+  TRIP_RESOURCE_CATEGORIES[2],
+  TRIP_RESOURCE_CATEGORIES[1],
+  TRIP_RESOURCE_CATEGORIES[0],
 ];
 
 export function TripResourcesWorkspace({ tripId, initialTrip }: { tripId: string; initialTrip?: Trip }) {
@@ -36,7 +43,7 @@ export function TripResourcesWorkspace({ tripId, initialTrip }: { tripId: string
   const [trip, setTrip] = useState(initialTrip);
   const [resources, setResources] = useState<TripResource[]>([]);
   const [role, setRole] = useState<TripRole>();
-  const [activeCategory, setActiveCategory] = useState<TripResourceCategory>("transportation");
+  const [activeCategory, setActiveCategory] = useState<TripResourceCategory>(initialTrip?.mode === "collection" ? "note" : "transportation");
   const [dialog, setDialog] = useState<{ open: boolean; resource?: TripResource; initialCategory?: TripResourceCategory }>({ open: false });
   const [deleting, setDeleting] = useState<TripResource>();
   const { openItemId, open: openSwipe, close: closeSwipe } = useMobileSwipeGroup();
@@ -56,6 +63,9 @@ export function TripResourcesWorkspace({ tripId, initialTrip }: { tripId: string
 
   useEffect(() => { refresh(); }, [refresh]);
   useEffect(() => {
+    setActiveCategory(trip?.mode === "collection" ? "note" : "transportation");
+  }, [trip?.mode]);
+  useEffect(() => {
     if (!authReady || !user) {
       setRole(undefined);
       return;
@@ -69,6 +79,7 @@ export function TripResourcesWorkspace({ tripId, initialTrip }: { tripId: string
   }
 
   const canEdit = isAdmin || Boolean(role);
+  const resourceCategories = trip.mode === "collection" ? COLLECTION_RESOURCE_CATEGORIES : TRIP_RESOURCE_CATEGORIES;
   const jumpToCategory = (category: TripResourceCategory) => {
     setActiveCategory(category);
     const target = document.getElementById(`resource-category-${category}`) ?? document.getElementById("resource-categories");
@@ -79,15 +90,15 @@ export function TripResourcesWorkspace({ tripId, initialTrip }: { tripId: string
       <header className="sticky top-0 z-20 -mx-4 flex items-center gap-3 border-b border-border bg-bg/95 px-4 pb-3 pt-3 backdrop-blur sm:-mx-6 sm:gap-4 sm:px-6 sm:py-4">
         <div className="flex min-w-0 flex-1 items-center gap-3 sm:flex-initial"><Link href={`/trip/${tripId}`} aria-label="返回旅行" title="返回旅行" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-muted hover:bg-searchBackground hover:text-[#555555] sm:h-9 sm:w-9"><ArrowLeft className="h-4 w-4 stroke-[1.5]" /></Link><h1 className="min-w-0 truncate text-title font-semibold">{trip.name}</h1></div>
         <div aria-hidden="true" className="hidden min-w-4 flex-1 sm:block" />
-        <div className="hidden shrink-0 items-center gap-3 sm:flex"><TripPrimaryNav tripId={tripId} /><div className="flex shrink-0 items-center justify-end gap-1 before:mr-2 before:h-[30px] before:w-px before:shrink-0 before:bg-border before:content-['']">{canEdit && <AddIconButton context="header" label="新增旅途資訊" onClick={() => setDialog({ open: true })} className="border-0 bg-transparent text-muted shadow-none hover:bg-transparent hover:text-ink [&>svg]:h-4 [&>svg]:w-4" />}<Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" aria-current="page" className="flex h-11 w-11 shrink-0 items-center justify-center border-0 bg-transparent text-muted shadow-none hover:bg-transparent hover:text-ink"><FolderHeart className="h-4 w-4 stroke-[1.5]" /></Link><AuthControl className="border-0 bg-transparent text-muted shadow-none hover:bg-transparent hover:text-ink [&>svg]:h-4 [&>svg]:w-4" /></div></div>
-        <div className="flex w-[140px] shrink-0 items-center justify-end gap-2 sm:hidden">{canEdit ? <AddIconButton context="header" label="新增旅途資訊" onClick={() => setDialog({ open: true })} /> : <span aria-hidden="true" className="h-11 w-11 shrink-0" />}<Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" aria-current="page" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-ink hover:bg-searchBackground"><FolderHeart className="h-4 w-4 stroke-[1.5]" /></Link><AuthControl /></div>
+        <div className="hidden shrink-0 items-center gap-3 sm:flex"><TripPrimaryNav tripId={tripId} collection={trip.mode === "collection"} /><div className="flex shrink-0 items-center justify-end gap-1 before:mr-2 before:h-[30px] before:w-px before:shrink-0 before:bg-border before:content-['']"><StandaloneRefreshAction className="border-0 bg-transparent shadow-none hover:bg-transparent" /><Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" aria-current="page" className="flex h-11 w-11 shrink-0 items-center justify-center border-0 bg-transparent text-muted shadow-none hover:bg-transparent hover:text-ink"><FolderHeart className="h-4 w-4 stroke-[1.5]" /></Link><AuthControl className="border-0 bg-transparent text-muted shadow-none hover:bg-transparent hover:text-ink [&>svg]:h-4 [&>svg]:w-4" /></div></div>
+        <div className="flex shrink-0 items-center justify-end gap-2 sm:hidden"><StandaloneRefreshAction /><Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" aria-current="page" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-ink hover:bg-searchBackground"><FolderHeart className="h-4 w-4 stroke-[1.5]" /></Link><AuthControl /></div>
       </header>
-      <div className="sm:hidden"><TripPrimaryNav tripId={tripId} /></div>
+      <div className="sm:hidden"><TripPrimaryNav tripId={tripId} collection={trip.mode === "collection"} /></div>
 
-      <nav id="resource-categories" aria-label="旅途資訊分類快速導覽" className="no-scrollbar mb-8 max-w-full scroll-mt-36 overflow-x-auto pt-5 sm:pt-6"><div className="flex min-w-max flex-nowrap items-center gap-5 pr-4">{RESOURCE_CATEGORIES.map(({ value, label }) => <button key={value} type="button" onClick={() => jumpToCategory(value)} aria-current={activeCategory === value ? "location" : undefined} className={`shrink-0 border-b pb-1 text-xs transition-colors ${activeCategory === value ? "border-muted text-ink" : "border-transparent text-muted hover:text-[#555555]"}`}>{label}</button>)}</div></nav>
+      <nav id="resource-categories" aria-label="旅途資訊分類快速導覽" className="no-scrollbar mb-8 max-w-full scroll-mt-36 overflow-x-auto pt-5 sm:pt-6"><div className="flex min-w-max flex-nowrap items-center gap-5 pr-4">{resourceCategories.map(({ value, label }) => <button key={value} type="button" onClick={() => jumpToCategory(value)} aria-current={activeCategory === value ? "location" : undefined} className={`shrink-0 border-b pb-1 text-xs transition-colors ${activeCategory === value ? "border-muted text-ink" : "border-transparent text-muted hover:text-[#555555]"}`}>{label}</button>)}</div></nav>
       {resources.length === 0 && !canEdit
         ? <EmptyState title="尚無旅途資訊" description="" />
-        : <div className="space-y-12">{RESOURCE_CATEGORIES.map(({ value, label, icon: Icon }) => {
+        : <div className="space-y-12">{resourceCategories.map(({ value, label, icon: Icon }) => {
           const categoryResources = resources.filter((resource) => resource.category === value);
           if (categoryResources.length === 0 && !canEdit) return null;
           return <section id={`resource-category-${value}`} key={value} className="scroll-mt-36"><header className="mb-4 flex items-center"><Icon className="h-4 w-4 shrink-0 text-muted" /><h2 className="ml-3 whitespace-nowrap text-sm font-semibold tracking-body">{label}</h2>{canEdit && <AddIconButton label={`新增${label}`} onClick={() => setDialog({ open: true, initialCategory: value })} className="ml-auto" />}</header>{categoryResources.length > 0 && <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">{categoryResources.map((resource) => <ResourceCard key={resource.id} resource={resource} canEdit={canEdit} swipeOpen={openItemId === resource.id} onSwipeOpen={() => openSwipe(resource.id)} onSwipeClose={closeSwipe} onEdit={() => setDialog({ open: true, resource })} onDelete={() => setDeleting(resource)} />)}</div>}</section>;

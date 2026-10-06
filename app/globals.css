@@ -31,6 +31,7 @@
 
   html body[data-scroll-locked] {
     margin-right: 0 !important;
+    overscroll-behavior: none;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -50,6 +51,12 @@
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  .dialog-scroll-content {
+    max-height: calc(100dvh - max(32px, env(safe-area-inset-top)) - max(32px, env(safe-area-inset-bottom)));
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
   }
 
   /* 8px grid rhythm helper for section stacks */

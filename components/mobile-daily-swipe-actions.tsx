@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { SquarePen, Trash2 } from "lucide-react";
+import { Copy, MapPinPlus, SquarePen, Trash2 } from "lucide-react";
 
 const ACTION_SLOT_WIDTH = 56;
 const DIRECTION_LOCK_THRESHOLD = 12;
@@ -30,9 +30,11 @@ export function MobileDailySwipeActions({ itemId, enabled, open, dragging, onOpe
   return <MobileSwipeActions itemId={itemId} canEdit={enabled} canDelete={enabled} open={open} dragging={dragging} onOpen={onOpen} onClose={onClose} onEdit={onEdit} onDelete={onDelete}>{children}</MobileSwipeActions>;
 }
 
-export function MobileSwipeActions({ itemId, canEdit, canDelete, open, dragging = false, desktopPassthrough = false, mobileFrame = false, onOpen, onClose, onEdit, onDelete, children, className = "" }: {
+export function MobileSwipeActions({ itemId, canAddToTrip = false, canEdit, canDuplicate = false, canDelete, open, dragging = false, desktopPassthrough = false, mobileFrame = false, onOpen, onClose, onAddToTrip, onEdit, onDuplicate, onDelete, children, className = "" }: {
   itemId: string;
+  canAddToTrip?: boolean;
   canEdit: boolean;
+  canDuplicate?: boolean;
   canDelete: boolean;
   open: boolean;
   dragging?: boolean;
@@ -40,12 +42,14 @@ export function MobileSwipeActions({ itemId, canEdit, canDelete, open, dragging 
   mobileFrame?: boolean;
   onOpen: () => void;
   onClose: () => void;
+  onAddToTrip?: () => void;
   onEdit: () => void;
+  onDuplicate?: () => void;
   onDelete: () => void;
   children: ReactNode;
   className?: string;
 }) {
-  const actionCount = Number(canEdit) + Number(canDelete);
+  const actionCount = Number(canAddToTrip) + Number(canEdit) + Number(canDuplicate) + Number(canDelete);
   const actionRailWidth = actionCount * ACTION_SLOT_WIDTH;
   const enabled = actionCount > 0;
   const gesture = useRef<Gesture | undefined>(undefined);
@@ -116,7 +120,9 @@ export function MobileSwipeActions({ itemId, canEdit, canDelete, open, dragging 
 
   return <div data-mobile-swipe-card={itemId} className={`relative overflow-hidden rounded-card ${mobileFrame ? "border border-border bg-surface shadow-soft" : ""} ${desktopPassthrough ? "sm:contents" : "sm:hidden"} ${className}`}>
     {enabled && <div aria-hidden={!open} className="absolute inset-y-0 right-0 flex border-l border-divider/60 bg-surface sm:hidden" style={{ width: actionRailWidth }}>
-      {canEdit && <button type="button" aria-label="編輯" title="編輯" tabIndex={open ? 0 : -1} data-no-dnd onClick={() => { onClose(); onEdit(); }} className={`flex w-14 items-center justify-center bg-searchBackground text-muted transition-colors hover:text-ink focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-2px] focus-visible:outline-ink ${canDelete ? "border-r border-divider/60" : ""}`}><SquarePen className="h-4 w-4" /></button>}
+      {canAddToTrip && <button type="button" aria-label="加入旅程" title="加入旅程" tabIndex={open ? 0 : -1} data-no-dnd onClick={() => { onClose(); onAddToTrip?.(); }} className="flex w-14 flex-col items-center justify-center gap-1 border-r border-divider/60 bg-searchBackground text-[10px] text-muted transition-colors hover:text-ink focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-2px] focus-visible:outline-ink"><MapPinPlus className="h-4 w-4" /><span>加入</span></button>}
+      {canEdit && <button type="button" aria-label="編輯" title="編輯" tabIndex={open ? 0 : -1} data-no-dnd onClick={() => { onClose(); onEdit(); }} className={`flex w-14 items-center justify-center bg-searchBackground text-muted transition-colors hover:text-ink focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-2px] focus-visible:outline-ink ${canDuplicate || canDelete ? "border-r border-divider/60" : ""}`}><SquarePen className="h-4 w-4" /></button>}
+      {canDuplicate && <button type="button" aria-label="複製" title="複製" tabIndex={open ? 0 : -1} data-no-dnd onClick={() => { onClose(); onDuplicate?.(); }} className={`flex w-14 items-center justify-center bg-searchBackground text-muted transition-colors hover:text-ink focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-2px] focus-visible:outline-ink ${canDelete ? "border-r border-divider/60" : ""}`}><Copy className="h-4 w-4" /></button>}
       {canDelete && <button type="button" aria-label="刪除" title="刪除" tabIndex={open ? 0 : -1} data-no-dnd onClick={() => { onClose(); onDelete(); }} className="flex w-14 items-center justify-center bg-surface text-[#8a666d] transition-colors hover:bg-[#f9f4f5] hover:text-[#5f3f46] focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-2px] focus-visible:outline-ink"><Trash2 className="h-4 w-4" /></button>}
     </div>}
     <div

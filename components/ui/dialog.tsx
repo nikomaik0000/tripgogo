@@ -25,7 +25,7 @@ export function DialogContent({
           "fixed left-1/2 top-1/2 z-50 w-[calc(100%-32px)] max-w-lg -translate-x-1/2 -translate-y-1/2",
           "rounded-card border border-border bg-surface p-5 shadow-pop sm:p-6",
           "data-[state=closed]:animate-dialogContentOut data-[state=open]:animate-dialogContentIn",
-          "max-h-[calc(100dvh-32px)] overflow-y-auto",
+          "dialog-scroll-content overflow-y-auto overscroll-contain touch-pan-y",
           className
         )}
         onInteractOutside={(event) => {

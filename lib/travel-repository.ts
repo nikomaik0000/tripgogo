@@ -39,6 +39,38 @@ function cleanupMessage(action: string, error: unknown) {
   return `${action}，但圖片清理未完成，可能留下 orphan object：${error instanceof Error ? error.message : String(error)}`;
 }
 
+async function copyTravelItemImage(sourcePath: string, destinationTripId: string, destinationItemId: string) {
+  const supabase = createClient();
+  const extension = getTravelItemImageExtensionFromPath(sourcePath);
+  const destinationPath = `${destinationTripId}/${destinationItemId}/${crypto.randomUUID()}.${extension}`;
+  let imageCopied = false;
+  try {
+    const { error: copyError } = await supabase.storage.from(TRAVEL_ITEM_IMAGE_BUCKET).copy(sourcePath, destinationPath);
+    if (copyError) throw new Error(copyError.message);
+    imageCopied = true;
+    const { data, error: attachError } = await supabase.from("tg_travel_items")
+      .update({ image_path: destinationPath }).eq("id", destinationItemId).is("image_path", null).select().single();
+    return mapItem(result(data, attachError) as TgTravelItemRow);
+  } catch (cause) {
+    const cleanupIssues: string[] = [];
+    if (imageCopied) {
+      try {
+        await removeTravelItemImages([destinationPath]);
+      } catch (cleanupError) {
+        cleanupIssues.push(`無法刪除複本圖片：${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`);
+      }
+    }
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    const cleanup = cleanupIssues.length > 0 ? `；圖片補償清理不完整：${cleanupIssues.join("；")}` : "；已完成圖片補償清理";
+    throw new Error(`${reason}${cleanup}`);
+  }
+}
+
+async function removeIncompleteTravelItem(itemId: string) {
+  const { error } = await createClient().from("tg_travel_items").delete().eq("id", itemId);
+  if (error) throw new Error(error.message);
+}
+
 export const travelRepository = {
   async getTrips() {
     const { data, error } = await createClient().from("tg_trips").select("*").order("start_date");
@@ -66,6 +98,27 @@ export const travelRepository = {
     if (!authData.user) return new Map<string, TripRole>();
     const { data, error } = await supabase.from("tg_trip_members").select("trip_id, role").eq("user_id", authData.user.id);
     return new Map<string, TripRole>(result(data, error).map((row: { trip_id: string; role: string }) => [row.trip_id, row.role as TripRole]));
+  },
+
+  async getEditableTrips() {
+    const supabase = createClient();
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError) throw new Error(authError.message);
+    if (!authData.user) return [];
+    const { data: profileData, error: profileError } = await supabase.from("tg_profiles")
+      .select("platform_role").eq("id", authData.user.id).maybeSingle();
+    if (profileError) throw new Error(profileError.message);
+    let query = supabase.from("tg_trips").select("*").eq("mode", "trip").order("start_date");
+    if (profileData?.platform_role !== "admin") {
+      const { data: membershipData, error: membershipError } = await supabase.from("tg_trip_members")
+        .select("trip_id").eq("user_id", authData.user.id);
+      if (membershipError) throw new Error(membershipError.message);
+      const tripIds = membershipData.map((membership: { trip_id: string }) => membership.trip_id);
+      if (tripIds.length === 0) return [];
+      query = query.in("id", tripIds);
+    }
+    const { data, error } = await query;
+    return result(data, error).map((row: unknown) => mapTrip(row as TgTripRow));
   },
 
   async getTripEditors(tripId: string): Promise<TripEditor[]> {
@@ -129,18 +182,18 @@ export const travelRepository = {
     if (error) throw new Error(error.message);
   },
 
-  async saveTrip(input: Pick<Trip, "name" | "startDate" | "endDate"> & { id?: string; ownerId?: string; isPublic?: boolean }) {
+  async saveTrip(input: Pick<Trip, "name" | "mode" | "startDate" | "endDate"> & { id?: string; ownerId?: string; isPublic?: boolean }) {
     const supabase = createClient();
     if (input.id) {
       const { data, error } = await supabase.from("tg_trips").update({
-        name: input.name, start_date: input.startDate, end_date: input.endDate,
+        name: input.name, mode: input.mode, start_date: input.startDate, end_date: input.endDate,
       }).eq("id", input.id).select().single();
       return mapTrip(result(data, error) as TgTripRow);
     }
     const { data: authData, error: authError } = await supabase.auth.getUser();
     if (authError || !authData.user) throw new Error("請先登入再新增旅行");
     const { data, error } = await supabase.from("tg_trips").insert({
-      owner_id: authData.user.id, name: input.name, start_date: input.startDate, end_date: input.endDate,
+      owner_id: authData.user.id, name: input.name, mode: input.mode, start_date: input.startDate, end_date: input.endDate,
       is_public: input.isPublic ?? true,
     }).select().single();
     return mapTrip(result(data, error) as TgTripRow);
@@ -246,6 +299,8 @@ export const travelRepository = {
       date: input.date, name: input.name, google_maps_url: input.googleMapsUrl,
       extra_link_1: input.extraLink1 ?? null, extra_link_2: input.extraLink2 ?? null,
       business_hours: input.businessHours ?? null, note: input.note, image_path: nextImagePath,
+      status: input.status, rating: input.rating, completed_date: input.completedDate,
+      experience_note: input.experienceNote || null, consumed_items: input.consumedItems || null,
       image_fit: input.imageFit, sort_order: sortOrder,
     };
     let saved: TravelItem;
@@ -275,6 +330,86 @@ export const travelRepository = {
       }
     }
     return { item: saved, cleanupWarning };
+  },
+
+  async duplicateItem(itemId: string) {
+    const supabase = createClient();
+    const { data: sourceData, error: sourceError } = await supabase.from("tg_travel_items").select("*").eq("id", itemId).single();
+    const source = result(sourceData, sourceError) as TgTravelItemRow;
+    const { data: tripData, error: tripError } = await supabase.from("tg_trips").select("mode").eq("id", source.trip_id).single();
+    const tripMode = (result(tripData, tripError) as Pick<TgTripRow, "mode">).mode ?? "trip";
+    let lastQuery = supabase.from("tg_travel_items").select("sort_order").eq("trip_id", source.trip_id);
+    lastQuery = source.date ? lastQuery.eq("date", source.date) : lastQuery.is("date", null);
+    const { data: lastData, error: lastError } = await lastQuery.order("sort_order", { ascending: false }).limit(1).maybeSingle();
+    if (lastError) throw new Error(lastError.message);
+    const { data: destinationData, error: destinationError } = await supabase.from("tg_travel_items").insert({
+      trip_id: source.trip_id,
+      type: source.type,
+      category: source.category,
+      area: source.area,
+      date: tripMode === "collection" ? null : source.date,
+      name: source.name,
+      google_maps_url: source.google_maps_url,
+      extra_link_1: source.extra_link_1,
+      extra_link_2: source.extra_link_2,
+      business_hours: source.business_hours,
+      note: source.note,
+      image_path: null,
+      status: tripMode === "collection" ? source.status : null,
+      rating: source.rating,
+      completed_date: tripMode === "collection" ? source.completed_date : null,
+      experience_note: source.experience_note,
+      consumed_items: source.consumed_items,
+      image_fit: source.image_fit,
+      sort_order: (lastData?.sort_order ?? -1) + 1,
+    }).select().single();
+    const destination = result(destinationData, destinationError) as TgTravelItemRow;
+    if (!source.image_path) return mapItem(destination);
+
+    try {
+      return await copyTravelItemImage(source.image_path, source.trip_id, destination.id);
+    } catch (cause) {
+      const cleanupIssues: string[] = [];
+      try {
+        await removeIncompleteTravelItem(destination.id);
+      } catch (cleanupError) {
+        cleanupIssues.push(`無法刪除複本資料：${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`);
+      }
+      const reason = cause instanceof Error ? cause.message : String(cause);
+      const cleanup = cleanupIssues.length > 0 ? `；補償清理不完整：${cleanupIssues.join("；")}` : "；已完成補償清理";
+      throw new Error(`複製項目圖片失敗：${reason}${cleanup}`);
+    }
+  },
+
+  async addCollectionItemToTrip(source: TravelItem, targetTripId: string, targetDate: string) {
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc("tg_add_collection_item_to_trip", {
+      p_source_item_id: source.id,
+      p_target_trip_id: targetTripId,
+      p_target_date: targetDate,
+    });
+    const destinationItemId = result(data, error) as string;
+    if (!source.imagePath) return destinationItemId;
+    try {
+      await copyTravelItemImage(source.imagePath, targetTripId, destinationItemId);
+      return destinationItemId;
+    } catch (cause) {
+      const cleanupIssues: string[] = [];
+      try {
+        await removeIncompleteTravelItem(destinationItemId);
+      } catch (cleanupError) {
+        cleanupIssues.push(`無法刪除未完成的旅程項目：${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`);
+      }
+      const reason = cause instanceof Error ? cause.message : String(cause);
+      const cleanup = cleanupIssues.length > 0 ? `；補償清理不完整：${cleanupIssues.join("；")}` : "；已完成補償清理";
+      throw new Error(`加入旅程圖片失敗：${reason}${cleanup}`);
+    }
+  },
+
+  async updateItemStatus(itemId: string, status: NonNullable<TravelItem["status"]>) {
+    const { data, error } = await createClient().from("tg_travel_items")
+      .update({ status }).eq("id", itemId).select().single();
+    return mapItem(result(data, error) as TgTravelItemRow);
   },
 
   async deleteItem(itemId: string) {

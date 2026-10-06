@@ -2,7 +2,7 @@ import type { TgFlightRow, TgHotelStayRow, TgTransportationRow, TgTravelItemRow,
 import type { Flight, HotelStay, Transportation, TravelItem, Trip, TripResource } from "@/lib/types";
 
 export const mapTrip = (row: TgTripRow): Trip => ({
-  id: row.id, ownerId: row.owner_id, name: row.name, startDate: row.start_date,
+  id: row.id, ownerId: row.owner_id, name: row.name, mode: row.mode ?? "trip", startDate: row.start_date,
   endDate: row.end_date, isPublic: row.is_public, createdAt: row.created_at, updatedAt: row.updated_at,
 });
 
@@ -11,7 +11,9 @@ export const mapItem = (row: TgTravelItemRow): TravelItem => ({
   category: row.category, area: row.area, date: row.date, name: row.name,
   googleMapsUrl: row.google_maps_url, extraLink1: row.extra_link_1 ?? undefined,
   extraLink2: row.extra_link_2 ?? undefined, businessHours: row.business_hours ?? undefined,
-  note: row.note, imagePath: row.image_path ?? undefined, imageFit: row.image_fit ?? "cover",
+  note: row.note, status: row.status, rating: row.rating, completedDate: row.completed_date,
+  experienceNote: row.experience_note ?? "", consumedItems: row.consumed_items ?? "",
+  imagePath: row.image_path ?? undefined, imageFit: row.image_fit ?? "cover",
   order: row.sort_order, createdAt: row.created_at, updatedAt: row.updated_at,
 });
 
