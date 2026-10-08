@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowUpDown, CalendarDays, CarFront, ChevronRight, Clock3, Copy, Ellipsis, FolderHeart, Hotel, Link2, MapPin, MapPinned, MapPinPlus, Navigation, Plane, Search, SquarePen, Trash2, UtensilsCrossed, X } from "lucide-react";
+import { ArrowLeft, ArrowUpDown, CalendarCheck, CalendarDays, CarFront, ChevronRight, Clock3, Copy, Ellipsis, FolderHeart, Hotel, Link2, MapPin, MapPinned, MapPinPlus, Navigation, Plane, Search, SquarePen, TicketCheck, Trash2, UtensilsCrossed, X } from "lucide-react";
 import { closestCenter, DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -12,7 +12,7 @@ import { AddIconButton } from "@/components/add-icon-button";
 import { AddCollectionItemToTripDialog } from "@/components/add-collection-item-to-trip-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { ClampedNote } from "@/components/clamped-note";
+import { ClampedNote, LinkifiedText } from "@/components/clamped-note";
 import { FlightDialog } from "@/components/flight-dialog";
 import { HotelStayDialog } from "@/components/hotel-stay-dialog";
 import { isDailyCardInteractiveTarget, MobileDailySwipeActions, MobileSwipeActions, useMobileSwipeGroup } from "@/components/mobile-daily-swipe-actions";
@@ -50,6 +50,7 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
   const [sort, setSort] = useState<TravelItemSort>(initialTrip?.mode === "collection" ? "area" : "date");
   const [dialog, setDialog] = useState<{ open: boolean; type: TravelItemType; item?: TravelItem; initialDate?: string; allowTypeChange?: boolean; desktopTwoColumn?: boolean }>({ open: false, type: "place" });
   const [importOpen, setImportOpen] = useState(false);
+  const [outlineRefreshVersion, setOutlineRefreshVersion] = useState(0);
   const [deleting, setDeleting] = useState<TravelItem>();
   const [addingToTrip, setAddingToTrip] = useState<TravelItem>();
   const [editableTrips, setEditableTrips] = useState<Trip[]>([]);
@@ -138,8 +139,14 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
       <div className="sm:hidden"><TripPrimaryNav activeTab={tab} onTabChange={setTab} collection={trip.mode === "collection"} /></div>
       {trip.mode === "trip" && tab === "daily" && <Daily trip={trip} items={items} canEdit={canEdit} onAdd={(date) => setDialog({ open: true, type: "place", initialDate: date, allowTypeChange: true })} onEdit={edit} onDelete={remove} onReorder={reorder} />}
       {(tab === "place" || tab === "food") && <ItemList type={tab} items={items} query={query} sort={sort} collection={trip.mode === "collection"} canEdit={canEdit} canAddToTrip={trip.mode === "collection" && canEdit && editableTrips.length > 0} onQuery={setQuery} onSort={setSort} onAdd={() => setDialog({ open: true, type: tab, desktopTwoColumn: true })} onEdit={editListItem} onAddToTrip={setAddingToTrip} onDuplicate={duplicate} onDelete={remove} onToggleStatus={toggleCollectionStatus} />}
-      {tab === "outline" && (trip.mode === "collection" ? <CollectionOutline items={items} /> : <Outline trip={trip} items={items} canEdit={canEdit} initialFlights={initialFlights} initialHotelStays={initialHotelStays} initialTransportations={initialTransportations} />)}
-      {canEdit && <TravelItemImportDialog open={importOpen} trip={trip} onOpenChange={setImportOpen} onImported={refresh} />}
+      {tab === "outline" && (trip.mode === "collection" ? <CollectionOutline items={items} /> : <Outline trip={trip} items={items} canEdit={canEdit} initialFlights={initialFlights} initialHotelStays={initialHotelStays} initialTransportations={initialTransportations} refreshVersion={outlineRefreshVersion} />)}
+      {canEdit && <TravelItemImportDialog open={importOpen} trip={trip} onOpenChange={setImportOpen} onImported={async (mode) => {
+        if (mode === "itinerary") {
+          await refresh();
+        } else {
+          setOutlineRefreshVersion((version) => version + 1);
+        }
+      }} />}
       <TravelItemDialog open={dialog.open} type={dialog.type} trip={trip} item={dialog.item} items={items} initialDate={dialog.initialDate} allowTypeChange={dialog.allowTypeChange} desktopTwoColumn={dialog.desktopTwoColumn} onTypeChange={(type) => setDialog((value) => ({ ...value, type }))} onOpenChange={(open) => setDialog((value) => ({ ...value, open }))} onSave={async (value) => {
         const { imageFile, ...itemValue } = value;
         try {
@@ -265,14 +272,14 @@ function ItemCard({ item, canEdit, canAddToTrip = false, collection = false, onE
         {item.imagePath && <TravelItemCardImage item={item} url={imageUrl} mobile />}
         <section className="flex min-w-0 flex-1 flex-col justify-start gap-3 pb-4">
           <ItemCompactBusinessHours item={item} />
-          {item.note && <ClampedNote note={item.note} lines={reviewVisible ? 1 : 5} showMarker={false} hideMoreAction onOverflowChange={(overflow) => setMobileOverflow((current) => current.note === overflow ? current : { ...current, note: overflow })} textClassName={CARD_NOTE_TYPOGRAPHY} />}
+          {item.note && <ClampedNote note={item.note} lines={reviewVisible ? 1 : 5} linkify showMarker={false} hideMoreAction onOverflowChange={(overflow) => setMobileOverflow((current) => current.note === overflow ? current : { ...current, note: overflow })} textClassName={CARD_NOTE_TYPOGRAPHY} />}
           {reviewVisible && <ReviewInfo item={item} collection={collection} onOverflowChange={(overflow) => setMobileOverflow((current) => current.completed === overflow ? current : { ...current, completed: overflow })} />}
         </section>
         {hasMobileFooterActions && <footer className="mt-auto flex min-h-12 shrink-0 items-center border-t border-divider">
           <div className="flex items-center gap-4">
             {hasMobileMore && <MoreDetailsAction onClick={() => setDetailsOpen(true)} />}
             {item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} />}
-            {item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} />}
+            {item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} itemType={item.type} />}
           </div>
         </footer>}
       </article>
@@ -289,7 +296,7 @@ function ItemCard({ item, canEdit, canAddToTrip = false, collection = false, onE
         <div className="flex min-w-0 flex-1 gap-4 pb-5">
           <section className="flex min-w-0 flex-1 flex-col gap-3">
             <ItemCompactBusinessHours item={item} />
-            {item.note && <ClampedNote note={item.note} lines={reviewVisible ? 1 : 5} showMarker={false} hideMoreAction onOverflowChange={(overflow) => setDesktopOverflow((current) => current.note === overflow ? current : { ...current, note: overflow })} textClassName={CARD_NOTE_TYPOGRAPHY} />}
+            {item.note && <ClampedNote note={item.note} lines={reviewVisible ? 1 : 5} linkify showMarker={false} hideMoreAction onOverflowChange={(overflow) => setDesktopOverflow((current) => current.note === overflow ? current : { ...current, note: overflow })} textClassName={CARD_NOTE_TYPOGRAPHY} />}
             {reviewVisible && <ReviewInfo item={item} collection={collection} onOverflowChange={(overflow) => setDesktopOverflow((current) => current.completed === overflow ? current : { ...current, completed: overflow })} />}
           </section>
           {item.imagePath && <TravelItemCardImage item={item} url={imageUrl} />}
@@ -298,7 +305,7 @@ function ItemCard({ item, canEdit, canAddToTrip = false, collection = false, onE
           <div className="flex items-center gap-4">
             {hasDesktopMore && <MoreDetailsAction onClick={() => setDetailsOpen(true)} quiet />}
             {item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} quiet />}
-            {item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} quiet />}
+            {item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} itemType={item.type} quiet />}
           </div>
           {canEdit && <div className="ml-auto flex items-center gap-4">{canAddToTrip && <Action label="加入旅程" quiet onClick={onAddToTrip}><MapPinPlus /></Action>}<Action label="編輯" quiet onClick={onEdit}><SquarePen /></Action><Action label="複製" quiet onClick={onDuplicate}><Copy /></Action><Action label="刪除" quiet onClick={onDelete}><Trash2 /></Action></div>}
         </footer>
@@ -307,7 +314,7 @@ function ItemCard({ item, canEdit, canAddToTrip = false, collection = false, onE
       </>
     );
   }
-  return <article className="rounded-card border border-border bg-surface p-6 shadow-soft"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><ItemName item={item} /><p className="mt-2 text-xs text-muted">{item.date ? displayDate(item.date) : "未定"} · {item.category || (item.type === "place" ? "地點" : "美食")}</p></div>{canEdit && <div className="flex shrink-0">{controls}<Action label="編輯" onClick={onEdit}><SquarePen /></Action><Action label="刪除" onClick={onDelete}><Trash2 /></Action></div>}</div><div className="my-4 border-t border-divider" />{item.area && <p className="text-sm text-muted">{item.area}</p>}<BusinessHours item={item} compact={compactBusiness} />{item.note && <p className="mt-3 whitespace-pre-wrap text-sm text-muted">{item.note}</p>}</article>;
+  return <article className="rounded-card border border-border bg-surface p-6 shadow-soft"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><ItemName item={item} /><p className="mt-2 text-xs text-muted">{item.date ? displayDate(item.date) : "未定"} · {item.category || (item.type === "place" ? "地點" : "美食")}</p></div>{canEdit && <div className="flex shrink-0">{controls}<Action label="編輯" onClick={onEdit}><SquarePen /></Action><Action label="刪除" onClick={onDelete}><Trash2 /></Action></div>}</div><div className="my-4 border-t border-divider" />{item.area && <p className="text-sm text-muted">{item.area}</p>}<BusinessHours item={item} compact={compactBusiness} />{item.note && <p className="mt-3 whitespace-pre-wrap break-words text-sm text-muted"><LinkifiedText text={item.note} /></p>}</article>;
 }
 
 function CardMetadata({ item, collection, canEdit, onToggleStatus, mobile = false }: { item: TravelItem; collection: boolean; canEdit: boolean; onToggleStatus: () => void; mobile?: boolean }) {
@@ -370,7 +377,7 @@ function ItemDetailsDialog({ item, open, onOpenChange }: { item: TravelItem; ope
     { label: "吃了什麼", value: reviewVisible ? item.consumedItems : "", className: "text-[#333333]" },
     { label: "心得", value: reviewVisible ? item.experienceNote : "", className: "text-muted" },
   ].filter((section) => Boolean(section.value));
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent title="完整內容"><div className="divide-y divide-divider">{sections.map((section) => <section key={section.label} className="py-4 first:pt-0 last:pb-0"><h3 className="mb-2 text-xs font-medium text-ink">{section.label}</h3><p className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${section.className}`}>{section.value}</p></section>)}</div></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent title="完整內容"><div className="divide-y divide-divider">{sections.map((section) => <section key={section.label} className="py-4 first:pt-0 last:pb-0"><h3 className="mb-2 text-xs font-medium text-ink">{section.label}</h3><p className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${section.className}`}>{section.label === "備註" ? <LinkifiedText text={section.value} /> : section.value}</p></section>)}</div></DialogContent></Dialog>;
 }
 
 function hasReviewInfo(item: TravelItem, collection: boolean) {
@@ -462,12 +469,12 @@ function DailyCard({ item, canEdit, swipeOpen = false, swipeDragging = false, on
         <DailyDesktopInfo item={item} />
         <DailyExternalLinks item={item} />
       </div>
-      {item.note && <div className="border-t border-divider/60 px-6 py-3"><ClampedNote note={item.note} lines={1} showMarker={false} moreLabel="more+" inlineMore textClassName={CARD_NOTE_TYPOGRAPHY} /></div>}
+      {item.note && <div className="border-t border-divider/60 px-6 py-3"><ClampedNote note={item.note} lines={1} linkify showMarker={false} moreLabel="more+" inlineMore textClassName={CARD_NOTE_TYPOGRAPHY} /></div>}
     </MobileDailySwipeActions>
     <div className="hidden min-h-[130px] min-w-0 grid-cols-[56px_208px_minmax(0,1fr)_56px_56px] sm:grid md:grid-cols-[64px_264px_minmax(0,1fr)_64px_64px] lg:grid-cols-[72px_288px_minmax(0,1fr)_72px_72px] xl:grid-cols-[72px_336px_minmax(0,1fr)_72px_72px]">
       <div className="flex items-center justify-center"><TypeMark item={item} /></div>
       <DailyDesktopInfo item={item} />
-      <div className="min-w-0 border-l border-divider/60 px-4 pt-[27px] md:px-5">{item.note && <div className="min-w-0"><ClampedNote note={item.note} lines={3} textClassName={CARD_NOTE_TYPOGRAPHY} showMarker={false} /></div>}</div>
+      <div className="min-w-0 border-l border-divider/60 px-4 pt-[27px] md:px-5">{item.note && <div className="min-w-0"><ClampedNote note={item.note} lines={3} linkify textClassName={CARD_NOTE_TYPOGRAPHY} showMarker={false} /></div>}</div>
       <DailyExternalLinks item={item} />
       <DailyDesktopManageActions canEdit={canEdit} onEdit={onEdit} onDelete={onDelete} />
     </div>
@@ -475,11 +482,10 @@ function DailyCard({ item, canEdit, swipeOpen = false, swipeDragging = false, on
 }
 
 function DailyDesktopInfo({ item }: { item: TravelItem }) {
-  const status = item.businessHours ? getBusinessStatus(item.businessHours) : null;
   return <div className="flex min-w-0 flex-col justify-center border-l border-divider/60 px-[15px]">
     <DailyItemName item={item} />
     {(item.area || item.category) && <div className="mt-[14px] text-xs leading-4 text-muted"><LocationCategory item={item} wrapOnDesktop /></div>}
-    {item.businessHours && <div className="mt-[10px] flex min-w-0 flex-wrap items-center gap-2 text-xs leading-4 text-muted"><Clock3 className="h-4 w-4 shrink-0" /><span className="min-w-0 break-words">{item.businessHours}</span>{status && <BusinessStatusLabel status={status} desktopEnglish desktopCompact />}</div>}
+    <BusinessInfo item={item} className="mt-[10px] text-xs leading-4" desktopEnglish desktopCompact />
   </div>;
 }
 
@@ -502,7 +508,7 @@ function DailyItemName({ item }: { item: TravelItem }) {
 }
 
 function DailyExternalLinks({ item }: { item: TravelItem }) {
-  return <div className="flex flex-col items-center justify-center gap-1 border-l border-divider/60" data-no-dnd>{item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} quiet />}{item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} quiet />}</div>;
+  return <div className="flex flex-col items-center justify-center gap-1 border-l border-divider/60" data-no-dnd>{item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} quiet />}{item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} itemType={item.type} quiet />}</div>;
 }
 
 function DailyDesktopManageActions({ canEdit, onEdit, onDelete }: { canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
@@ -552,7 +558,7 @@ function CollectionOutlineGroup({ label, items, completed = false }: { label: st
   })}</div></div>)}</div>}</section>;
 }
 
-function Outline({ trip, items, canEdit, initialFlights, initialHotelStays, initialTransportations }: { trip: Trip; items: TravelItem[]; canEdit: boolean; initialFlights: Flight[]; initialHotelStays: HotelStay[]; initialTransportations: Transportation[] }) {
+function Outline({ trip, items, canEdit, initialFlights, initialHotelStays, initialTransportations, refreshVersion }: { trip: Trip; items: TravelItem[]; canEdit: boolean; initialFlights: Flight[]; initialHotelStays: HotelStay[]; initialTransportations: Transportation[]; refreshVersion: number }) {
   const [flights, setFlights] = useState<Flight[]>(initialFlights);
   const [hotelStays, setHotelStays] = useState<HotelStay[]>(initialHotelStays);
   const [transportations, setTransportations] = useState<Transportation[]>(initialTransportations);
@@ -572,6 +578,9 @@ function Outline({ trip, items, canEdit, initialFlights, initialHotelStays, init
       toast.error(errorMessage(error, "無法載入行程大綱"));
     }
   }, [trip.id]);
+  useEffect(() => {
+    if (refreshVersion > 0) void refresh();
+  }, [refresh, refreshVersion]);
   const sections = [...tripDates(trip).map((date) => ({ date, items: items.filter((item) => item.date === date) })), { date: undefined, items: items.filter((item) => !item.date) }];
   const sortedFlights = [...flights].sort((a, b) => `${a.departureDate}T${a.departureTime}`.localeCompare(`${b.departureDate}T${b.departureTime}`) || a.createdAt.localeCompare(b.createdAt));
   const sortedStays = [...hotelStays].sort((a, b) => a.checkInDate.localeCompare(b.checkInDate) || a.createdAt.localeCompare(b.createdAt));
@@ -613,7 +622,7 @@ function FlightCard({ flight, canEdit, swipeOpen, onSwipeOpen, onSwipeClose, onE
     <header className="flex min-w-0 items-center justify-between gap-4 pb-5"><div className="flex min-w-0 items-center gap-4"><span className="truncate font-medium">{flight.airline}</span><span className="shrink-0 text-sm text-muted">{flight.flightNumber}</span></div><div className="flex min-w-0 shrink-0 items-center gap-2 text-sm text-muted"><span className="max-w-20 truncate sm:max-w-none">{flight.departurePlace}</span><ChevronRight className="h-4 w-4 shrink-0" /><span className="max-w-20 truncate sm:max-w-none">{flight.arrivalPlace}</span></div></header>
     <div className="border-t border-divider" />
     <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2 py-6"><div className="shrink-0 text-sm text-muted"><time dateTime={flight.departureDate}><DailyDateLabel date={flight.departureDate} /></time>{crossesDate && <><span className="mx-2">–</span><time dateTime={flight.arrivalDate}><DailyDateLabel date={flight.arrivalDate} /></time></>}</div><div className="flex items-center gap-3 text-title font-medium"><time dateTime={flight.departureTime}>{flight.departureTime}</time><ChevronRight className="h-4 w-4 text-muted" /><time dateTime={flight.arrivalTime}>{flight.arrivalTime}</time></div></div>
-    {flight.note && <div className="pb-5"><ClampedNote note={flight.note} lines={2} /></div>}
+    {flight.note && <div className="pb-5"><ClampedNote note={flight.note} lines={2} showMarker={false} textClassName="leading-[1.65]" /></div>}
     <footer className={`${flight.link ? "flex" : "hidden"} mt-auto h-14 items-center border-t border-divider sm:flex`}><div>{flight.link && <ExternalLinkAction href={flight.link} index={1} />}</div>{canEdit && <div className="ml-auto hidden items-center gap-4 sm:flex"><Action label="編輯" smallIcon onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onClick={onDelete}><Trash2 /></Action></div>}</footer>
   </article>
   </MobileSwipeActions>;
@@ -628,7 +637,7 @@ function HotelStayCard({ stay, canEdit, swipeOpen, onSwipeOpen, onSwipeClose, on
     <div className="mt-5 border-t border-divider" />
     <div className="space-y-4 py-6"><p className="text-center font-medium"><time dateTime={stay.checkInDate}><DailyDateLabel date={stay.checkInDate} /></time><span className="mx-3 text-muted">–</span><time dateTime={stay.checkOutDate}><DailyDateLabel date={stay.checkOutDate} /></time></p>
       {hasTimes && <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 rounded-pill bg-searchBackground px-4 py-2 text-sm text-muted">{stay.checkInTime && <span>入住&nbsp; {stay.checkInTime}</span>}{stay.checkOutTime && <span>退房&nbsp; {stay.checkOutTime}</span>}</div>}
-      {stay.address && <ContactRow label="地址" value={stay.address} />}{stay.phone && <ContactRow label="電話" value={stay.phone} />}{stay.note && <ClampedNote note={stay.note} lines={2} />}
+      {stay.address && <ContactRow label="地址" value={stay.address} />}{stay.phone && <ContactRow label="電話" value={stay.phone} />}{stay.note && <ClampedNote note={stay.note} lines={2} showMarker={false} textClassName="leading-[1.65]" />}
     </div>
     <footer className={`${stay.link ? "flex" : "hidden"} mt-auto h-14 items-center border-t border-divider sm:flex`}><div className="ml-auto flex items-center gap-4 sm:ml-0">{stay.link && <ExternalLinkAction href={stay.link} index={1} />}{stay.googleMapsUrl && <a href={stay.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label="開啟 Google Maps" title="開啟 Google Maps" className="hidden h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-[#555555] sm:flex sm:h-9 sm:w-9"><Navigation className="h-4 w-4" /></a>}</div>{canEdit && <div className="ml-auto hidden items-center gap-4 sm:flex"><Action label="編輯" smallIcon onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onClick={onDelete}><Trash2 /></Action></div>}</footer>
   </article>
@@ -668,14 +677,22 @@ function ContactRow({ label, value }: { label: string; value: string }) {
 
 function ItemName({ item }: { item: TravelItem }) { return item.googleMapsUrl ? <a href={item.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 font-medium hover:text-[#555555]"><span>{item.name}</span><MapPinned className="h-4 w-4 shrink-0" /></a> : <p className="font-medium">{item.name}</p>; }
 function ItemCompactBusinessHours({ item }: { item: TravelItem }) {
-  if (!item.businessHours) return null;
-  const status = getBusinessStatus(item.businessHours);
-  return <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs leading-[1.65] text-muted"><Clock3 className="h-4 w-4 shrink-0" /><span className="min-w-0 break-words">{item.businessHours}</span>{status && <BusinessStatusLabel status={status} desktopEnglish desktopCompact />}</div>;
+  return <BusinessInfo item={item} className="text-xs leading-[1.65]" desktopEnglish desktopCompact />;
 }
 function BusinessHours({ item, compact, flush = false }: { item: TravelItem; compact: boolean; flush?: boolean }) {
-  if (!item.businessHours) return null;
-  const status = getBusinessStatus(item.businessHours);
-  return <div className={`flex min-w-0 flex-wrap items-center gap-2 leading-4 text-muted ${compact ? `${flush ? "" : "mt-2"} text-xs` : `${flush ? "" : "mt-3"} text-sm`}`}><Clock3 className="h-4 w-4 shrink-0" /><span className="min-w-0 break-words">{item.businessHours}</span>{status && <BusinessStatusLabel status={status} />}</div>;
+  return <BusinessInfo item={item} className={`leading-4 ${compact ? `${flush ? "" : "mt-2"} text-xs` : `${flush ? "" : "mt-3"} text-sm`}`} />;
+}
+function BusinessInfo({ item, className, desktopEnglish = false, desktopCompact = false }: { item: TravelItem; className: string; desktopEnglish?: boolean; desktopCompact?: boolean }) {
+  if (!item.businessHours && !item.closedDaysText) return null;
+  const status = getBusinessStatus(item.businessHours, { closedRuleType: item.closedRuleType, closedRuleValues: item.closedRuleValues });
+  return <div className={`flex min-w-0 flex-wrap items-center gap-2 text-muted ${className}`}>
+    {item.businessHours && <><Clock3 className="h-4 w-4 shrink-0" /><span className="min-w-0 break-words">{item.businessHours}</span></>}
+    {status && <BusinessStatusLabel status={status} desktopEnglish={desktopEnglish} desktopCompact={desktopCompact} />}
+    {item.closedDaysText && <ClosedDaysLabel text={item.closedDaysText} compact={desktopCompact} />}
+  </div>;
+}
+function ClosedDaysLabel({ text, compact = false }: { text: string; compact?: boolean }) {
+  return <span title={`休｜${text}`} className={`inline-flex min-w-0 max-w-[min(240px,65vw)] shrink items-center overflow-hidden rounded-[5px] border border-badgeBorder bg-surface text-badgeText ${compact ? "h-[17px] px-[6px] text-[9px] leading-[15px]" : "px-2 py-0.5 text-[11px] leading-4"}`}><span className="shrink-0">休</span><span aria-hidden="true" className="mx-1 shrink-0 text-muted">｜</span><span className="min-w-0 truncate">{text}</span></span>;
 }
 function BusinessStatusLabel({ status, desktopEnglish = false, desktopCompact = false }: { status: BusinessStatus; desktopEnglish?: boolean; desktopCompact?: boolean }) {
   const values = {
@@ -686,9 +703,10 @@ function BusinessStatusLabel({ status, desktopEnglish = false, desktopCompact = 
   const value = values[status];
   return <span className={`inline-flex shrink-0 items-center rounded-[5px] text-[#333333] ${desktopCompact ? "h-[15px] px-[7px] py-0 text-[9px] leading-[15px]" : "px-2 py-0.5 text-[11px] leading-4"} ${value.className}`}>{desktopEnglish ? value.desktopLabel : <><span className="sm:hidden">{value.mobileLabel}</span><span className="hidden sm:inline">{value.label}</span></>}</span>;
 }
-function ExternalLinkAction({ href, index, quiet = false }: { href: string; index: 1 | 2; quiet?: boolean }) {
-  const label = `開啟其他連結 ${index}`;
-  return <a href={href} target="_blank" rel="noopener noreferrer" aria-label={label} title={label} onPointerDown={stopDrag} className={`flex h-11 w-11 items-center justify-center rounded-full text-muted hover:text-[#555555] sm:h-9 sm:w-9 ${quiet ? "bg-transparent hover:bg-transparent" : "hover:bg-bg"}`}><Link2 className="h-4 w-4" /></a>;
+function ExternalLinkAction({ href, index, itemType, quiet = false }: { href: string; index: 1 | 2; itemType?: TravelItemType; quiet?: boolean }) {
+  const label = index === 2 && itemType ? itemType === "food" ? "訂位" : "訂票" : `開啟其他連結 ${index}`;
+  const icon = index === 2 && itemType ? itemType === "food" ? <CalendarCheck className="h-4 w-4" /> : <TicketCheck className="h-4 w-4" /> : <Link2 className="h-4 w-4" />;
+  return <a href={href} target="_blank" rel="noopener noreferrer" aria-label={label} title={label} onPointerDown={stopDrag} className={`flex h-11 w-11 items-center justify-center rounded-full text-muted hover:text-[#555555] sm:h-9 sm:w-9 ${quiet ? "bg-transparent hover:bg-transparent" : "hover:bg-bg"}`}>{icon}</a>;
 }
 function Action({ label, onClick, onPointerDown, children, disabled, quiet = false }: { label: string; onClick: () => void; onPointerDown?: React.PointerEventHandler<HTMLButtonElement>; children: React.ReactElement; disabled?: boolean; smallIcon?: boolean; quiet?: boolean }) { return <button type="button" aria-label={label} title={label} disabled={disabled} onPointerDown={onPointerDown} onClick={onClick} className={`flex h-11 w-11 items-center justify-center rounded-full text-muted hover:text-[#555555] disabled:opacity-30 sm:h-9 sm:w-9 ${quiet ? "border-0 bg-transparent shadow-none hover:bg-transparent" : "hover:bg-bg"}`}><span className="[&>svg]:h-4 [&>svg]:w-4">{children}</span></button>; }
 

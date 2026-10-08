@@ -25,6 +25,8 @@ export type TgTravelItemRow = {
   id: string; trip_id: string; created_by: string | null; type: "place" | "food";
   category: string; area: string; date: string | null; name: string; google_maps_url: string;
   extra_link_1: string | null; extra_link_2: string | null; business_hours: string | null;
+  closed_days_text: string | null; closed_rule_type: "weekday" | "monthly_date" | "specific_date" | "irregular" | null;
+  closed_rule_values: (number | string)[] | null;
   note: string; status: "planned" | "completed" | null; rating: number | null;
   completed_date: string | null; experience_note: string | null; consumed_items: string | null;
   image_path: string | null; image_fit: "cover" | "contain";

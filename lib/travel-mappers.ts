@@ -11,6 +11,8 @@ export const mapItem = (row: TgTravelItemRow): TravelItem => ({
   category: row.category, area: row.area, date: row.date, name: row.name,
   googleMapsUrl: row.google_maps_url, extraLink1: row.extra_link_1 ?? undefined,
   extraLink2: row.extra_link_2 ?? undefined, businessHours: row.business_hours ?? undefined,
+  closedDaysText: row.closed_days_text?.trim() || undefined, closedRuleType: row.closed_rule_type,
+  closedRuleValues: row.closed_rule_values,
   note: row.note, status: row.status, rating: row.rating, completedDate: row.completed_date,
   experienceNote: row.experience_note ?? "", consumedItems: row.consumed_items ?? "",
   imagePath: row.image_path ?? undefined, imageFit: row.image_fit ?? "cover",

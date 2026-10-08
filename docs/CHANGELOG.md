@@ -1,5 +1,51 @@
 # Changelog
 
+## TRIP GOGO — Flight and Hotel JSON Import
+
+Added
+
+- Extended the shared Trip JSON Import Dialog with separate itinerary, Flight, and Hotel modes, strict type-specific validation, and compact responsive previews.
+- Added repository-backed sequential Flight and Hotel imports that continue after individual write failures and report successful and failed source indexes.
+
+Changed
+
+- Reset pasted JSON, preview, validation, and result state whenever the import mode changes, preventing one schema from leaking into another.
+- Limited Collection imports and prompt shortcuts to itinerary items, while Trip workspaces expose all three modes and refresh Outline data after successful Flight or Hotel writes.
+- Reused the existing Flight/Hotel save paths and RLS policies without adding RPCs, migrations, Trip-range restrictions, or database changes.
+
+## TRIP GOGO — GPT Prompt Shortcuts and Paste Tolerance
+
+Changed
+
+- Added one-row Flight, Hotel, and itinerary prompt-copy shortcuts to the shared Import Dialog, with existing-schema JSON-array examples and type-specific success feedback.
+- Updated every GPT format prompt to request one copy-friendly JSON code block without surrounding prose, while retaining all Trip/Collection TravelItem semantics.
+- Accepted an outer Markdown JSON code fence before the existing TravelItem parser and validation pipeline without changing validation rules.
+- Vertically centered inline note URL icons without increasing the inherited note line height, including matching clamped-preview measurement.
+- Left-aligned the complete prompt shortcut group with Mobile dialog content while preserving the existing Desktop spacing.
+
+## TRIP GOGO — Travel Item Link and Import Prompt Polish
+
+Changed
+
+- Refined the shared Trip/Collection GPT prompt to prefer verified Google Maps destinations, type-specific reservation or ticket links, trustworthy supplemental links, and concise exceptional-hours notes without changing import validation or storage.
+- Gave Food and Place second links dedicated CalendarCheck and TicketCheck actions with matching type-specific Dialog labels while preserving link1 behavior and the existing footer layout.
+- Replaced HTTP(S) URLs in rendered Place/Food notes with safe accessible link icons, preserving original text, whitespace, and punctuation while keeping raw note values editable.
+- Matched the closed-day label separator to the existing muted header/menu separator tone without changing spacing or layout.
+
+## TRIP GOGO — Structured Closed Days
+
+Added
+
+- Added nullable display text, rule type, and JSON rule values for shared Trip/Collection Place and Food items, with weekly, monthly-date, specific-date, and irregular rules.
+- Added one shared editor that generates concise closed-day labels without exposing JSON, plus quiet width-limited card labels beside business hours and OPEN/CLOSE status.
+- Added client and database-boundary GPT JSON validation, concise prompt guidance, and automatic display-text generation when structured values are present.
+
+Changed
+
+- Business status now checks device-local structured closed-day rules before the existing business-hours calculation; irregular and display-only text never force CLOSE.
+- Item save, single-item duplication, whole Trip/Collection duplication, Collection-to-Trip copying, and batch import now preserve closed-day metadata.
+- Specific-date display text is capped at two dates plus an ellipsis while retaining every structured date for CLOSE evaluation.
+
 ## TRIP GOGO — Pending Invitation Refresh
 
 Added

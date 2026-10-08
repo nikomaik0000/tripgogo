@@ -4,6 +4,10 @@
 
 ### Done
 
+- Shared Trip Import Dialog modes for itinerary, Flight, and Hotel JSON, with strict previews, sequential repository writes, partial-failure results, Collection-only itinerary controls, and Outline refresh
+- Copy-friendly Flight/Hotel/itinerary GPT prompt shortcuts, fenced-JSON paste tolerance, Mobile action alignment, and inline note-link baseline refinement
+- Travel Item link and import-prompt polish with safe note URL icons, type-specific Food/Place link2 actions, verified-link guidance, concise exceptional-hours notes, and muted closed-day separators
+- Structured Place/Food closed days shared by Trip and Collection, with concise card labels, device-local CLOSE precedence, guided forms, GPT import validation, and complete copy-flow preservation
 - Session-independent pending invitation refresh, recipient-validated rejection, and immediate Homepage refresh after acceptance
 - Permission-aware Trip/Collection GPT JSON batch import with copied mode-specific prompts, blocking preview validation, and per-row RPC results
 - Collection Place/Food to Trip copying with dual edit authorization, date selection, independent images, and compact vertically centered Homepage cards

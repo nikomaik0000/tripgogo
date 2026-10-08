@@ -1,5 +1,7 @@
 export type TravelItemType = "place" | "food";
 export type TravelItemImageFit = "cover" | "contain";
+export type ClosedRuleType = "weekday" | "monthly_date" | "specific_date" | "irregular";
+export type ClosedRuleValue = number | string;
 export type TripMode = "trip" | "collection";
 export type CollectionItemStatus = "planned" | "completed";
 export type TripRole = "owner" | "editor";
@@ -62,6 +64,9 @@ export interface TravelItem {
   extraLink1?: string;
   extraLink2?: string;
   businessHours?: string;
+  closedDaysText?: string;
+  closedRuleType: ClosedRuleType | null;
+  closedRuleValues: ClosedRuleValue[] | null;
   note: string;
   status: CollectionItemStatus | null;
   rating: number | null;

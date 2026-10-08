@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { TgFlightRow, TgHotelStayRow, TgProfileRow, TgTransportationRow, TgTravelItemRow, TgTripInvitationRow, TgTripMemberRow, TgTripResourceRow, TgTripRow } from "@/lib/database.types";
 import { mapFlight, mapHotelStay, mapItem, mapTransportation, mapTrip, mapTripResource } from "@/lib/travel-mappers";
 import { getTravelItemImageExtensionFromPath, getTravelItemImageFormat } from "@/lib/travel-item-image";
-import type { TravelImportItem, TravelImportResult } from "@/lib/travel-import";
+import type { FlightImportItem, HotelImportItem, TravelImportItem, TravelImportResult } from "@/lib/travel-import";
 import type { Flight, HotelStay, PendingTripInvitation, Transportation, TransportationInput, TravelItem, Trip, TripEditor, TripInvitation, TripResource, TripRole } from "@/lib/types";
 
 const RESOURCE_IMAGE_BUCKET = "tg-trip-resources";
@@ -24,6 +24,20 @@ function result<T>(data: T | null, error: PostgrestError | null): T {
   if (error) throw new Error(error.message);
   if (data === null) throw new Error("Supabase did not return the requested data");
   return data;
+}
+
+async function importSequentially<T>(items: T[], save: (item: T) => Promise<unknown>): Promise<TravelImportResult> {
+  const failures: TravelImportResult["failures"] = [];
+  let successCount = 0;
+  for (const [index, item] of items.entries()) {
+    try {
+      await save(item);
+      successCount += 1;
+    } catch (error) {
+      failures.push({ index, message: error instanceof Error ? error.message : "寫入失敗" });
+    }
+  }
+  return { successCount, failureCount: failures.length, failures };
 }
 
 async function uploadTravelItemImage(tripId: string, file: File, itemId?: string) {
@@ -315,7 +329,9 @@ export const travelRepository = {
       trip_id: input.tripId, type: input.type, category: input.category, area: input.area,
       date: input.date, name: input.name, google_maps_url: input.googleMapsUrl,
       extra_link_1: input.extraLink1 ?? null, extra_link_2: input.extraLink2 ?? null,
-      business_hours: input.businessHours ?? null, note: input.note, image_path: nextImagePath,
+      business_hours: input.businessHours ?? null, closed_days_text: input.closedDaysText ?? null,
+      closed_rule_type: input.closedRuleType, closed_rule_values: input.closedRuleValues,
+      note: input.note, image_path: nextImagePath,
       status: input.status, rating: input.rating, completed_date: input.completedDate,
       experience_note: input.experienceNote || null, consumed_items: input.consumedItems || null,
       image_fit: input.imageFit, sort_order: sortOrder,
@@ -370,6 +386,9 @@ export const travelRepository = {
       extra_link_1: source.extra_link_1,
       extra_link_2: source.extra_link_2,
       business_hours: source.business_hours,
+      closed_days_text: source.closed_days_text,
+      closed_rule_type: source.closed_rule_type,
+      closed_rule_values: source.closed_rule_values,
       note: source.note,
       image_path: null,
       status: tripMode === "collection" ? source.status : null,
@@ -521,6 +540,10 @@ export const travelRepository = {
     return mapFlight(result(data, error) as TgFlightRow);
   },
 
+  async importFlights(tripId: string, items: FlightImportItem[]) {
+    return importSequentially(items, (item) => travelRepository.saveFlight({ ...item, tripId }));
+  },
+
   async deleteFlight(flightId: string) {
     const { error } = await createClient().from("tg_flights").delete().eq("id", flightId);
     if (error) throw new Error(error.message);
@@ -544,6 +567,10 @@ export const travelRepository = {
       : createClient().from("tg_hotel_stays").insert(values);
     const { data, error } = await query.select().single();
     return mapHotelStay(result(data, error) as TgHotelStayRow);
+  },
+
+  async importHotelStays(tripId: string, items: HotelImportItem[]) {
+    return importSequentially(items, (item) => travelRepository.saveHotelStay({ ...item, tripId }));
   },
 
   async deleteHotelStay(stayId: string) {

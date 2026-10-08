@@ -1,11 +1,25 @@
+import { isClosedOnDate } from "@/lib/closed-days";
+import type { ClosedRuleType, ClosedRuleValue } from "@/lib/types";
+
 export type BusinessStatus = "open" | "closing-soon" | "closed";
+
+type BusinessStatusOptions = {
+  currentDate?: Date;
+  closedRuleType?: ClosedRuleType | null;
+  closedRuleValues?: ClosedRuleValue[] | null;
+};
 
 const HOURS_PATTERN = /^(\d{2}):(\d{2})\s*[-–～~]\s*(\d{2}):(\d{2})$/;
 
 export function getBusinessStatus(
   businessHours: string | undefined,
-  currentDate = new Date()
+  options: Date | BusinessStatusOptions = {}
 ): BusinessStatus | undefined {
+  const currentDate = options instanceof Date ? options : options.currentDate ?? new Date();
+  const closedRuleType = options instanceof Date ? null : options.closedRuleType;
+  const closedRuleValues = options instanceof Date ? null : options.closedRuleValues;
+  if (isClosedOnDate(closedRuleType, closedRuleValues, currentDate)) return "closed";
+
   const value = businessHours?.trim();
   if (!value) return undefined;
   if (value === "24 小時") return "open";
