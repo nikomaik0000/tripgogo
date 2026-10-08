@@ -3,13 +3,22 @@ import { createClient } from "@/lib/supabase/client";
 import type { TgFlightRow, TgHotelStayRow, TgProfileRow, TgTransportationRow, TgTravelItemRow, TgTripInvitationRow, TgTripMemberRow, TgTripResourceRow, TgTripRow } from "@/lib/database.types";
 import { mapFlight, mapHotelStay, mapItem, mapTransportation, mapTrip, mapTripResource } from "@/lib/travel-mappers";
 import { getTravelItemImageExtensionFromPath, getTravelItemImageFormat } from "@/lib/travel-item-image";
-import type { Flight, HotelStay, Transportation, TransportationInput, TravelItem, Trip, TripEditor, TripInvitation, TripResource, TripRole } from "@/lib/types";
+import type { TravelImportItem, TravelImportResult } from "@/lib/travel-import";
+import type { Flight, HotelStay, PendingTripInvitation, Transportation, TransportationInput, TravelItem, Trip, TripEditor, TripInvitation, TripResource, TripRole } from "@/lib/types";
 
 const RESOURCE_IMAGE_BUCKET = "tg-trip-resources";
 const RESOURCE_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 const RESOURCE_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const TRAVEL_ITEM_IMAGE_BUCKET = "tg-travel-item-images";
 const TRAVEL_ITEM_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+
+type PendingTripInvitationRpcRow = {
+  invitation_id: string;
+  trip_id: string;
+  trip_name: string;
+  created_at: string;
+  expires_at: string | null;
+};
 
 function result<T>(data: T | null, error: PostgrestError | null): T {
   if (error) throw new Error(error.message);
@@ -139,25 +148,20 @@ export const travelRepository = {
 
   async getTripPendingInvitations(tripId: string): Promise<TripInvitation[]> {
     const { data, error } = await createClient().from("tg_trip_invitations").select("*")
-      .eq("trip_id", tripId).is("accepted_at", null).order("created_at");
+      .eq("trip_id", tripId).is("accepted_at", null)
+      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`).order("created_at");
     return (result(data, error) as TgTripInvitationRow[]).map(mapInvitation);
   },
 
-  async getMyPendingInvitations(): Promise<TripInvitation[]> {
-    const supabase = createClient();
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError) throw new Error(authError.message);
-    const email = authData.user?.email?.trim().toLowerCase();
-    if (!email) return [];
-    const { data, error } = await supabase.from("tg_trip_invitations").select("*")
-      .eq("email", email).is("accepted_at", null)
-      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`).order("created_at");
-    const invitations = (result(data, error) as TgTripInvitationRow[]).map(mapInvitation);
-    if (invitations.length === 0) return [];
-    const { data: tripData, error: tripError } = await supabase.from("tg_trips").select("id, name")
-      .in("id", invitations.map((invitation) => invitation.tripId));
-    const names = new Map<string, string>(result(tripData, tripError).map((trip: { id: string; name: string }) => [trip.id, trip.name]));
-    return invitations.map((invitation) => ({ ...invitation, tripName: names.get(invitation.tripId) }));
+  async getMyPendingInvitations(): Promise<PendingTripInvitation[]> {
+    const { data, error } = await createClient().rpc("tg_get_my_pending_trip_invitations");
+    return (result(data, error) as PendingTripInvitationRpcRow[]).map((invitation) => ({
+      id: invitation.invitation_id,
+      tripId: invitation.trip_id,
+      tripName: invitation.trip_name,
+      createdAt: invitation.created_at,
+      expiresAt: invitation.expires_at ?? undefined,
+    }));
   },
 
   async inviteTripEditor(tripId: string, email: string) {
@@ -169,6 +173,11 @@ export const travelRepository = {
 
   async acceptTripInvitation(invitationId: string) {
     const { data, error } = await createClient().rpc("tg_accept_trip_invitation", { p_invitation_id: invitationId });
+    return result(data, error) as string;
+  },
+
+  async rejectTripInvitation(invitationId: string) {
+    const { data, error } = await createClient().rpc("tg_reject_trip_invitation", { p_invitation_id: invitationId });
     return result(data, error) as string;
   },
 
@@ -272,6 +281,14 @@ export const travelRepository = {
   async getItems(tripId: string) {
     const { data, error } = await createClient().from("tg_travel_items").select("*").eq("trip_id", tripId).order("sort_order");
     return result(data, error).map((row: unknown) => mapItem(row as TgTravelItemRow));
+  },
+
+  async importTravelItems(tripId: string, items: TravelImportItem[]): Promise<TravelImportResult> {
+    const { data, error } = await createClient().rpc("tg_import_travel_items", {
+      p_trip_id: tripId,
+      p_items: items,
+    });
+    return result(data, error) as unknown as TravelImportResult;
   },
 
   async saveItem(input: Omit<TravelItem, "id" | "createdAt" | "updatedAt" | "order"> & { id?: string }, imageFile?: File) {

@@ -63,7 +63,7 @@ export function TripList({ initialTrips }: { initialTrips: Trip[] }) {
             {isAdmin
               ? <AddIconButton context="header" label="新增旅程或收藏" onClick={() => { setEditing(undefined); setOpen(true); }} />
               : null}
-            <PendingInvitationsControl onAccepted={refreshRoles} />
+            <PendingInvitationsControl onAccepted={async () => { await Promise.all([refresh(), refreshRoles()]); }} />
             <AuthControl />
           </div>
         </div>

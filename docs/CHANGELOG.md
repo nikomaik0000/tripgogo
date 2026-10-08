@@ -1,5 +1,30 @@
 # Changelog
 
+## TRIP GOGO — Pending Invitation Refresh
+
+Added
+
+- Added recipient-validated invitation rejection and homepage rechecks when the browser regains focus, becomes visible, or restores a page from browser/PWA cache.
+
+Changed
+
+- Centralized pending invitation recipient matching in a JWT-backed RPC that excludes accepted, expired, and already-member invitations.
+- Accepted invitations now disappear immediately and refresh both Homepage Trips/Collections and roles without requiring another login or page reload.
+- Owner invitation lists no longer show expired invitations.
+
+## TRIP GOGO — GPT JSON Batch Import
+
+Added
+
+- Added an edit-permission-aware Upload action to the shared Trip/Collection workspace header on Desktop and Mobile.
+- Added one shared GPT JSON Import Dialog with mode-specific prompt copying, strict parsing, row-level previews, blocking validation, and explicit import results.
+- Added a repository-backed batch RPC that revalidates `tg_can_edit_trip`, workspace mode, Trip dates, Collection status, ratings, allowed fields, and per-date ordering before inserting image-free TravelItems.
+
+Changed
+
+- Trip imports require complete in-range `YYYY-MM-DD` dates and always store null status/completed dates; Collection imports omit itinerary dates and default missing status to planned.
+- Batch runtime failures now report successful and failed row counts with original JSON indexes instead of silently discarding errors.
+
 ## TRIP GOGO — Collection Item to Trip
 
 Added

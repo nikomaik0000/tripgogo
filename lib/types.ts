@@ -12,13 +12,16 @@ export interface TripEditor {
   createdAt: string;
 }
 
-export interface TripInvitation {
+export interface PendingTripInvitation {
   id: string;
   tripId: string;
   tripName?: string;
-  email: string;
   createdAt: string;
   expiresAt?: string;
+}
+
+export interface TripInvitation extends PendingTripInvitation {
+  email: string;
 }
 
 export interface Trip {

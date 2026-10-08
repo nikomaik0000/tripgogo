@@ -4,6 +4,8 @@
 
 ### Done
 
+- Session-independent pending invitation refresh, recipient-validated rejection, and immediate Homepage refresh after acceptance
+- Permission-aware Trip/Collection GPT JSON batch import with copied mode-specific prompts, blocking preview validation, and per-row RPC results
 - Collection Place/Food to Trip copying with dual edit authorization, date selection, independent images, and compact vertically centered Homepage cards
 - Owner/Admin-only outer Trip/Collection management, Food-first Collection navigation, shared Mobile Select state cleanup, and iOS Dialog scroll containment
 - Post-release Collection Outline links/layout, Trip reviews, standalone refresh, safe item duplication, unified Mobile swipe actions, and compact Mobile toolbar
