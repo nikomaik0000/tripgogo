@@ -21,6 +21,7 @@ import { TravelItemDialog } from "@/components/travel-item-dialog";
 import { TravelItemImportAction, TravelItemImportDialog } from "@/components/travel-item-import-dialog";
 import { StandaloneRefreshAction } from "@/components/standalone-refresh-action";
 import { TripPrimaryNav, type TripPrimaryTab } from "@/components/trip-primary-nav";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,6 +32,7 @@ import { travelRepository } from "@/lib/travel-repository";
 import type { CollectionItemStatus, Flight, HotelStay, Transportation, TravelItem, TravelItemSort, TravelItemType, Trip, TripRole } from "@/lib/types";
 
 type Tab = TripPrimaryTab;
+type DayOperation = "move" | "swap";
 const CARD_NOTE_TYPOGRAPHY = "text-xs font-normal leading-[1.65] tracking-body text-muted";
 
 export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlights, initialHotelStays, initialTransportations }: {
@@ -70,12 +72,11 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
       return;
     }
     travelRepository.getTripRole(tripId).then(setRole).catch((error) => toast.error(errorMessage(error, "無法確認編輯權限")));
-    if (trip?.mode === "collection") {
-      travelRepository.getEditableTrips().then(setEditableTrips).catch((error) => toast.error(errorMessage(error, "無法載入可加入的旅程")));
-    } else {
-      setEditableTrips([]);
-    }
-  }, [authReady, trip?.mode, tripId, user]);
+    setEditableTrips([]);
+    travelRepository.getEditableTrips()
+      .then((nextTrips) => setEditableTrips(nextTrips.filter((targetTrip) => targetTrip.id !== tripId)))
+      .catch((error) => toast.error(errorMessage(error, "無法載入可加入的旅程")));
+  }, [authReady, tripId, user]);
   useEffect(() => {
     const requestedTab = new URLSearchParams(window.location.search).get("tab");
     if (requestedTab === "daily" || requestedTab === "place" || requestedTab === "food" || requestedTab === "outline") {
@@ -126,6 +127,11 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
       await refresh();
     }
   };
+  const moveOrSwapDay = async (sourceDate: string, targetDate: string, operation: DayOperation) => {
+    await travelRepository.moveOrSwapTripDayItems(tripId, sourceDate, targetDate, operation);
+    await refresh();
+    toast.success(operation === "move" ? "已移動整天行程" : "已交換日期");
+  };
 
   if (!trip) return <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6"><Link href="/" className="flex items-center gap-2 text-sm text-muted"><ArrowLeft className="h-4 w-4" />返回</Link><EmptyState title="找不到這趟旅行" description="" /></main>;
   return (
@@ -137,8 +143,8 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
         <div className="flex shrink-0 items-center justify-end gap-2 sm:hidden"><StandaloneRefreshAction />{canEdit && <TravelItemImportAction onClick={() => setImportOpen(true)} />}<Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-muted hover:bg-searchBackground hover:text-[#555555]"><FolderHeart className="h-4 w-4 stroke-[1.5]" /></Link><AuthControl /></div>
       </header>
       <div className="sm:hidden"><TripPrimaryNav activeTab={tab} onTabChange={setTab} collection={trip.mode === "collection"} /></div>
-      {trip.mode === "trip" && tab === "daily" && <Daily trip={trip} items={items} canEdit={canEdit} onAdd={(date) => setDialog({ open: true, type: "place", initialDate: date, allowTypeChange: true })} onEdit={edit} onDelete={remove} onReorder={reorder} />}
-      {(tab === "place" || tab === "food") && <ItemList type={tab} items={items} query={query} sort={sort} collection={trip.mode === "collection"} canEdit={canEdit} canAddToTrip={trip.mode === "collection" && canEdit && editableTrips.length > 0} onQuery={setQuery} onSort={setSort} onAdd={() => setDialog({ open: true, type: tab, desktopTwoColumn: true })} onEdit={editListItem} onAddToTrip={setAddingToTrip} onDuplicate={duplicate} onDelete={remove} onToggleStatus={toggleCollectionStatus} />}
+      {trip.mode === "trip" && tab === "daily" && <Daily trip={trip} items={items} canEdit={canEdit} onAdd={(date) => setDialog({ open: true, type: "place", initialDate: date, allowTypeChange: true })} onEdit={edit} onDelete={remove} onReorder={reorder} onMoveOrSwapDay={moveOrSwapDay} />}
+      {(tab === "place" || tab === "food") && <ItemList type={tab} items={items} query={query} sort={sort} collection={trip.mode === "collection"} canEdit={canEdit} canAddToTrip={canEdit && editableTrips.length > 0} onQuery={setQuery} onSort={setSort} onAdd={() => setDialog({ open: true, type: tab, desktopTwoColumn: true })} onEdit={editListItem} onAddToTrip={setAddingToTrip} onDuplicate={duplicate} onDelete={remove} onToggleStatus={toggleCollectionStatus} />}
       {tab === "outline" && (trip.mode === "collection" ? <CollectionOutline items={items} /> : <Outline trip={trip} items={items} canEdit={canEdit} initialFlights={initialFlights} initialHotelStays={initialHotelStays} initialTransportations={initialTransportations} refreshVersion={outlineRefreshVersion} />)}
       {canEdit && <TravelItemImportDialog open={importOpen} trip={trip} onOpenChange={setImportOpen} onImported={async (mode) => {
         if (mode === "itinerary") {
@@ -167,7 +173,7 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
         onConfirm={async (targetTripId, date) => {
           if (!addingToTrip) return;
           try {
-            await travelRepository.addCollectionItemToTrip(addingToTrip, targetTripId, date);
+            await travelRepository.addItemToTrip(addingToTrip, targetTripId, date);
             setAddingToTrip(undefined);
             toast.success("已加入旅程");
           } catch (error) {
@@ -413,9 +419,10 @@ function TravelItemCardImage({ item, url, mobile = false }: { item: TravelItem; 
   </div>;
 }
 
-function Daily({ trip, items, canEdit, onAdd, onEdit, onDelete, onReorder }: { trip: Trip; items: TravelItem[]; canEdit: boolean; onAdd: (date: string) => void; onEdit: (item: TravelItem) => void; onDelete: (item: TravelItem) => void; onReorder: (activeId: string, overId: string) => void }) {
+function Daily({ trip, items, canEdit, onAdd, onEdit, onDelete, onReorder, onMoveOrSwapDay }: { trip: Trip; items: TravelItem[]; canEdit: boolean; onAdd: (date: string) => void; onEdit: (item: TravelItem) => void; onDelete: (item: TravelItem) => void; onReorder: (activeId: string, overId: string) => void; onMoveOrSwapDay: (sourceDate: string, targetDate: string, operation: DayOperation) => Promise<void> }) {
   const dates = tripDates(trip);
   const [activeDate, setActiveDate] = useState(trip.startDate ?? "");
+  const [dayActionDate, setDayActionDate] = useState<string>();
   const [openSwipeItemId, setOpenSwipeItemId] = useState<string>();
   useEffect(() => setActiveDate(trip.startDate ?? ""), [trip.startDate]);
   useEffect(() => {
@@ -439,7 +446,80 @@ function Daily({ trip, items, canEdit, onAdd, onEdit, onDelete, onReorder }: { t
     setActiveDate(date);
     document.getElementById(`daily-${date}`)?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   };
-  return <><nav aria-label="快速跳轉日期" className="no-scrollbar mb-8 max-w-full overflow-x-auto pt-5 sm:pt-6"><div className="flex min-w-max flex-nowrap items-center gap-5 pr-4">{dates.map((date) => <button key={date} type="button" onClick={() => jumpToDate(date)} aria-current={activeDate === date ? "date" : undefined} className={`shrink-0 border-b pb-1 text-xs transition-colors ${activeDate === date ? "border-muted text-ink" : "border-transparent text-muted hover:text-[#555555]"}`}><DailyDateLabel date={date} /></button>)}</div></nav><div className="space-y-8">{dates.map((date) => { const day = items.filter((item) => item.date === date).sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt)); return <section id={`daily-${date}`} className="scroll-mt-36" key={date}><div className="mb-4 flex items-center justify-between"><h2 className="text-title font-semibold"><DailyDateLabel date={date} /></h2>{canEdit && <AddIconButton label={`新增 ${displayDate(date)} 行程`} onClick={() => onAdd(date)} />}</div>{day.length === 0 ? <EmptyState title="今天尚未安排" description="" /> : canEdit ? <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={() => setOpenSwipeItemId(undefined)} onDragEnd={handleDragEnd}><SortableContext items={day.map((item) => item.id)} strategy={verticalListSortingStrategy}><div className="space-y-3">{day.map((item) => <SortableDailyCard key={item.id} item={item} swipeOpen={openSwipeItemId === item.id} onSwipeOpen={() => setOpenSwipeItemId(item.id)} onSwipeClose={() => setOpenSwipeItemId((current) => current === item.id ? undefined : current)} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />)}</div></SortableContext></DndContext> : <div className="space-y-3">{day.map((item) => <DailyCard key={item.id} item={item} canEdit={false} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />)}</div>}</section>; })}</div></>;
+  return <>
+    <nav aria-label="快速跳轉日期" className="no-scrollbar mb-8 max-w-full overflow-x-auto pt-5 sm:pt-6"><div className="flex min-w-max flex-nowrap items-center gap-5 pr-4">{dates.map((date) => <button key={date} type="button" onClick={() => jumpToDate(date)} aria-current={activeDate === date ? "date" : undefined} className={`shrink-0 border-b pb-1 text-xs transition-colors ${activeDate === date ? "border-muted text-ink" : "border-transparent text-muted hover:text-[#555555]"}`}><DailyDateLabel date={date} /></button>)}</div></nav>
+    <div className="space-y-8">{dates.map((date) => {
+      const day = items.filter((item) => item.date === date).sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt));
+      return <section id={`daily-${date}`} className="scroll-mt-36" key={date}>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-title font-semibold"><DailyDateLabel date={date} /></h2>
+          {canEdit && <div className="flex items-center gap-1">
+            <AddIconButton label={`新增 ${displayDate(date)} 行程`} onClick={() => onAdd(date)} />
+            {day.length > 0 && dates.length > 1 && <Action label={`調整 ${displayDate(date)} 整天行程`} quiet onClick={() => setDayActionDate(date)}><Ellipsis /></Action>}
+          </div>}
+        </div>
+        {day.length === 0 ? <EmptyState title="今天尚未安排" description="" /> : canEdit ? <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={() => setOpenSwipeItemId(undefined)} onDragEnd={handleDragEnd}><SortableContext items={day.map((item) => item.id)} strategy={verticalListSortingStrategy}><div className="space-y-3">{day.map((item) => <SortableDailyCard key={item.id} item={item} swipeOpen={openSwipeItemId === item.id} onSwipeOpen={() => setOpenSwipeItemId(item.id)} onSwipeClose={() => setOpenSwipeItemId((current) => current === item.id ? undefined : current)} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />)}</div></SortableContext></DndContext> : <div className="space-y-3">{day.map((item) => <DailyCard key={item.id} item={item} canEdit={false} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />)}</div>}
+      </section>;
+    })}</div>
+    <TripDayActionDialog
+      open={Boolean(dayActionDate)}
+      sourceDate={dayActionDate}
+      dates={dates}
+      onOpenChange={(open) => { if (!open) setDayActionDate(undefined); }}
+      onConfirm={async (targetDate, operation) => {
+        if (!dayActionDate) return;
+        await onMoveOrSwapDay(dayActionDate, targetDate, operation);
+      }}
+    />
+  </>;
+}
+
+function TripDayActionDialog({ open, sourceDate, dates, onOpenChange, onConfirm }: { open: boolean; sourceDate?: string; dates: string[]; onOpenChange: (open: boolean) => void; onConfirm: (targetDate: string, operation: DayOperation) => Promise<void> }) {
+  const [operation, setOperation] = useState<DayOperation>("move");
+  const [targetDate, setTargetDate] = useState("");
+  const [saving, setSaving] = useState(false);
+  const targetDates = dates.filter((date) => date !== sourceDate);
+  const defaultTargetDate = targetDates[0] ?? "";
+  useEffect(() => {
+    if (!open) return;
+    setOperation("move");
+    setTargetDate(defaultTargetDate);
+    setSaving(false);
+  }, [defaultTargetDate, open]);
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!sourceDate || !targetDate || saving) return;
+    setSaving(true);
+    try {
+      await onConfirm(targetDate, operation);
+      onOpenChange(false);
+    } catch (error) {
+      toast.error(errorMessage(error, operation === "move" ? "移動整天行程失敗" : "交換日期失敗"));
+      setSaving(false);
+    }
+  };
+  return <Dialog open={open} onOpenChange={(nextOpen) => { if (!saving) onOpenChange(nextOpen); }}>
+    <DialogContent title={sourceDate ? `調整 ${displayDate(sourceDate)} 行程` : "調整整天行程"} preventOutsideDismiss={saving}>
+      <form className="space-y-5" onSubmit={submit}>
+        <div className="grid grid-cols-2 gap-2" role="group" aria-label="整天行程操作">
+          <Button type="button" variant={operation === "move" ? "primary" : "outline"} onClick={() => setOperation("move")}>移動整天行程</Button>
+          <Button type="button" variant={operation === "swap" ? "primary" : "outline"} onClick={() => setOperation("swap")}>交換日期</Button>
+        </div>
+        <div className="space-y-2">
+          <label className="block text-xs font-medium tracking-body text-muted">目標日期</label>
+          <Select value={targetDate} onValueChange={setTargetDate} disabled={saving}>
+            <SelectTrigger aria-label="選擇目標日期" className="w-full"><SelectValue placeholder="選擇日期" /></SelectTrigger>
+            <SelectContent>{targetDates.map((date) => <SelectItem key={date} value={date}>{displayDate(date)}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <p className="text-xs leading-relaxed text-muted">{operation === "move" ? "來源日期的所有行程會接在目標日期現有行程之後。" : "兩個日期的所有行程會整批交換，原本順序不變。"}</p>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>取消</Button>
+          <Button type="submit" disabled={!targetDate || saving}>{saving ? "處理中…" : "確認"}</Button>
+        </div>
+      </form>
+    </DialogContent>
+  </Dialog>;
 }
 
 function DailyDateLabel({ date }: { date?: string | null }) {

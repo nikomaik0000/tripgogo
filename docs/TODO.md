@@ -4,6 +4,9 @@
 
 ### Done
 
+- Transportation GPT prompt and JSON import for existing rental-car and rail fields, with strict validation, responsive preview, sequential writes, and Outline refresh
+- Trip Daily whole-day move/date swap with atomic authorization and ordering, plus Homepage title/spacing cleanup and opt-in 56px card swipe
+- Cross-Trip Place/Food copying with dual edit authorization, self-target rejection, independent images, and RLS-derived Homepage `旅遊` / `收藏` tabs
 - Shared Trip Import Dialog modes for itinerary, Flight, and Hotel JSON, with strict previews, sequential repository writes, partial-failure results, Collection-only itinerary controls, and Outline refresh
 - Copy-friendly Flight/Hotel/itinerary GPT prompt shortcuts, fenced-JSON paste tolerance, Mobile action alignment, and inline note-link baseline refinement
 - Travel Item link and import-prompt polish with safe note URL icons, type-specific Food/Place link2 actions, verified-link guidance, concise exceptional-hours notes, and muted closed-day separators

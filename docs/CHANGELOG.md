@@ -1,5 +1,41 @@
 # Changelog
 
+## TRIP GOGO — Transportation JSON Import
+
+Added
+
+- Added strict `rental_car` and `rail` Transportation JSON parsing, type-specific validation, responsive card previews, and sequential repository-backed imports with per-row failure reporting.
+
+Changed
+
+- Added `交通` to Trip import modes with matching two-row Mobile and single-row Desktop controls; Collection imports remain itinerary-only.
+- Transportation imports reuse the existing save path, RLS, and Outline refresh signal without database changes or full-page refreshes.
+- Set the `匯入 TripGoGo JSON` Dialog title letter spacing to a locally overridden positive `0.04em` without changing its size, weight, or line height.
+
+## TRIP GOGO — Daily Day Operations and Homepage Gesture Polish
+
+Added
+
+- Added permission-protected whole-day move and date-swap actions to Trip Daily headers, backed by one atomic RPC with Trip/date validation and row locking.
+
+Changed
+
+- Removed the redundant Homepage section title and balanced the existing `旅遊` / `收藏` tab spacing across Mobile and Desktop.
+- Made Homepage card actions easier to reveal from linked card content with a 56px opt-in opening threshold while retaining direction locking, vertical scrolling, click navigation, outside-close, and shared defaults elsewhere.
+- Whole-day moves now preserve destination order and append source items in stable order; date swaps retain each day group's existing `sort_order` and leave item metadata unchanged.
+
+## TRIP GOGO — Cross-Trip Item Copy and Homepage Mode Tabs
+
+Added
+
+- Extended the existing add-to-Trip flow so editable Trip Place/Food items can be copied into another editable Trip with an explicitly selected target date.
+- Added minimal Homepage `旅遊` and `收藏` text tabs derived from the currently visible RLS-filtered data.
+
+Changed
+
+- Reused the existing independent Storage image-copy lifecycle, target-date validation, same-day ordering, and Trip-only status semantics for both Collection and Trip sources.
+- Homepage mode tabs now disappear with their last visible item and immediately fall back to the remaining mode without changing creation, card actions, permissions, or sorting.
+
 ## TRIP GOGO — Flight and Hotel JSON Import
 
 Added

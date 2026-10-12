@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { TgFlightRow, TgHotelStayRow, TgProfileRow, TgTransportationRow, TgTravelItemRow, TgTripInvitationRow, TgTripMemberRow, TgTripResourceRow, TgTripRow } from "@/lib/database.types";
 import { mapFlight, mapHotelStay, mapItem, mapTransportation, mapTrip, mapTripResource } from "@/lib/travel-mappers";
 import { getTravelItemImageExtensionFromPath, getTravelItemImageFormat } from "@/lib/travel-item-image";
-import type { FlightImportItem, HotelImportItem, TravelImportItem, TravelImportResult } from "@/lib/travel-import";
+import type { FlightImportItem, HotelImportItem, TransportationImportItem, TravelImportItem, TravelImportResult } from "@/lib/travel-import";
 import type { Flight, HotelStay, PendingTripInvitation, Transportation, TransportationInput, TravelItem, Trip, TripEditor, TripInvitation, TripResource, TripRole } from "@/lib/types";
 
 const RESOURCE_IMAGE_BUCKET = "tg-trip-resources";
@@ -123,7 +123,7 @@ export const travelRepository = {
     return new Map<string, TripRole>(result(data, error).map((row: { trip_id: string; role: string }) => [row.trip_id, row.role as TripRole]));
   },
 
-  async getEditableTrips() {
+  async getEditableTrips(): Promise<Trip[]> {
     const supabase = createClient();
     const { data: authData, error: authError } = await supabase.auth.getUser();
     if (authError) throw new Error(authError.message);
@@ -417,7 +417,7 @@ export const travelRepository = {
     }
   },
 
-  async addCollectionItemToTrip(source: TravelItem, targetTripId: string, targetDate: string) {
+  async addItemToTrip(source: TravelItem, targetTripId: string, targetDate: string) {
     const supabase = createClient();
     const { data, error } = await supabase.rpc("tg_add_collection_item_to_trip", {
       p_source_item_id: source.id,
@@ -519,6 +519,16 @@ export const travelRepository = {
     if (error) throw new Error(error.message);
   },
 
+  async moveOrSwapTripDayItems(tripId: string, sourceDate: string, targetDate: string, operation: "move" | "swap") {
+    const { error } = await createClient().rpc("tg_move_or_swap_trip_day_items", {
+      p_trip_id: tripId,
+      p_source_date: sourceDate,
+      p_target_date: targetDate,
+      p_operation: operation,
+    });
+    if (error) throw new Error(error.message);
+  },
+
   async getFlights(tripId: string) {
     const { data, error } = await createClient().from("tg_flights").select("*").eq("trip_id", tripId)
       .order("departure_date").order("departure_time");
@@ -607,6 +617,10 @@ export const travelRepository = {
       : createClient().from("tg_transportations").insert(values);
     const { data, error } = await query.select().single();
     return mapTransportation(result(data, error) as TgTransportationRow);
+  },
+
+  async importTransportations(tripId: string, items: TransportationImportItem[]) {
+    return importSequentially(items, (item) => travelRepository.saveTransportation({ ...item, tripId }));
   },
 
   async deleteTransportation(transportationId: string) {

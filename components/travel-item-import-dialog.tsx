@@ -9,13 +9,16 @@ import { Textarea } from "@/components/ui/input";
 import {
   getFlightFormatPrompt,
   getHotelFormatPrompt,
+  getTransportationFormatPrompt,
   getTravelImportPrompt,
   parseFlightImport,
   parseHotelImport,
+  parseTransportationImport,
   parseTravelImport,
   type FlightImportItem,
   type HotelImportItem,
   type ImportPreview,
+  type TransportationImportItem,
   type TravelImportItem,
   type TravelImportResult,
 } from "@/lib/travel-import";
@@ -23,17 +26,19 @@ import { travelRepository } from "@/lib/travel-repository";
 import type { Trip } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export type TravelImportMode = "itinerary" | "flight" | "hotel";
+export type TravelImportMode = "itinerary" | "flight" | "hotel" | "transportation";
 
 type PreviewState =
   | { mode: "itinerary"; value: ImportPreview<TravelImportItem> }
   | { mode: "flight"; value: ImportPreview<FlightImportItem> }
-  | { mode: "hotel"; value: ImportPreview<HotelImportItem> };
+  | { mode: "hotel"; value: ImportPreview<HotelImportItem> }
+  | { mode: "transportation"; value: ImportPreview<TransportationImportItem> };
 
 const MODE_LABELS: Record<TravelImportMode, string> = {
   itinerary: "行程",
   flight: "機票",
   hotel: "飯店",
+  transportation: "交通",
 };
 
 export function TravelItemImportAction({ onClick, className }: { onClick: () => void; className?: string }) {
@@ -89,6 +94,8 @@ export function TravelItemImportDialog({ open, trip, onOpenChange, onImported }:
       setPreview({ mode, value: parseFlightImport(source) });
     } else if (mode === "hotel") {
       setPreview({ mode, value: parseHotelImport(source) });
+    } else if (mode === "transportation") {
+      setPreview({ mode, value: parseTransportationImport(source) });
     } else {
       setPreview({ mode, value: parseTravelImport(source, trip) });
     }
@@ -103,6 +110,8 @@ export function TravelItemImportDialog({ open, trip, onOpenChange, onImported }:
         nextResult = await travelRepository.importFlights(trip.id, preview.value.rows.flatMap((row) => row.item ? [row.item] : []));
       } else if (preview.mode === "hotel") {
         nextResult = await travelRepository.importHotelStays(trip.id, preview.value.rows.flatMap((row) => row.item ? [row.item] : []));
+      } else if (preview.mode === "transportation") {
+        nextResult = await travelRepository.importTransportations(trip.id, preview.value.rows.flatMap((row) => row.item ? [row.item] : []));
       } else {
         nextResult = await travelRepository.importTravelItems(trip.id, preview.value.rows.flatMap((row) => row.item ? [row.item] : []));
       }
@@ -122,24 +131,24 @@ export function TravelItemImportDialog({ open, trip, onOpenChange, onImported }:
   };
 
   return <Dialog open={open} onOpenChange={(next) => { if (!importing) onOpenChange(next); }}>
-    <DialogContent title="匯入 TripGoGo JSON" className="max-h-[calc(100dvh-32px)] sm:max-w-3xl" preventOutsideDismiss>
+    <DialogContent title="匯入 TripGoGo JSON" titleClassName="!tracking-[0.04em]" className="max-h-[calc(100dvh-32px)] sm:max-w-3xl" preventOutsideDismiss>
       <div className="space-y-5">
         <div className="space-y-3">
           <p className="text-sm leading-6 text-muted">貼上 ChatGPT 產生的 JSON，解析並確認預覽後才會寫入。</p>
           <div className="grid min-w-0 grid-cols-2 divide-x divide-divider overflow-hidden rounded-card border border-border text-[11px] text-muted">
             <div className="min-w-0 px-3 py-3 sm:px-4">
               <span className="flex min-w-0 items-center gap-2 whitespace-nowrap"><Clipboard className="hidden h-4 w-4 shrink-0 stroke-[1.5] sm:block" />複製 GPT 格式提示詞</span>
-              <span className="mt-2 inline-flex min-w-0 items-center whitespace-nowrap">
-                <PromptButton label="行程" onClick={() => copyPrompt(getTravelImportPrompt(trip), "行程")} />
-                {trip.mode === "trip" && <><PromptDivider /><PromptButton label="機票" onClick={() => copyPrompt(getFlightFormatPrompt(), "機票")} /><PromptDivider /><PromptButton label="飯店" onClick={() => copyPrompt(getHotelFormatPrompt(), "飯店")} /></>}
-              </span>
+              {trip.mode === "trip" ? <span className="mt-2 flex min-w-0 flex-wrap items-center whitespace-nowrap">
+                <span className="flex w-full min-w-0 items-center sm:w-auto"><PromptButton label="行程" onClick={() => copyPrompt(getTravelImportPrompt(trip), "行程")} /><PromptDivider /><PromptButton label="機票" onClick={() => copyPrompt(getFlightFormatPrompt(), "機票")} /><PromptDivider className="hidden sm:inline" /></span>
+                <span className="flex w-full min-w-0 items-center sm:w-auto"><PromptButton label="飯店" onClick={() => copyPrompt(getHotelFormatPrompt(), "飯店")} /><PromptDivider /><PromptButton label="交通" onClick={() => copyPrompt(getTransportationFormatPrompt(), "交通")} /></span>
+              </span> : <span className="mt-2 inline-flex min-w-0 items-center whitespace-nowrap"><PromptButton label="行程" onClick={() => copyPrompt(getTravelImportPrompt(trip), "行程")} /></span>}
             </div>
             <div className="min-w-0 px-3 py-3 sm:px-4">
               <span className="block whitespace-nowrap">匯入類型</span>
-              <span className="mt-2 inline-flex min-w-0 items-center whitespace-nowrap">
-                <ModeButton mode="itinerary" activeMode={mode} onClick={changeMode} disabled={importing} />
-                {trip.mode === "trip" && <><PromptDivider /><ModeButton mode="flight" activeMode={mode} onClick={changeMode} disabled={importing} /><PromptDivider /><ModeButton mode="hotel" activeMode={mode} onClick={changeMode} disabled={importing} /></>}
-              </span>
+              {trip.mode === "trip" ? <span className="mt-2 flex min-w-0 flex-wrap items-center whitespace-nowrap">
+                <span className="flex w-full min-w-0 items-center sm:w-auto"><ModeButton mode="itinerary" activeMode={mode} onClick={changeMode} disabled={importing} /><PromptDivider /><ModeButton mode="flight" activeMode={mode} onClick={changeMode} disabled={importing} /><PromptDivider className="hidden sm:inline" /></span>
+                <span className="flex w-full min-w-0 items-center sm:w-auto"><ModeButton mode="hotel" activeMode={mode} onClick={changeMode} disabled={importing} /><PromptDivider /><ModeButton mode="transportation" activeMode={mode} onClick={changeMode} disabled={importing} /></span>
+              </span> : <span className="mt-2 inline-flex min-w-0 items-center whitespace-nowrap"><ModeButton mode="itinerary" activeMode={mode} onClick={changeMode} disabled={importing} /></span>}
             </div>
           </div>
         </div>
@@ -178,8 +187,8 @@ function PromptButton({ label, onClick }: { label: string; onClick: () => void }
   return <button type="button" onClick={onClick} className="py-1 text-[#222222] transition-colors hover:text-[#555555]">{label}</button>;
 }
 
-function PromptDivider() {
-  return <span aria-hidden="true" className="px-1 text-muted">｜</span>;
+function PromptDivider({ className }: { className?: string }) {
+  return <span aria-hidden="true" className={cn("px-1 text-muted", className)}>｜</span>;
 }
 
 function ModeButton({ mode, activeMode, onClick, disabled }: { mode: TravelImportMode; activeMode: TravelImportMode; onClick: (mode: TravelImportMode) => void; disabled: boolean }) {
@@ -201,6 +210,13 @@ function Preview({ state, errorCount }: { state: PreviewState; errorCount: numbe
       <p className="mt-1 text-xs text-muted">Check-in {item.checkInDate}{item.checkInTime ? ` ${item.checkInTime}` : ""} · Check-out {item.checkOutDate}{item.checkOutTime ? ` ${item.checkOutTime}` : ""}</p>
       {item.address && <p className="mt-1 truncate text-xs text-muted">{item.address}</p>}
     </> : <p className="font-medium">無法辨識飯店</p>} />;
+  }
+  if (state.mode === "transportation") {
+    return <PreviewList preview={state.value} errorCount={errorCount} renderSummary={(item) => item ? <>
+      <p className="truncate font-medium">{item.type === "rental_car" ? `${item.company} · ${item.vehicleModel}` : `${item.routeName}${item.trainNumber ? ` · ${item.trainNumber}` : ""}`}</p>
+      <p className="mt-1 truncate text-xs text-muted">{item.departurePlace} → {item.arrivalPlace}</p>
+      <p className="mt-1 text-xs text-muted">{item.startDate} {item.startTime} → {item.endDate} {item.endTime}</p>
+    </> : <p className="font-medium">無法辨識交通</p>} />;
   }
   return <PreviewList preview={state.value} errorCount={errorCount} renderSummary={(item) => item ? <>
     <p className="truncate font-medium">{item.name}</p>
@@ -241,6 +257,7 @@ function ImportResult({ result }: { result: TravelImportResult }) {
 function placeholder(mode: TravelImportMode) {
   if (mode === "flight") return '[{ "airline": "航空公司", "flightNumber": "航班編號", "departurePlace": "出發地", "arrivalPlace": "抵達地" }]';
   if (mode === "hotel") return '[{ "name": "飯店名稱", "checkInDate": "YYYY-MM-DD", "checkOutDate": "YYYY-MM-DD" }]';
+  if (mode === "transportation") return '[{ "type": "rail", "routeName": "路線名稱", "startDate": "YYYY-MM-DD", "startTime": "HH:mm", "endDate": "YYYY-MM-DD", "endTime": "HH:mm", "departurePlace": "出發站", "arrivalPlace": "抵達站" }]';
   return '[{ "type": "place", "name": "景點名稱" }]';
 }
 

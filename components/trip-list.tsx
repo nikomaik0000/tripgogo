@@ -13,7 +13,7 @@ import { MobileSwipeActions, useMobileSwipeGroup } from "@/components/mobile-dai
 import { TripFormDialog } from "@/components/trip-form-dialog";
 import { useAuth } from "@/lib/auth-context";
 import { travelRepository } from "@/lib/travel-repository";
-import type { Trip, TripRole } from "@/lib/types";
+import type { Trip, TripMode, TripRole } from "@/lib/types";
 
 const HOME_CARD_SPACING = "py-4";
 
@@ -24,6 +24,7 @@ export function TripList({ initialTrips }: { initialTrips: Trip[] }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Trip>();
   const [deleting, setDeleting] = useState<Trip>();
+  const [activeMode, setActiveMode] = useState<TripMode>("trip");
   const { openItemId, open: openSwipe, close: closeSwipe } = useMobileSwipeGroup();
 
   const refresh = useCallback(async () => {
@@ -53,10 +54,17 @@ export function TripList({ initialTrips }: { initialTrips: Trip[] }) {
       return (right.trip.startDate ?? "").localeCompare(left.trip.startDate ?? "") || left.index - right.index;
     })
     .map(({ trip }) => trip);
+  const availableModes = (["trip", "collection"] as const).filter((mode) => trips.some((trip) => trip.mode === mode));
+  const visibleMode = availableModes.includes(activeMode) ? activeMode : availableModes[0] ?? "trip";
+  const visibleTrips = sortedTrips.filter((trip) => trip.mode === visibleMode);
+
+  useEffect(() => {
+    if (activeMode !== visibleMode) setActiveMode(visibleMode);
+  }, [activeMode, visibleMode]);
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24 pt-4 sm:px-6">
-      <header className="sticky top-0 z-20 -mx-4 mb-8 border-b border-border bg-bg/90 px-4 pb-4 pt-3 backdrop-blur sm:-mx-6 sm:px-6">
+      <header className="sticky top-0 z-20 -mx-4 mb-6 border-b border-border bg-bg/90 px-4 pb-4 pt-3 backdrop-blur sm:-mx-6 sm:mb-8 sm:px-6">
         <div className="flex items-center justify-between gap-3">
           <h1 className="logo-title flex min-w-0 flex-1 items-center gap-5 whitespace-nowrap text-sm font-normal uppercase tracking-[0.08em] text-ink sm:text-[27px] sm:tracking-[0.24em]"><PlaneTakeoff className="h-5 w-5 shrink-0 sm:h-6 sm:w-6" />TRIP GOGO</h1>
           <div className="flex shrink-0 items-center gap-2">
@@ -68,10 +76,12 @@ export function TripList({ initialTrips }: { initialTrips: Trip[] }) {
           </div>
         </div>
       </header>
-      <h2 className="mb-4 text-base font-semibold tracking-[0.16em]">旅程與收藏</h2>
+      {availableModes.length > 0 && <div role="tablist" aria-label="首頁內容分類" className="mb-8 flex w-fit max-w-full items-center gap-5">
+        {availableModes.map((mode) => <button key={mode} id={`home-${mode}-tab`} type="button" role="tab" aria-selected={visibleMode === mode} aria-controls="home-trip-cards" onClick={() => { setActiveMode(mode); closeSwipe(); }} className={`shrink-0 border-b pb-1 text-xs transition-colors ${visibleMode === mode ? "border-ink text-ink" : "border-transparent text-muted hover:text-[#555555]"}`}>{mode === "trip" ? "旅遊" : "收藏"}</button>)}
+      </div>}
       {trips.length === 0 ? <EmptyState title="尚未建立旅程或收藏" description="" icon="map" /> : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {sortedTrips.map((trip) => {
+        <div id="home-trip-cards" role="tabpanel" aria-labelledby={`home-${visibleMode}-tab`} className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {visibleTrips.map((trip) => {
             const canManage = isAdmin || roles.get(trip.id) === "owner";
             const editTrip = () => { setEditing(trip); setOpen(true); };
             const copyTrip = () => {
@@ -106,7 +116,7 @@ export function TripList({ initialTrips }: { initialTrips: Trip[] }) {
 }
 
 function TripCard({ trip, canManage, swipeOpen, onSwipeOpen, onSwipeClose, onEdit, onCopy, onDelete }: { trip: Trip; canManage: boolean; swipeOpen: boolean; onSwipeOpen: () => void; onSwipeClose: () => void; onEdit: () => void; onCopy: () => void; onDelete: () => void }) {
-  return <MobileSwipeActions itemId={`trip-${trip.id}`} canEdit={canManage} canDuplicate={canManage} canDelete={canManage} open={swipeOpen} desktopPassthrough mobileFrame onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDuplicate={onCopy} onDelete={onDelete}>
+  return <MobileSwipeActions itemId={`trip-${trip.id}`} canEdit={canManage} canDuplicate={canManage} canDelete={canManage} open={swipeOpen} desktopPassthrough mobileFrame allowSwipeFromLinks openThreshold={56} onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDuplicate={onCopy} onDelete={onDelete}>
   <article className="flex h-[184px] flex-col bg-surface px-5 pt-5 sm:h-[220px] sm:rounded-card sm:border sm:border-border sm:px-6 sm:shadow-soft">
     <Link href={`/trip/${trip.id}`} className="flex items-center gap-2 pb-4 text-sm text-muted hover:text-[#555555]"><MapPin className="h-4 w-4 shrink-0" />{trip.mode === "collection" ? "收藏" : formatTripRange(trip.startDate, trip.endDate)}</Link>
     <div className="border-t border-divider" />

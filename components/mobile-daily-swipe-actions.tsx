@@ -30,7 +30,7 @@ export function MobileDailySwipeActions({ itemId, enabled, open, dragging, onOpe
   return <MobileSwipeActions itemId={itemId} canEdit={enabled} canDelete={enabled} open={open} dragging={dragging} onOpen={onOpen} onClose={onClose} onEdit={onEdit} onDelete={onDelete}>{children}</MobileSwipeActions>;
 }
 
-export function MobileSwipeActions({ itemId, canAddToTrip = false, canEdit, canDuplicate = false, canDelete, open, dragging = false, desktopPassthrough = false, mobileFrame = false, onOpen, onClose, onAddToTrip, onEdit, onDuplicate, onDelete, children, className = "" }: {
+export function MobileSwipeActions({ itemId, canAddToTrip = false, canEdit, canDuplicate = false, canDelete, open, dragging = false, desktopPassthrough = false, mobileFrame = false, allowSwipeFromLinks = false, openThreshold, onOpen, onClose, onAddToTrip, onEdit, onDuplicate, onDelete, children, className = "" }: {
   itemId: string;
   canAddToTrip?: boolean;
   canEdit: boolean;
@@ -40,6 +40,8 @@ export function MobileSwipeActions({ itemId, canAddToTrip = false, canEdit, canD
   dragging?: boolean;
   desktopPassthrough?: boolean;
   mobileFrame?: boolean;
+  allowSwipeFromLinks?: boolean;
+  openThreshold?: number;
   onOpen: () => void;
   onClose: () => void;
   onAddToTrip?: () => void;
@@ -53,6 +55,7 @@ export function MobileSwipeActions({ itemId, canAddToTrip = false, canEdit, canD
   const actionRailWidth = actionCount * ACTION_SLOT_WIDTH;
   const enabled = actionCount > 0;
   const gesture = useRef<Gesture | undefined>(undefined);
+  const suppressClick = useRef(false);
   const [offset, setOffset] = useState(open ? -actionRailWidth : 0);
   const [swiping, setSwiping] = useState(false);
 
@@ -69,7 +72,8 @@ export function MobileSwipeActions({ itemId, canAddToTrip = false, canEdit, canD
   }, [dragging, onClose, open]);
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!enabled || dragging || event.pointerType !== "touch" || isDailyCardInteractiveTarget(event.target)) return;
+    if (!enabled || dragging || event.pointerType !== "touch" || isMobileSwipeInteractiveTarget(event.target, allowSwipeFromLinks)) return;
+    suppressClick.current = false;
     gesture.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -89,6 +93,7 @@ export function MobileSwipeActions({ itemId, canAddToTrip = false, canEdit, canD
       if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < DIRECTION_LOCK_THRESHOLD) return;
       if (Math.abs(deltaX) > Math.abs(deltaY) * HORIZONTAL_DOMINANCE) {
         current.direction = "horizontal";
+        suppressClick.current = true;
         setSwiping(true);
         event.currentTarget.setPointerCapture(event.pointerId);
       } else {
@@ -108,7 +113,10 @@ export function MobileSwipeActions({ itemId, canAddToTrip = false, canEdit, canD
     gesture.current = undefined;
     setSwiping(false);
     if (current.direction === "horizontal" && !cancelled) {
-      const nextOpen = current.currentOffset <= -actionRailWidth / 2;
+      const openingThreshold = Math.min(openThreshold ?? actionRailWidth / 2, actionRailWidth);
+      const nextOpen = current.startOffset === 0
+        ? current.currentOffset <= -openingThreshold
+        : current.currentOffset <= -actionRailWidth / 2;
       setOffset(nextOpen ? -actionRailWidth : 0);
       if (nextOpen) onOpen();
       else onClose();
@@ -132,6 +140,12 @@ export function MobileSwipeActions({ itemId, canAddToTrip = false, canEdit, canD
       onPointerMove={handlePointerMove}
       onPointerUp={(event) => finishGesture(event)}
       onPointerCancel={(event) => finishGesture(event, true)}
+      onClickCapture={(event) => {
+        if (!suppressClick.current) return;
+        suppressClick.current = false;
+        event.preventDefault();
+        event.stopPropagation();
+      }}
     >
       {children}
     </div>
@@ -142,8 +156,9 @@ export function isDailyCardInteractiveTarget(target: EventTarget | null) {
   return isMobileSwipeInteractiveTarget(target);
 }
 
-export function isMobileSwipeInteractiveTarget(target: EventTarget | null) {
-  return target instanceof Element && Boolean(target.closest("a, button, input, textarea, select, [data-no-dnd]"));
+export function isMobileSwipeInteractiveTarget(target: EventTarget | null, allowLinks = false) {
+  const selector = allowLinks ? "button, input, textarea, select, [data-no-dnd]" : "a, button, input, textarea, select, [data-no-dnd]";
+  return target instanceof Element && Boolean(target.closest(selector));
 }
 
 export function useMobileSwipeGroup() {

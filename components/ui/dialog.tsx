@@ -11,10 +11,11 @@ export function DialogContent({
   className,
   children,
   title,
+  titleClassName,
   preventOutsideDismiss = false,
   onInteractOutside,
   ...props
-}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { title: string; preventOutsideDismiss?: boolean }) {
+}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { title: string; titleClassName?: string; preventOutsideDismiss?: boolean }) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay
@@ -35,7 +36,7 @@ export function DialogContent({
         {...props}
       >
         <div className="mb-4 flex items-center justify-between">
-          <DialogPrimitive.Title className="text-title font-semibold">{title}</DialogPrimitive.Title>
+          <DialogPrimitive.Title className={cn("text-title font-semibold", titleClassName)}>{title}</DialogPrimitive.Title>
           <DialogPrimitive.Close aria-label="關閉" title="關閉" className="flex h-11 w-11 items-center justify-center rounded-card text-muted hover:bg-searchBackground sm:h-9 sm:w-9">
             <X className="h-4 w-4 stroke-[1.5]" />
           </DialogPrimitive.Close>

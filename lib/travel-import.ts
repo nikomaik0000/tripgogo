@@ -1,11 +1,15 @@
 import { formatClosedDaysText, validateClosedRuleValues } from "@/lib/closed-days";
-import type { ClosedRuleType, ClosedRuleValue, CollectionItemStatus, Flight, HotelStay, TravelItemType, Trip } from "@/lib/types";
+import type { ClosedRuleType, ClosedRuleValue, CollectionItemStatus, Flight, HotelStay, TransportationInput, TravelItemType, Trip } from "@/lib/types";
 
 const COMMON_FIELDS = ["type", "category", "area", "name", "businessHours", "closedDaysText", "closedRuleType", "closedRuleValues", "googleMapsUrl", "link1", "link2", "note"] as const;
 const MODE_FIELDS = ["date", "status", "rating", "completedDate", "consumedItems", "experienceNote"] as const;
 const ALLOWED_FIELDS = new Set<string>([...COMMON_FIELDS, ...MODE_FIELDS]);
 const FLIGHT_FIELDS = new Set(["airline", "flightNumber", "departurePlace", "arrivalPlace", "departureDate", "departureTime", "arrivalDate", "arrivalTime", "link", "note"]);
 const HOTEL_FIELDS = new Set(["name", "checkInDate", "checkOutDate", "checkInTime", "checkOutTime", "address", "phone", "googleMapsUrl", "link", "note"]);
+const TRANSPORTATION_COMMON_FIELDS = ["type", "startDate", "startTime", "endDate", "endTime", "departurePlace", "arrivalPlace", "reservationNumber", "cost", "link", "note"];
+const RENTAL_CAR_FIELDS = new Set([...TRANSPORTATION_COMMON_FIELDS, "company", "vehicleModel", "address", "googleMapsUrl"]);
+const RAIL_FIELDS = new Set([...TRANSPORTATION_COMMON_FIELDS, "routeName", "trainNumber", "seat", "carriage", "ticket"]);
+const TRANSPORTATION_FIELDS = new Set([...RENTAL_CAR_FIELDS, ...RAIL_FIELDS]);
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
@@ -32,6 +36,7 @@ export type TravelImportItem = {
 
 export type FlightImportItem = Omit<Flight, "id" | "tripId" | "createdAt" | "updatedAt">;
 export type HotelImportItem = Omit<HotelStay, "id" | "tripId" | "createdAt" | "updatedAt">;
+export type TransportationImportItem = TransportationInput;
 
 export type ImportPreviewRow<T> = {
   index: number;
@@ -48,6 +53,7 @@ export type TravelImportPreviewRow = ImportPreviewRow<TravelImportItem>;
 export type TravelImportPreview = ImportPreview<TravelImportItem>;
 export type FlightImportPreview = ImportPreview<FlightImportItem>;
 export type HotelImportPreview = ImportPreview<HotelImportItem>;
+export type TransportationImportPreview = ImportPreview<TransportationImportItem>;
 
 export type TravelImportFailure = {
   index: number;
@@ -70,6 +76,10 @@ export function parseFlightImport(source: string): FlightImportPreview {
 
 export function parseHotelImport(source: string): HotelImportPreview {
   return parseImportArray(source, validateHotelRow);
+}
+
+export function parseTransportationImport(source: string): TransportationImportPreview {
+  return parseImportArray(source, validateTransportationRow);
 }
 
 function parseImportArray<T>(source: string, validate: (value: unknown, index: number) => ImportPreviewRow<T>): ImportPreview<T> {
@@ -169,6 +179,60 @@ export function getHotelFormatPrompt() {
     "日期使用 YYYY-MM-DD，時間使用 24 小時制 HH:mm。未提供的 Check-in 或 Check-out 時間不要自行猜測；其他缺少的選填資料使用空字串或省略欄位。",
     "googleMapsUrl 優先填入可確認的真實 Google Maps place URL；若無精確網址，可使用 https://www.google.com/maps/search/?api=1&query=...，query 由飯店名稱加地區或城市組成。不要虛構 maps.app.goo.gl 或其他短網址。",
     "link 優先填入飯店官方網站或正式訂房資訊頁；無法確認時留空，不要虛構網址。",
+    "輸出格式：",
+    JSON.stringify(example, null, 2),
+    "最終回覆只輸出一個標示為 json 的 Markdown code block，code block 內只放上述 JSON array；不要在 code block 前後加入任何說明或其他文字。",
+  ].join("\n");
+}
+
+export function getTransportationFormatPrompt() {
+  const example = [
+    {
+      type: "rental_car",
+      company: "...",
+      vehicleModel: "...",
+      startDate: "YYYY-MM-DD",
+      startTime: "HH:mm",
+      endDate: "YYYY-MM-DD",
+      endTime: "HH:mm",
+      departurePlace: "...",
+      arrivalPlace: "...",
+      reservationNumber: "",
+      cost: "",
+      address: "",
+      googleMapsUrl: "",
+      link: "",
+      note: "",
+    },
+    {
+      type: "rail",
+      routeName: "...",
+      trainNumber: "",
+      startDate: "YYYY-MM-DD",
+      startTime: "HH:mm",
+      endDate: "YYYY-MM-DD",
+      endTime: "HH:mm",
+      departurePlace: "...",
+      arrivalPlace: "...",
+      seat: "",
+      carriage: "",
+      ticket: "",
+      reservationNumber: "",
+      cost: "",
+      link: "",
+      note: "",
+    },
+  ];
+  return [
+    "請將以上租車、JR 或鐵路資訊整理成 TripGoGo 交通 JSON 格式。",
+    "最外層必須是 JSON array，即使只有一筆交通資料也必須使用 array；多筆交通各自成為一筆 object。",
+    "type 只能是 rental_car 或 rail，並依 type 使用對應欄位。",
+    "共同欄位為：type, startDate, startTime, endDate, endTime, departurePlace, arrivalPlace, reservationNumber, cost, link, note。",
+    "rental_car 只使用以下欄位：type, company, vehicleModel, startDate, startTime, endDate, endTime, departurePlace, arrivalPlace, reservationNumber, cost, address, googleMapsUrl, link, note；company 與 vehicleModel 必填，不要輸出 rail 專用欄位。",
+    "rail 只使用以下欄位：type, routeName, trainNumber, startDate, startTime, endDate, endTime, departurePlace, arrivalPlace, seat, carriage, ticket, reservationNumber, cost, link, note；routeName 必填，不要輸出 rental_car 專用欄位。",
+    "startDate、startTime、endDate、endTime、departurePlace、arrivalPlace 必填；日期使用 YYYY-MM-DD，時間使用 24 小時制 HH:mm，結束日期時間不可早於開始日期時間。",
+    "只依使用者提供的現有資訊整理，不要自行猜測不存在的公司、班次、車型、地點、日期、時間、費用或網址。",
+    "選填欄位沒有資料時使用空字串或省略欄位。",
     "輸出格式：",
     JSON.stringify(example, null, 2),
     "最終回覆只輸出一個標示為 json 的 Markdown code block，code block 內只放上述 JSON array；不要在 code block 前後加入任何說明或其他文字。",
@@ -332,6 +396,83 @@ function validateHotelRow(value: unknown, index: number): ImportPreviewRow<Hotel
     link: link || undefined,
     note: note || undefined,
   } satisfies HotelImportItem : undefined;
+
+  return { index, item, errors };
+}
+
+function validateTransportationRow(value: unknown, index: number): ImportPreviewRow<TransportationImportItem> {
+  if (!isRecord(value)) return { index, errors: ["每筆資料必須是 JSON object。"] };
+
+  const errors: string[] = [];
+  const typeValue = readString(value, "type", errors, true);
+  const type = typeValue === "rental_car" || typeValue === "rail" ? typeValue : undefined;
+  if (typeValue && !type) errors.push("type 必須是 rental_car 或 rail。");
+  validateKnownFields(value, type === "rental_car" ? RENTAL_CAR_FIELDS : type === "rail" ? RAIL_FIELDS : TRANSPORTATION_FIELDS, errors);
+
+  const startDate = readRequiredDate(value, "startDate", errors);
+  const startTime = readTime(value, "startTime", errors, true);
+  const endDate = readRequiredDate(value, "endDate", errors);
+  const endTime = readTime(value, "endTime", errors, true);
+  const departurePlace = readString(value, "departurePlace", errors, true);
+  const arrivalPlace = readString(value, "arrivalPlace", errors, true);
+  const reservationNumber = readString(value, "reservationNumber", errors);
+  const cost = readString(value, "cost", errors);
+  const link = readString(value, "link", errors);
+  const note = readString(value, "note", errors);
+  validateUrl("link", link, errors);
+
+  if (startDate && startTime && endDate && endTime && `${endDate}T${endTime}` < `${startDate}T${startTime}`) {
+    errors.push("結束日期時間不可早於開始日期時間。");
+  }
+
+  const common = {
+    startDate,
+    startTime,
+    endDate,
+    endTime,
+    departurePlace,
+    arrivalPlace,
+    reservationNumber: reservationNumber || undefined,
+    cost: cost || undefined,
+    link: link || undefined,
+    note: note || undefined,
+  };
+  let item: TransportationImportItem | undefined;
+
+  if (type === "rental_car") {
+    const company = readString(value, "company", errors, true);
+    const vehicleModel = readString(value, "vehicleModel", errors, true);
+    const address = readString(value, "address", errors);
+    const googleMapsUrl = readString(value, "googleMapsUrl", errors);
+    validateUrl("googleMapsUrl", googleMapsUrl, errors);
+    if (company && vehicleModel && startDate && startTime && endDate && endTime && departurePlace && arrivalPlace) {
+      item = {
+        type,
+        company,
+        vehicleModel,
+        ...common,
+        address: address || undefined,
+        googleMapsUrl: googleMapsUrl || undefined,
+      };
+    }
+  } else if (type === "rail") {
+    const routeName = readString(value, "routeName", errors, true);
+    const trainNumber = readString(value, "trainNumber", errors);
+    const seat = readString(value, "seat", errors);
+    const carriage = readString(value, "carriage", errors);
+    const ticket = readString(value, "ticket", errors);
+    if (routeName && startDate && startTime && endDate && endTime && departurePlace && arrivalPlace) {
+      item = {
+        type,
+        routeName,
+        ...common,
+        trainNumber: trainNumber || undefined,
+        seat: seat || undefined,
+        carriage: carriage || undefined,
+        ticket: ticket || undefined,
+      };
+    }
+  }
 
   return { index, item, errors };
 }
