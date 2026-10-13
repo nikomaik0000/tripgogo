@@ -4,6 +4,7 @@
 
 ### Done
 
+- Responsive Trip/Resource title tracking, marker-free Transportation notes, and five-line Desktop Daily note previews
 - Transportation GPT prompt and JSON import for existing rental-car and rail fields, with strict validation, responsive preview, sequential writes, and Outline refresh
 - Trip Daily whole-day move/date swap with atomic authorization and ordering, plus Homepage title/spacing cleanup and opt-in 56px card swipe
 - Cross-Trip Place/Food copying with dual edit authorization, self-target rejection, independent images, and RLS-derived Homepage `旅遊` / `收藏` tabs

@@ -1,5 +1,13 @@
 # Changelog
 
+## TRIP GOGO — Title and Card Note Polish
+
+Changed
+
+- Relaxed Trip and Resource page-title tracking to `0.02em` on Mobile and `0.04em` on Desktop without changing typography or overflow behavior.
+- Removed the decorative marker from rental-car and rail notes to match Flight and Hotel cards.
+- Increased only the Desktop Daily-card note preview from three to five lines while retaining the compact Mobile rule and full-note Dialog.
+
 ## TRIP GOGO — Transportation JSON Import
 
 Added
