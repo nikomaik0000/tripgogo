@@ -4,6 +4,8 @@
 
 ### Done
 
+- Trip/Collection Resource batch deletion and multi-Trip copying with independent rows, immutable shared-image paths, partial-failure reporting, shared Batch Management visuals, and a consistent GPT Upload entry
+- Outline-only batch deletion for Trip and Collection with permission-aware entry visibility, cross-tab selection, partial-failure reporting, TravelItem image cleanup, and in-place refresh
 - Responsive Trip/Resource title tracking, marker-free Transportation notes, and five-line Desktop Daily note previews
 - Transportation GPT prompt and JSON import for existing rental-car and rail fields, with strict validation, responsive preview, sequential writes, and Outline refresh
 - Trip Daily whole-day move/date swap with atomic authorization and ordering, plus Homepage title/spacing cleanup and opt-in 56px card swipe

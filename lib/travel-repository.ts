@@ -453,8 +453,8 @@ export const travelRepository = {
     const { data, error: readError } = await supabase.from("tg_travel_items").select("image_path").eq("id", itemId).single();
     if (readError) throw new Error(readError.message);
     const imagePath = (data as Pick<TgTravelItemRow, "image_path">).image_path;
-    const { error } = await supabase.from("tg_travel_items").delete().eq("id", itemId);
-    if (error) throw new Error(error.message);
+    const { data: deleted, error } = await supabase.from("tg_travel_items").delete().eq("id", itemId).select("id").single();
+    result(deleted, error);
     if (!imagePath) return {};
     try {
       await removeTravelItemImages([imagePath]);
@@ -490,8 +490,20 @@ export const travelRepository = {
   },
 
   async deleteTripResource(resourceId: string) {
-    const { error } = await createClient().from("tg_trip_resources").delete().eq("id", resourceId);
-    if (error) throw new Error(error.message);
+    const { data, error } = await createClient().from("tg_trip_resources").delete().eq("id", resourceId).select("id").single();
+    result(data, error);
+  },
+
+  async copyTripResourceToTrip(source: TripResource, targetTripId: string) {
+    const { data, error } = await createClient().from("tg_trip_resources").insert({
+      trip_id: targetTripId,
+      category: source.category,
+      title: source.title,
+      note: source.note ?? null,
+      external_url: source.externalUrl ?? null,
+      image_path: source.imagePath ?? null,
+    }).select().single();
+    return mapTripResource(result(data, error) as TgTripResourceRow);
   },
 
   async uploadTripResourceImage(tripId: string, file: File) {
@@ -555,8 +567,8 @@ export const travelRepository = {
   },
 
   async deleteFlight(flightId: string) {
-    const { error } = await createClient().from("tg_flights").delete().eq("id", flightId);
-    if (error) throw new Error(error.message);
+    const { data, error } = await createClient().from("tg_flights").delete().eq("id", flightId).select("id").single();
+    result(data, error);
   },
 
   async getHotelStays(tripId: string) {
@@ -584,8 +596,8 @@ export const travelRepository = {
   },
 
   async deleteHotelStay(stayId: string) {
-    const { error } = await createClient().from("tg_hotel_stays").delete().eq("id", stayId);
-    if (error) throw new Error(error.message);
+    const { data, error } = await createClient().from("tg_hotel_stays").delete().eq("id", stayId).select("id").single();
+    result(data, error);
   },
 
   async getTransportations(tripId: string) {
@@ -624,8 +636,8 @@ export const travelRepository = {
   },
 
   async deleteTransportation(transportationId: string) {
-    const { error } = await createClient().from("tg_transportations").delete().eq("id", transportationId);
-    if (error) throw new Error(error.message);
+    const { data, error } = await createClient().from("tg_transportations").delete().eq("id", transportationId).select("id").single();
+    result(data, error);
   },
 };
 

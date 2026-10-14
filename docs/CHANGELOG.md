@@ -1,5 +1,30 @@
 # Changelog
 
+## TRIP GOGO — Resources Batch Management and Import Entry
+
+Added
+
+- Added permission-aware Resource batch management for Trip and Collection with category-specific selection, cross-tab totals, sequential deletion, and partial-failure reporting.
+- Added sequential copying of selected Resources into one or more editable Trips as independent rows while preserving the existing immutable shared-image path lifecycle.
+- Added the existing GPT JSON Upload action and shared Import Dialog to Resource headers on Desktop and Mobile.
+
+Changed
+
+- Extracted the fixed-height, scroll-safe Batch Management visual shell for reuse by Outline and Resources without changing the existing Outline batch behavior.
+- Strengthened Resource deletion with deleted-row verification so RLS-filtered zero-row deletes cannot be reported as successful.
+
+## TRIP GOGO — Outline Batch Delete
+
+Added
+
+- Added an edit-permission-aware batch-management entry to Trip and Collection Outline views, with mode-specific tabs, per-tab selection, cross-tab totals, and responsive list rows.
+- Added sequential batch deletion for TravelItem, Flight, HotelStay, and Transportation records with confirmation, partial-failure details, TravelItem image-cleanup warnings, and existing in-place refresh paths.
+
+Changed
+
+- Strengthened the four existing repository delete paths with deleted-row verification so RLS-filtered zero-row deletes cannot be reported as successful.
+- Simplified the batch-management tab selection to typography-only emphasis and stabilized the responsive Dialog height so empty and populated tabs share the same fixed shell with a scrollable content area.
+
 ## TRIP GOGO — Title and Card Note Polish
 
 Changed

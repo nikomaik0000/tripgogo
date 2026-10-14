@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowUpDown, CalendarCheck, CalendarDays, CarFront, ChevronRight, Clock3, Copy, Ellipsis, FolderHeart, Hotel, Link2, MapPin, MapPinned, MapPinPlus, Navigation, Plane, Search, SquarePen, TicketCheck, Trash2, UtensilsCrossed, X } from "lucide-react";
+import { ArrowLeft, ArrowUpDown, CalendarCheck, CalendarDays, CarFront, ChevronRight, Clock3, Copy, Ellipsis, FolderHeart, Hotel, Link2, ListChecks, MapPin, MapPinned, MapPinPlus, Navigation, Plane, Search, SquarePen, TicketCheck, Trash2, UtensilsCrossed, X } from "lucide-react";
 import { closestCenter, DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { AuthControl } from "@/components/auth-control";
 import { AddIconButton } from "@/components/add-icon-button";
 import { AddCollectionItemToTripDialog } from "@/components/add-collection-item-to-trip-dialog";
+import { BatchManagementDialog } from "@/components/batch-management-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ClampedNote, LinkifiedText } from "@/components/clamped-note";
@@ -145,7 +146,7 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
       <div className="sm:hidden"><TripPrimaryNav activeTab={tab} onTabChange={setTab} collection={trip.mode === "collection"} /></div>
       {trip.mode === "trip" && tab === "daily" && <Daily trip={trip} items={items} canEdit={canEdit} onAdd={(date) => setDialog({ open: true, type: "place", initialDate: date, allowTypeChange: true })} onEdit={edit} onDelete={remove} onReorder={reorder} onMoveOrSwapDay={moveOrSwapDay} />}
       {(tab === "place" || tab === "food") && <ItemList type={tab} items={items} query={query} sort={sort} collection={trip.mode === "collection"} canEdit={canEdit} canAddToTrip={canEdit && editableTrips.length > 0} onQuery={setQuery} onSort={setSort} onAdd={() => setDialog({ open: true, type: tab, desktopTwoColumn: true })} onEdit={editListItem} onAddToTrip={setAddingToTrip} onDuplicate={duplicate} onDelete={remove} onToggleStatus={toggleCollectionStatus} />}
-      {tab === "outline" && (trip.mode === "collection" ? <CollectionOutline items={items} /> : <Outline trip={trip} items={items} canEdit={canEdit} initialFlights={initialFlights} initialHotelStays={initialHotelStays} initialTransportations={initialTransportations} refreshVersion={outlineRefreshVersion} />)}
+      {tab === "outline" && (trip.mode === "collection" ? <CollectionOutline items={items} canEdit={canEdit} onRefreshItems={refresh} /> : <Outline trip={trip} items={items} canEdit={canEdit} initialFlights={initialFlights} initialHotelStays={initialHotelStays} initialTransportations={initialTransportations} refreshVersion={outlineRefreshVersion} onRefreshItems={refresh} />)}
       {canEdit && <TravelItemImportDialog open={importOpen} trip={trip} onOpenChange={setImportOpen} onImported={async (mode) => {
         if (mode === "itinerary") {
           await refresh();
@@ -291,7 +292,7 @@ function ItemCard({ item, canEdit, canAddToTrip = false, collection = false, onE
       </article>
       </MobileSwipeActions>
       <article className="hidden min-h-[220px] min-w-0 flex-col self-stretch rounded-card border border-border bg-surface px-5 pt-5 sm:flex">
-        <header className="flex min-w-0 items-start justify-between gap-5 pb-5">
+        <header className="flex min-w-0 items-center justify-between gap-5 pb-5">
           <div className="min-w-0 flex-1">
             {item.googleMapsUrl
               ? <a href={item.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label={`在 Google Maps 開啟${item.name}`} title="開啟 Google Maps" className="line-clamp-2 cursor-pointer font-medium text-ink no-underline transition-colors hover:text-[#666666] hover:no-underline focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-ink">{item.name}</a>
@@ -554,7 +555,7 @@ function DailyCard({ item, canEdit, swipeOpen = false, swipeDragging = false, on
     <div className="hidden min-h-[130px] min-w-0 grid-cols-[56px_208px_minmax(0,1fr)_56px_56px] sm:grid md:grid-cols-[64px_264px_minmax(0,1fr)_64px_64px] lg:grid-cols-[72px_288px_minmax(0,1fr)_72px_72px] xl:grid-cols-[72px_336px_minmax(0,1fr)_72px_72px]">
       <div className="flex items-center justify-center"><TypeMark item={item} /></div>
       <DailyDesktopInfo item={item} />
-      <div className="min-w-0 border-l border-divider/60 px-4 pt-[27px] md:px-5">{item.note && <div className="min-w-0"><ClampedNote note={item.note} lines={5} linkify textClassName={CARD_NOTE_TYPOGRAPHY} showMarker={false} /></div>}</div>
+      <div className="flex min-w-0 flex-col justify-center border-l border-divider/60 px-4 md:px-5">{item.note && <div className="min-w-0"><ClampedNote note={item.note} lines={5} linkify textClassName={CARD_NOTE_TYPOGRAPHY} showMarker={false} /></div>}</div>
       <DailyExternalLinks item={item} />
       <DailyDesktopManageActions canEdit={canEdit} onEdit={onEdit} onDelete={onDelete} />
     </div>
@@ -606,13 +607,18 @@ function formatRating(rating: number) {
   return Number.isInteger(rating) ? String(rating) : String(Number(rating.toFixed(2)));
 }
 
-function CollectionOutline({ items }: { items: TravelItem[] }) {
+function CollectionOutline({ items, canEdit, onRefreshItems }: { items: TravelItem[]; canEdit: boolean; onRefreshItems: () => Promise<void> }) {
+  const [batchOpen, setBatchOpen] = useState(false);
   const food = items.filter((item) => item.type === "food");
   const places = items.filter((item) => item.type === "place");
-  return <div className="space-y-10 pb-24 pt-8">
-    <CollectionSummary label="美食" items={food} plannedLabel="想吃" completedLabel="吃過" />
-    <CollectionSummary label="地點" items={places} plannedLabel="想去" completedLabel="去過" />
-  </div>;
+  return <>
+    {canEdit && items.length > 0 && <div className="mb-8 flex min-w-0 justify-end pt-5 sm:pt-6"><BatchManagementAction onClick={() => setBatchOpen(true)} /></div>}
+    <div className="space-y-10 pb-24">
+      <CollectionSummary label="美食" items={food} plannedLabel="想吃" completedLabel="吃過" />
+      <CollectionSummary label="地點" items={places} plannedLabel="想去" completedLabel="去過" />
+    </div>
+    <BatchManagementDialog open={batchOpen} mode="collection" items={items} onOpenChange={setBatchOpen} onRefreshItems={onRefreshItems} />
+  </>;
 }
 
 function CollectionSummary({ label, items, plannedLabel, completedLabel }: { label: string; items: TravelItem[]; plannedLabel: string; completedLabel: string }) {
@@ -638,10 +644,11 @@ function CollectionOutlineGroup({ label, items, completed = false }: { label: st
   })}</div></div>)}</div>}</section>;
 }
 
-function Outline({ trip, items, canEdit, initialFlights, initialHotelStays, initialTransportations, refreshVersion }: { trip: Trip; items: TravelItem[]; canEdit: boolean; initialFlights: Flight[]; initialHotelStays: HotelStay[]; initialTransportations: Transportation[]; refreshVersion: number }) {
+function Outline({ trip, items, canEdit, initialFlights, initialHotelStays, initialTransportations, refreshVersion, onRefreshItems }: { trip: Trip; items: TravelItem[]; canEdit: boolean; initialFlights: Flight[]; initialHotelStays: HotelStay[]; initialTransportations: Transportation[]; refreshVersion: number; onRefreshItems: () => Promise<void> }) {
   const [flights, setFlights] = useState<Flight[]>(initialFlights);
   const [hotelStays, setHotelStays] = useState<HotelStay[]>(initialHotelStays);
   const [transportations, setTransportations] = useState<Transportation[]>(initialTransportations);
+  const [batchOpen, setBatchOpen] = useState(false);
   const [flightDialog, setFlightDialog] = useState<{ open: boolean; flight?: Flight }>({ open: false });
   const [hotelDialog, setHotelDialog] = useState<{ open: boolean; stay?: HotelStay }>({ open: false });
   const [transportationDialog, setTransportationDialog] = useState<{ open: boolean; transportation?: Transportation }>({ open: false });
@@ -665,13 +672,17 @@ function Outline({ trip, items, canEdit, initialFlights, initialHotelStays, init
   const sortedFlights = [...flights].sort((a, b) => `${a.departureDate}T${a.departureTime}`.localeCompare(`${b.departureDate}T${b.departureTime}`) || a.createdAt.localeCompare(b.createdAt));
   const sortedStays = [...hotelStays].sort((a, b) => a.checkInDate.localeCompare(b.checkInDate) || a.createdAt.localeCompare(b.createdAt));
   const sortedTransportations = [...transportations].sort((a, b) => `${a.startDate}T${a.startTime}`.localeCompare(`${b.startDate}T${b.startTime}`) || a.createdAt.localeCompare(b.createdAt));
+  const hasManageableData = items.length + flights.length + hotelStays.length + transportations.length > 0;
   const navigation = [{ value: "flight", label: "機票" }, { value: "hotel", label: "住宿" }, { value: "transportation", label: "交通" }, { value: "itinerary", label: "行程" }];
   const jumpToSection = (section: string) => {
     setActiveSection(section);
     document.getElementById(`outline-${section}`)?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   };
   return <>
-    <nav aria-label="大綱快速導覽" className="no-scrollbar mb-8 max-w-full overflow-x-auto pt-5 sm:pt-6"><div className="flex min-w-max flex-nowrap items-center gap-5 pr-4">{navigation.map(({ value, label }) => <button key={value} type="button" onClick={() => jumpToSection(value)} aria-current={activeSection === value ? "location" : undefined} className={`shrink-0 border-b pb-1 text-xs transition-colors ${activeSection === value ? "border-muted text-ink" : "border-transparent text-muted hover:text-[#555555]"}`}>{label}</button>)}</div></nav>
+    <div className="mb-8 flex min-w-0 items-start gap-3 pt-5 sm:pt-6">
+      <nav aria-label="大綱快速導覽" className="no-scrollbar min-w-0 flex-1 overflow-x-auto"><div className="flex min-w-max flex-nowrap items-center gap-5 pr-4">{navigation.map(({ value, label }) => <button key={value} type="button" onClick={() => jumpToSection(value)} aria-current={activeSection === value ? "location" : undefined} className={`shrink-0 border-b pb-1 text-xs transition-colors ${activeSection === value ? "border-muted text-ink" : "border-transparent text-muted hover:text-[#555555]"}`}>{label}</button>)}</div></nav>
+      {canEdit && hasManageableData && <BatchManagementAction onClick={() => setBatchOpen(true)} />}
+    </div>
     <div className="space-y-12">
       <OutlineDetailsSection id="outline-flight" icon={Plane} label="機票" addLabel="新增機票" canEdit={canEdit} onAdd={() => setFlightDialog({ open: true })}>
         {sortedFlights.length > 0 && <div className="grid grid-cols-1 gap-6 md:grid-cols-2">{sortedFlights.map((flight) => <FlightCard key={flight.id} flight={flight} canEdit={canEdit} swipeOpen={openItemId === `flight-${flight.id}`} onSwipeOpen={() => openSwipe(`flight-${flight.id}`)} onSwipeClose={closeSwipe} onEdit={() => setFlightDialog({ open: true, flight })} onDelete={() => setDeleting({ kind: "flight", value: flight })} />)}</div>}
@@ -688,7 +699,12 @@ function Outline({ trip, items, canEdit, initialFlights, initialHotelStays, init
     <HotelStayDialog open={hotelDialog.open} stay={hotelDialog.stay} onOpenChange={(open) => setHotelDialog((current) => ({ ...current, open }))} onSave={(value) => { travelRepository.saveHotelStay({ ...value, id: hotelDialog.stay?.id, tripId: trip.id }).then(() => refresh()).then(() => { setHotelDialog({ open: false }); toast.success(hotelDialog.stay ? "已更新飯店" : "已新增飯店"); }).catch((error) => toast.error(errorMessage(error, "飯店儲存失敗"))); }} />
     <TransportationDialog open={transportationDialog.open} transportation={transportationDialog.transportation} onOpenChange={(open) => setTransportationDialog((current) => ({ ...current, open }))} onSave={(value) => { travelRepository.saveTransportation({ ...value, id: transportationDialog.transportation?.id, tripId: trip.id }).then(() => refresh()).then(() => { setTransportationDialog({ open: false }); toast.success(transportationDialog.transportation ? "已更新交通" : "已新增交通"); }).catch((error) => toast.error(errorMessage(error, "交通儲存失敗"))); }} />
     <ConfirmDialog open={Boolean(deleting)} title={`刪除${deleting?.kind === "flight" ? "機票" : deleting?.kind === "hotel" ? "飯店" : "交通"}`} description={`確定刪除「${deleting ? deleteLabel(deleting) : ""}」？`} onOpenChange={(open) => { if (!open) setDeleting(undefined); }} onConfirm={() => { if (!deleting) return; const action = deleting.kind === "flight" ? travelRepository.deleteFlight(deleting.value.id) : deleting.kind === "hotel" ? travelRepository.deleteHotelStay(deleting.value.id) : travelRepository.deleteTransportation(deleting.value.id); action.then(() => refresh()).then(() => { setDeleting(undefined); toast.success("已刪除"); }).catch((error) => toast.error(errorMessage(error, "刪除失敗"))); }} />
+    <BatchManagementDialog open={batchOpen} mode="trip" items={items} flights={flights} hotelStays={hotelStays} transportations={transportations} onOpenChange={setBatchOpen} onRefreshItems={onRefreshItems} onRefreshOutline={refresh} />
   </>;
+}
+
+function BatchManagementAction({ onClick }: { onClick: () => void }) {
+  return <button type="button" aria-label="批次管理" title="批次管理" onClick={onClick} className="flex h-10 w-10 shrink-0 items-center justify-center border-0 bg-transparent text-muted shadow-none transition-colors hover:bg-transparent hover:text-[#555555] sm:h-9 sm:w-9"><ListChecks className="h-4 w-4 stroke-[1.5]" /></button>;
 }
 
 function OutlineDetailsSection({ id, icon: Icon, label, addLabel, canEdit, onAdd, children }: { id: string; icon: typeof Plane; label: string; addLabel: string; canEdit: boolean; onAdd: () => void; children: React.ReactNode }) {

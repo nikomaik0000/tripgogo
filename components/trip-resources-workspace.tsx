@@ -10,12 +10,14 @@ import { ClampedNote } from "@/components/clamped-note";
 import { ConfirmDialog, useUnsavedChangesDialog } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { MobileSwipeActions, useMobileSwipeGroup } from "@/components/mobile-daily-swipe-actions";
+import { ResourceBatchManagementAction, ResourceBatchManagementDialog } from "@/components/resource-batch-management-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input, Textarea } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StandaloneRefreshAction } from "@/components/standalone-refresh-action";
 import { TripPrimaryNav } from "@/components/trip-primary-nav";
+import { TravelItemImportAction, TravelItemImportDialog } from "@/components/travel-item-import-dialog";
 import { useAuth } from "@/lib/auth-context";
 import { travelRepository } from "@/lib/travel-repository";
 import type { Trip, TripResource, TripResourceCategory, TripRole } from "@/lib/types";
@@ -46,6 +48,8 @@ export function TripResourcesWorkspace({ tripId, initialTrip }: { tripId: string
   const [activeCategory, setActiveCategory] = useState<TripResourceCategory>(initialTrip?.mode === "collection" ? "note" : "transportation");
   const [dialog, setDialog] = useState<{ open: boolean; resource?: TripResource; initialCategory?: TripResourceCategory }>({ open: false });
   const [deleting, setDeleting] = useState<TripResource>();
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const { openItemId, open: openSwipe, close: closeSwipe } = useMobileSwipeGroup();
 
   const refresh = useCallback(async () => {
@@ -90,12 +94,15 @@ export function TripResourcesWorkspace({ tripId, initialTrip }: { tripId: string
       <header className="sticky top-0 z-20 -mx-4 flex items-center gap-3 border-b border-border bg-bg/95 px-4 pb-3 pt-3 backdrop-blur sm:-mx-6 sm:gap-4 sm:px-6 sm:py-4">
         <div className="flex min-w-0 flex-1 items-center gap-3 sm:flex-initial"><Link href={`/trip/${tripId}`} aria-label="返回旅行" title="返回旅行" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-muted hover:bg-searchBackground hover:text-[#555555] sm:h-9 sm:w-9"><ArrowLeft className="h-4 w-4 stroke-[1.5]" /></Link><h1 className="min-w-0 truncate text-title font-semibold !tracking-[0.02em] sm:!tracking-[0.04em]">{trip.name}</h1></div>
         <div aria-hidden="true" className="hidden min-w-4 flex-1 sm:block" />
-        <div className="hidden shrink-0 items-center gap-3 sm:flex"><TripPrimaryNav tripId={tripId} collection={trip.mode === "collection"} /><div className="flex shrink-0 items-center justify-end gap-1 before:mr-2 before:h-[30px] before:w-px before:shrink-0 before:bg-border before:content-['']"><StandaloneRefreshAction className="border-0 bg-transparent shadow-none hover:bg-transparent" /><Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" aria-current="page" className="flex h-11 w-11 shrink-0 items-center justify-center border-0 bg-transparent text-muted shadow-none hover:bg-transparent hover:text-ink"><FolderHeart className="h-4 w-4 stroke-[1.5]" /></Link><AuthControl className="border-0 bg-transparent text-muted shadow-none hover:bg-transparent hover:text-ink [&>svg]:h-4 [&>svg]:w-4" /></div></div>
-        <div className="flex shrink-0 items-center justify-end gap-2 sm:hidden"><StandaloneRefreshAction /><Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" aria-current="page" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-ink hover:bg-searchBackground"><FolderHeart className="h-4 w-4 stroke-[1.5]" /></Link><AuthControl /></div>
+        <div className="hidden shrink-0 items-center gap-3 sm:flex"><TripPrimaryNav tripId={tripId} collection={trip.mode === "collection"} /><div className="flex shrink-0 items-center justify-end gap-1 before:mr-2 before:h-[30px] before:w-px before:shrink-0 before:bg-border before:content-['']"><StandaloneRefreshAction className="border-0 bg-transparent shadow-none hover:bg-transparent" />{canEdit && <TravelItemImportAction onClick={() => setImportOpen(true)} className="border-0 bg-transparent shadow-none hover:bg-transparent hover:text-ink" />}<Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" aria-current="page" className="flex h-11 w-11 shrink-0 items-center justify-center border-0 bg-transparent text-muted shadow-none hover:bg-transparent hover:text-ink"><FolderHeart className="h-4 w-4 stroke-[1.5]" /></Link><AuthControl className="border-0 bg-transparent text-muted shadow-none hover:bg-transparent hover:text-ink [&>svg]:h-4 [&>svg]:w-4" /></div></div>
+        <div className="flex shrink-0 items-center justify-end gap-2 sm:hidden"><StandaloneRefreshAction />{canEdit && <TravelItemImportAction onClick={() => setImportOpen(true)} />}<Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" aria-current="page" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-ink hover:bg-searchBackground"><FolderHeart className="h-4 w-4 stroke-[1.5]" /></Link><AuthControl /></div>
       </header>
       <div className="sm:hidden"><TripPrimaryNav tripId={tripId} collection={trip.mode === "collection"} /></div>
 
-      <nav id="resource-categories" aria-label="旅途資訊分類快速導覽" className="no-scrollbar mb-8 max-w-full scroll-mt-36 overflow-x-auto pt-5 sm:pt-6"><div className="flex min-w-max flex-nowrap items-center gap-5 pr-4">{resourceCategories.map(({ value, label }) => <button key={value} type="button" onClick={() => jumpToCategory(value)} aria-current={activeCategory === value ? "location" : undefined} className={`shrink-0 border-b pb-1 text-xs transition-colors ${activeCategory === value ? "border-muted text-ink" : "border-transparent text-muted hover:text-[#555555]"}`}>{label}</button>)}</div></nav>
+      <div id="resource-categories" className="mb-8 flex min-w-0 scroll-mt-36 items-start gap-3 pt-5 sm:pt-6">
+        <nav aria-label="旅途資訊分類快速導覽" className="no-scrollbar min-w-0 flex-1 overflow-x-auto"><div className="flex min-w-max flex-nowrap items-center gap-5 pr-4">{resourceCategories.map(({ value, label }) => <button key={value} type="button" onClick={() => jumpToCategory(value)} aria-current={activeCategory === value ? "location" : undefined} className={`shrink-0 border-b pb-1 text-xs transition-colors ${activeCategory === value ? "border-muted text-ink" : "border-transparent text-muted hover:text-[#555555]"}`}>{label}</button>)}</div></nav>
+        {canEdit && resources.length > 0 && <ResourceBatchManagementAction onClick={() => setBatchOpen(true)} />}
+      </div>
       {resources.length === 0 && !canEdit
         ? <EmptyState title="尚無旅途資訊" description="" />
         : <div className="space-y-12">{resourceCategories.map(({ value, label, icon: Icon }) => {
@@ -105,6 +112,8 @@ export function TripResourcesWorkspace({ tripId, initialTrip }: { tripId: string
         })}</div>}
 
       <ResourceDialog open={dialog.open} resource={dialog.resource} initialCategory={dialog.initialCategory} tripId={tripId} onOpenChange={(open) => setDialog((current) => ({ ...current, open }))} onSaved={() => { setDialog({ open: false }); refresh(); }} />
+      <ResourceBatchManagementDialog open={batchOpen} mode={trip.mode} sourceTripId={tripId} resources={resources} onOpenChange={setBatchOpen} onRefresh={refresh} />
+      {canEdit && <TravelItemImportDialog open={importOpen} trip={trip} onOpenChange={setImportOpen} onImported={() => undefined} />}
       <ConfirmDialog open={Boolean(deleting)} title="刪除旅途資訊" description={`確定刪除「${deleting?.title ?? ""}」？圖片檔案將保留，避免影響其他複本。`} onOpenChange={(open) => { if (!open) setDeleting(undefined); }} onConfirm={() => {
         if (!deleting) return;
         travelRepository.deleteTripResource(deleting.id).then(refresh).then(() => { setDeleting(undefined); toast.success("已刪除"); }).catch((error) => toast.error(errorMessage(error, "刪除失敗")));
