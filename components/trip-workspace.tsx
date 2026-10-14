@@ -679,7 +679,7 @@ function Outline({ trip, items, canEdit, initialFlights, initialHotelStays, init
     document.getElementById(`outline-${section}`)?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   };
   return <>
-    <div className="mb-8 flex min-w-0 items-start gap-3 pt-5 sm:pt-6">
+    <div className="mb-8 flex min-w-0 items-center gap-3 pt-5 sm:items-start sm:pt-6">
       <nav aria-label="大綱快速導覽" className="no-scrollbar min-w-0 flex-1 overflow-x-auto"><div className="flex min-w-max flex-nowrap items-center gap-5 pr-4">{navigation.map(({ value, label }) => <button key={value} type="button" onClick={() => jumpToSection(value)} aria-current={activeSection === value ? "location" : undefined} className={`shrink-0 border-b pb-1 text-xs transition-colors ${activeSection === value ? "border-muted text-ink" : "border-transparent text-muted hover:text-[#555555]"}`}>{label}</button>)}</div></nav>
       {canEdit && hasManageableData && <BatchManagementAction onClick={() => setBatchOpen(true)} />}
     </div>

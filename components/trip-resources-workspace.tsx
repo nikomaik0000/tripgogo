@@ -99,7 +99,7 @@ export function TripResourcesWorkspace({ tripId, initialTrip }: { tripId: string
       </header>
       <div className="sm:hidden"><TripPrimaryNav tripId={tripId} collection={trip.mode === "collection"} /></div>
 
-      <div id="resource-categories" className="mb-8 flex min-w-0 scroll-mt-36 items-start gap-3 pt-5 sm:pt-6">
+      <div id="resource-categories" className="mb-8 flex min-w-0 scroll-mt-36 items-center gap-3 pt-5 sm:items-start sm:pt-6">
         <nav aria-label="旅途資訊分類快速導覽" className="no-scrollbar min-w-0 flex-1 overflow-x-auto"><div className="flex min-w-max flex-nowrap items-center gap-5 pr-4">{resourceCategories.map(({ value, label }) => <button key={value} type="button" onClick={() => jumpToCategory(value)} aria-current={activeCategory === value ? "location" : undefined} className={`shrink-0 border-b pb-1 text-xs transition-colors ${activeCategory === value ? "border-muted text-ink" : "border-transparent text-muted hover:text-[#555555]"}`}>{label}</button>)}</div></nav>
         {canEdit && resources.length > 0 && <ResourceBatchManagementAction onClick={() => setBatchOpen(true)} />}
       </div>
