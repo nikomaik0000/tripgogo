@@ -11,6 +11,7 @@ import {
 } from "@/components/batch-management-dialog-shell";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { extractResourceNotePlainText } from "@/lib/resource-note-format";
 import { travelRepository } from "@/lib/travel-repository";
 import type { Trip, TripMode, TripResource, TripResourceCategory } from "@/lib/types";
 
@@ -279,7 +280,8 @@ export function ResourceBatchManagementDialog({ open, mode, sourceTripId, resour
 }
 
 function resourceRow(resource: TripResource): ResourceBatchRow {
-  const note = resource.note?.replace(/\s+/g, " ").trim();
+  const noteValue = resource.category === "note" ? extractResourceNotePlainText(resource.note) : resource.note;
+  const note = noteValue?.replace(/\s+/g, " ").trim();
   const noteSummary = note && note.length > 60 ? `${note.slice(0, 60)}…` : note;
   return {
     id: resource.id,

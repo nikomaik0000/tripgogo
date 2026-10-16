@@ -4,6 +4,9 @@
 
 ### Done
 
+- Resource note toolbar color-swatch polish and Dialog-scoped TravelItem image paste replacement without intercepting text fields
+- Resources card category-label cleanup, Place/Food-aligned body typography, and note-only structured bold/three-color highlighting with safe plain-text paste, URL-aware clamp/More rendering, and migration-free copy compatibility
+- TravelItem image clipboard paste and fixed 3:2 cropping for new and existing images, with drag/zoom/reset controls, single-pass browser encoding, deferred upload, and marker-free Resource card notes
 - Trip/Collection Resource batch deletion and multi-Trip copying with independent rows, immutable shared-image paths, partial-failure reporting, shared Batch Management visuals, and a consistent GPT Upload entry
 - Outline-only batch deletion for Trip and Collection with permission-aware entry visibility, cross-tab selection, partial-failure reporting, TravelItem image cleanup, and in-place refresh
 - Responsive Trip/Resource title tracking, marker-free Transportation notes, and five-line Desktop Daily note previews

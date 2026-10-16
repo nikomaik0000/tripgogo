@@ -13,7 +13,7 @@ import { AddCollectionItemToTripDialog } from "@/components/add-collection-item-
 import { BatchManagementDialog } from "@/components/batch-management-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { ClampedNote, LinkifiedText } from "@/components/clamped-note";
+import { CARD_NOTE_TYPOGRAPHY, ClampedNote, LinkifiedText } from "@/components/clamped-note";
 import { FlightDialog } from "@/components/flight-dialog";
 import { HotelStayDialog } from "@/components/hotel-stay-dialog";
 import { isDailyCardInteractiveTarget, MobileDailySwipeActions, MobileSwipeActions, useMobileSwipeGroup } from "@/components/mobile-daily-swipe-actions";
@@ -34,7 +34,6 @@ import type { CollectionItemStatus, Flight, HotelStay, Transportation, TravelIte
 
 type Tab = TripPrimaryTab;
 type DayOperation = "move" | "swap";
-const CARD_NOTE_TYPOGRAPHY = "text-xs font-normal leading-[1.65] tracking-body text-muted";
 
 export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlights, initialHotelStays, initialTransportations }: {
   tripId: string;

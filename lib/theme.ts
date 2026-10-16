@@ -49,6 +49,11 @@ export const colors = {
     place: "#cfedf9",
     shop: "#ffe9ee",
   },
+  resourceNoteHighlight: {
+    yellow: "#F5EED8",
+    pink: "#F3E3E6",
+    blue: "#E3EBF0",
+  },
 } as const;
 
 export const borderRadius = {

@@ -1,5 +1,39 @@
 # Changelog
 
+## TRIP GOGO — Resource Toolbar and Image Paste Polish
+
+Changed
+
+- Simplified the Resource note toolbar to keep the bold action and show the existing yellow, pink, and blue highlights as compact accessible color swatches with lightweight active outlines.
+- Expanded TravelItem clipboard image paste handling to the open item Dialog while preserving native paste behavior in inputs, textareas, and editable text regions.
+- Existing TravelItem images can now be replaced by pasting directly into the Dialog, while crop cancellation and parent Dialog cancellation continue to leave Storage unchanged.
+
+## TRIP GOGO — Resource Note Emphasis
+
+Added
+
+- Added a Resources-only lightweight note editor with bold and low-saturation yellow, pink, and blue highlights, backed by versioned structured spans in the existing note field.
+- Added plain-text-only paste and drop handling for Resource notes so external HTML, styles, fonts, scripts, frames, and images are never persisted or rendered.
+
+Changed
+
+- Removed the redundant category subtitle from Resource cards while preserving section headings, tabs, card dividers, and title spacing.
+- Unified Resource card body typography with the existing Place/Food card-note style across Desktop and Mobile.
+- Extended the existing safe URL, clamp, and More Dialog pipeline to render formatted Resource notes without storing HTML, adding schema fields, or introducing an editor package.
+- Resource batch summaries now extract visible plain text from formatted notes; existing Resource and whole-Trip copy paths continue to preserve the stored note value unchanged.
+
+## TRIP GOGO — TravelItem Image Paste and Crop
+
+Added
+
+- Added clipboard image paste to the existing TravelItem image dropzone without intercepting text or HTML paste in other Dialog fields.
+- Added a shared 3:2 crop editor for selected, dropped, pasted, and existing TravelItem images with cover positioning, pointer dragging, zoom, reset, cancel, and apply controls.
+
+Changed
+
+- TravelItem image processing now crops and compresses directly from the source in one canvas pass, then defers the existing upload and replace lifecycle until the parent Dialog is saved.
+- Removed the decorative marker only from Resource card notes while preserving their content, wrapping, typography, and spacing.
+
 ## TRIP GOGO — Resources Batch Management and Import Entry
 
 Added

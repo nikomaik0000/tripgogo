@@ -1,10 +1,17 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Link2 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
-export function ClampedNote({ note, lines, textClassName = "", linkify = false, showMarker = true, moreLabel = "+ More", lessLabel = "−", inlineExpand = false, hideMoreAction = false, onOverflowChange }: { note: string; lines: 1 | 2 | 3 | 4 | 5 | 10; textClassName?: string; linkify?: boolean; showMarker?: boolean; moreLabel?: string; lessLabel?: string; inlineMore?: boolean; inlineExpand?: boolean; hideMoreAction?: boolean; onOverflowChange?: (overflow: boolean) => void }) {
+export const CARD_NOTE_TYPOGRAPHY = "text-xs font-normal leading-[1.65] tracking-body text-muted";
+
+export type ClampedNoteFormattedRenderer = {
+  render: (text: string) => ReactNode;
+  appendToMeasurement: (container: HTMLElement, text: string) => void;
+};
+
+export function ClampedNote({ note, lines, textClassName = "", linkify = false, showMarker = true, moreLabel = "+ More", lessLabel = "−", inlineExpand = false, hideMoreAction = false, onOverflowChange, formattedRenderer }: { note: string; lines: 1 | 2 | 3 | 4 | 5 | 10; textClassName?: string; linkify?: boolean; showMarker?: boolean; moreLabel?: string; lessLabel?: string; inlineMore?: boolean; inlineExpand?: boolean; hideMoreAction?: boolean; onOverflowChange?: (overflow: boolean) => void; formattedRenderer?: ClampedNoteFormattedRenderer }) {
   const textRef = useRef<HTMLParagraphElement>(null);
   const onOverflowChangeRef = useRef(onOverflowChange);
   const [preview, setPreview] = useState<string>();
@@ -45,17 +52,16 @@ export function ClampedNote({ note, lines, textClassName = "", linkify = false, 
       const units = linkify ? linkifiedMeasurementUnits(note) : Array.from(note).map((value) => ({ type: "text", value }) as const);
       const fits = (length: number, suffix = "") => {
         measuring.replaceChildren();
-        for (const unit of units.slice(0, length)) {
-          if (unit.type === "link") {
-            const placeholder = document.createElement("span");
-            placeholder.setAttribute("aria-hidden", "true");
-            placeholder.style.display = "inline-block";
-            placeholder.style.width = "1rem";
-            placeholder.style.height = "1rem";
-            placeholder.style.verticalAlign = "middle";
-            measuring.appendChild(placeholder);
-          } else {
-            measuring.appendChild(document.createTextNode(unit.value));
+        const visibleUnits = units.slice(0, length);
+        if (formattedRenderer) {
+          formattedRenderer.appendToMeasurement(measuring, visibleUnits.map((unit) => unit.value).join(""));
+        } else {
+          for (const unit of visibleUnits) {
+            if (unit.type === "link") {
+              appendLinkPlaceholder(measuring);
+            } else {
+              measuring.appendChild(document.createTextNode(unit.value));
+            }
           }
         }
         if (suffix) measuring.appendChild(document.createTextNode(suffix));
@@ -82,18 +88,18 @@ export function ClampedNote({ note, lines, textClassName = "", linkify = false, 
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [hideMoreAction, linkify, moreLabel, note, lines]);
+  }, [formattedRenderer, hideMoreAction, linkify, moreLabel, note, lines]);
 
   useLayoutEffect(() => setExpanded(false), [note, lines]);
 
   return <>
     <div className={showMarker ? "grid min-w-0 grid-cols-[16px_minmax(0,1fr)] items-start gap-x-2 text-sm text-muted" : "min-w-0 text-sm text-muted"}>
       {showMarker && <span aria-hidden="true" className="flex h-4 w-4 items-center justify-center leading-4">✦</span>}
-      <p ref={textRef} className={`min-w-0 whitespace-pre-wrap break-words ${textClassName}`}>{linkify ? <LinkifiedText text={expanded || !preview ? note : preview} /> : expanded || !preview ? note : preview}{preview && !hideMoreAction && <> <button type="button" aria-label={expanded ? "收合備註" : "查看完整備註"} title={expanded ? "收合備註" : "查看完整備註"} onMouseDown={stopPropagation} onTouchStart={stopPropagation} onPointerDown={stopPropagation} onClick={() => inlineExpand ? setExpanded((value) => !value) : setOpen(true)} className="inline px-1 text-xs leading-[inherit] text-muted/90 transition-colors hover:text-muted">{expanded ? lessLabel : moreLabel}</button></>}</p>
+      <p ref={textRef} className={`min-w-0 whitespace-pre-wrap break-words ${textClassName}`}>{renderNoteText(expanded || !preview ? note : preview, linkify, formattedRenderer)}{preview && !hideMoreAction && <> <button type="button" aria-label={expanded ? "收合備註" : "查看完整備註"} title={expanded ? "收合備註" : "查看完整備註"} onMouseDown={stopPropagation} onTouchStart={stopPropagation} onPointerDown={stopPropagation} onClick={() => inlineExpand ? setExpanded((value) => !value) : setOpen(true)} className="inline px-1 text-xs leading-[inherit] text-muted/90 transition-colors hover:text-muted">{expanded ? lessLabel : moreLabel}</button></>}</p>
     </div>
     {!inlineExpand && <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent title="備註">
-        <p className="min-w-0 whitespace-pre-wrap break-words text-sm text-ink">{linkify ? <LinkifiedText text={note} /> : note}</p>
+        <p className="min-w-0 whitespace-pre-wrap break-words text-sm text-ink">{renderNoteText(note, linkify, formattedRenderer)}</p>
       </DialogContent>
     </Dialog>}
   </>;
@@ -106,48 +112,64 @@ function stopPropagation(event: React.SyntheticEvent) {
 const URL_PATTERN = /https?:\/\/[^\s，。！？；：（）【】《》]+/gi;
 const TRAILING_PUNCTUATION = /[.,!?;:\])}，。！？；：）】》]+$/;
 
-type LinkifiedSegment = { type: "text"; value: string } | { type: "link"; value: string };
+export type LinkifiedSegment = { type: "text" | "link"; value: string; start: number; end: number };
+type LinkifiedMeasurementUnit = Pick<LinkifiedSegment, "type" | "value">;
 
-export function LinkifiedText({ text }: { text: string }) {
+export function LinkifiedText({ text, renderText }: { text: string; renderText?: (value: string, start: number, end: number) => ReactNode }) {
   const parts: React.ReactNode[] = [];
   for (const [index, segment] of linkifiedSegments(text).entries()) {
     if (segment.type === "link") {
       parts.push(<a key={`${index}-${segment.value}`} href={segment.value} target="_blank" rel="noopener noreferrer" aria-label="開啟連結" title="開啟連結" className="inline-flex h-4 w-4 shrink-0 items-center justify-center align-middle leading-none text-muted transition-colors hover:text-[#555555]"><Link2 aria-hidden="true" className="h-4 w-4" /></a>);
     } else {
-      parts.push(segment.value);
+      parts.push(renderText ? <span key={`${index}-${segment.start}`}>{renderText(segment.value, segment.start, segment.end)}</span> : segment.value);
     }
   }
   return <>{parts}</>;
 }
 
-function linkifiedMeasurementUnits(text: string): LinkifiedSegment[] {
-  const units: LinkifiedSegment[] = [];
+function linkifiedMeasurementUnits(text: string): LinkifiedMeasurementUnit[] {
+  const units: LinkifiedMeasurementUnit[] = [];
   for (const segment of linkifiedSegments(text)) {
     if (segment.type === "link") units.push(segment);
-    else units.push(...Array.from(segment.value).map((value): LinkifiedSegment => ({ type: "text", value })));
+    else units.push(...Array.from(segment.value).map((value): LinkifiedMeasurementUnit => ({ type: "text", value })));
   }
   return units;
 }
 
-function linkifiedSegments(text: string): LinkifiedSegment[] {
+export function linkifiedSegments(text: string): LinkifiedSegment[] {
   const segments: LinkifiedSegment[] = [];
   let cursor = 0;
   for (const match of text.matchAll(URL_PATTERN)) {
     const index = match.index ?? 0;
-    if (index > cursor) segments.push({ type: "text", value: text.slice(cursor, index) });
+    if (index > cursor) segments.push({ type: "text", value: text.slice(cursor, index), start: cursor, end: index });
     const candidate = match[0];
     const trailing = candidate.match(TRAILING_PUNCTUATION)?.[0] ?? "";
     const href = trailing ? candidate.slice(0, -trailing.length) : candidate;
     if (isSafeHttpUrl(href)) {
-      segments.push({ type: "link", value: href });
-      if (trailing) segments.push({ type: "text", value: trailing });
+      segments.push({ type: "link", value: href, start: index, end: index + href.length });
+      if (trailing) segments.push({ type: "text", value: trailing, start: index + href.length, end: index + candidate.length });
     } else {
-      segments.push({ type: "text", value: candidate });
+      segments.push({ type: "text", value: candidate, start: index, end: index + candidate.length });
     }
     cursor = index + candidate.length;
   }
-  if (cursor < text.length) segments.push({ type: "text", value: text.slice(cursor) });
+  if (cursor < text.length) segments.push({ type: "text", value: text.slice(cursor), start: cursor, end: text.length });
   return segments;
+}
+
+export function appendLinkPlaceholder(container: HTMLElement) {
+  const placeholder = document.createElement("span");
+  placeholder.setAttribute("aria-hidden", "true");
+  placeholder.style.display = "inline-block";
+  placeholder.style.width = "1rem";
+  placeholder.style.height = "1rem";
+  placeholder.style.verticalAlign = "middle";
+  container.appendChild(placeholder);
+}
+
+function renderNoteText(text: string, linkify: boolean, formattedRenderer?: ClampedNoteFormattedRenderer) {
+  if (formattedRenderer) return formattedRenderer.render(text);
+  return linkify ? <LinkifiedText text={text} /> : text;
 }
 
 function isSafeHttpUrl(value: string) {

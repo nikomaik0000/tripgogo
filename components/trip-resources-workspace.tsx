@@ -6,11 +6,12 @@ import { ArrowLeft, CarFront, ExternalLink, FolderHeart, ImageIcon, ImageUp, Squ
 import { toast } from "sonner";
 import { AddIconButton } from "@/components/add-icon-button";
 import { AuthControl } from "@/components/auth-control";
-import { ClampedNote } from "@/components/clamped-note";
+import { CARD_NOTE_TYPOGRAPHY, ClampedNote } from "@/components/clamped-note";
 import { ConfirmDialog, useUnsavedChangesDialog } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { MobileSwipeActions, useMobileSwipeGroup } from "@/components/mobile-daily-swipe-actions";
 import { ResourceBatchManagementAction, ResourceBatchManagementDialog } from "@/components/resource-batch-management-dialog";
+import { ResourceClampedNote, ResourceNoteEditor } from "@/components/resource-note";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input, Textarea } from "@/components/ui/input";
@@ -19,6 +20,7 @@ import { StandaloneRefreshAction } from "@/components/standalone-refresh-action"
 import { TripPrimaryNav } from "@/components/trip-primary-nav";
 import { TravelItemImportAction, TravelItemImportDialog } from "@/components/travel-item-import-dialog";
 import { useAuth } from "@/lib/auth-context";
+import { extractResourceNotePlainText, normalizeResourceNoteValue } from "@/lib/resource-note-format";
 import { travelRepository } from "@/lib/travel-repository";
 import type { Trip, TripResource, TripResourceCategory, TripRole } from "@/lib/types";
 
@@ -125,10 +127,12 @@ export function TripResourcesWorkspace({ tripId, initialTrip }: { tripId: string
 function ResourceCard({ resource, canEdit, swipeOpen, onSwipeOpen, onSwipeClose, onEdit, onDelete }: { resource: TripResource; canEdit: boolean; swipeOpen: boolean; onSwipeOpen: () => void; onSwipeClose: () => void; onEdit: () => void; onDelete: () => void }) {
   return <MobileSwipeActions itemId={resource.id} canEdit={canEdit} canDelete={canEdit} open={swipeOpen} desktopPassthrough mobileFrame onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete}>
   <article className="flex min-w-0 flex-col self-start bg-surface px-6 pt-6 sm:h-full sm:self-stretch sm:rounded-card sm:border sm:border-border sm:shadow-soft">
-    <header className="pb-5"><h3 className="line-clamp-2 font-medium">{resource.title}</h3><p className="mt-1 text-xs text-muted">{CATEGORY_LABELS[resource.category]}</p></header>
+    <header className="pb-5"><h3 className="line-clamp-2 font-medium">{resource.title}</h3></header>
     {(resource.imagePath || resource.note) && <div className="border-t border-divider" />}
     {resource.imagePath && <ResourceImage path={resource.imagePath} title={resource.title} />}
-    {resource.note && <div className={`${resource.imagePath ? "border-t border-divider" : ""} py-5`}><ClampedNote note={resource.note} lines={resource.imagePath ? 2 : 10} linkify /></div>}
+    {resource.note && <div className={`${resource.imagePath ? "border-t border-divider" : ""} py-5`}>{resource.category === "note"
+      ? <ResourceClampedNote note={resource.note} lines={resource.imagePath ? 2 : 10} />
+      : <ClampedNote note={resource.note} lines={resource.imagePath ? 2 : 10} linkify showMarker={false} textClassName={CARD_NOTE_TYPOGRAPHY} />}</div>}
     <footer className={`${resource.externalUrl ? "flex" : "hidden"} mt-auto h-14 shrink-0 items-center border-t border-divider sm:flex`}>
       {resource.externalUrl && <a href={resource.externalUrl} target="_blank" rel="noopener noreferrer" aria-label="開啟外部連結" title="開啟外部連結" className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-[#555555] sm:h-9 sm:w-9"><ExternalLink className="h-4 w-4" /></a>}
       {canEdit && <div className="ml-auto hidden items-center gap-4 sm:flex"><Action label="編輯" onClick={onEdit}><SquarePen /></Action><Action label="刪除" onClick={onDelete}><Trash2 /></Action></div>}
@@ -178,7 +182,8 @@ function ResourceDialog({ open, resource, initialCategory, tripId, onOpenChange,
     setSaving(true);
     try {
       const imagePath = file ? await travelRepository.uploadTripResourceImage(tripId, file) : form.imagePath || undefined;
-      await travelRepository.saveTripResource({ id: resource?.id, tripId, category: form.category, title: form.title.trim(), note: form.note.trim() || undefined, externalUrl: form.externalUrl.trim() || undefined, imagePath });
+      const note = form.category === "note" ? normalizeResourceNoteValue(form.note) : form.note.trim();
+      await travelRepository.saveTripResource({ id: resource?.id, tripId, category: form.category, title: form.title.trim(), note: note || undefined, externalUrl: form.externalUrl.trim() || undefined, imagePath });
       toast.success(resource ? "已更新" : "已新增");
       onSaved();
     } catch (error) {
@@ -187,9 +192,14 @@ function ResourceDialog({ open, resource, initialCategory, tripId, onOpenChange,
       setSaving(false);
     }
   }}>
-    <Field label="分類"><Select value={form.category} onValueChange={(value) => set("category", value as TripResourceCategory)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(CATEGORY_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></Field>
+    <Field label="分類"><Select value={form.category} onValueChange={(value) => setForm((current) => {
+      const category = value as TripResourceCategory;
+      return { ...current, category, note: current.category === "note" && category !== "note" ? extractResourceNotePlainText(current.note) : current.note };
+    })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(CATEGORY_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></Field>
     <Field label="標題"><Input required value={form.title} onChange={(event) => set("title", event.target.value)} /></Field>
-    <Field label="備註（選填）"><Textarea rows={4} value={form.note} onChange={(event) => set("note", event.target.value)} /></Field>
+    {form.category === "note"
+      ? <div className="space-y-2 text-sm"><span className="font-medium">備註（選填）</span><ResourceNoteEditor value={form.note} onChange={(value) => set("note", value)} /></div>
+      : <Field label="備註（選填）"><Textarea rows={4} value={form.note} onChange={(event) => set("note", event.target.value)} /></Field>}
     <Field label="外部網址（選填）"><Input type="url" value={form.externalUrl} onChange={(event) => set("externalUrl", event.target.value)} /></Field>
     <div className="space-y-2 text-sm"><span className="font-medium">圖片（選填）</span><ResourceImageUpload file={file} imagePath={form.imagePath} onFileChange={setFile} onRemove={() => { setFile(undefined); set("imagePath", ""); }} /></div>
     <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="ghost" onClick={requestClose}>取消</Button><Button type="submit" disabled={saving}>{saving ? "儲存中…" : "儲存"}</Button></div>
