@@ -1,5 +1,12 @@
 # Changelog
 
+## TRIP GOGO — Chinese Body Typography
+
+Changed
+
+- Added native CSS justification and strict CJK line-breaking to note and body-copy displays without changing their font size, line height, tracking, or rich-text formatting.
+- Kept manual line breaks intact and aligned ClampedNote previews with their full-content Dialog rendering while preserving safe URL wrapping.
+
 ## TRIP GOGO — Resource Toolbar and Image Paste Polish
 
 Changed

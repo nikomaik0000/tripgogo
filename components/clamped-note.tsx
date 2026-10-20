@@ -5,6 +5,7 @@ import { Link2 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 export const CARD_NOTE_TYPOGRAPHY = "text-xs font-normal leading-[1.65] tracking-body text-muted";
+export const BODY_TEXT_LAYOUT = "[text-align:justify] [text-justify:inter-ideograph] [line-break:strict] [word-break:normal] [overflow-wrap:break-word]";
 
 export type ClampedNoteFormattedRenderer = {
   render: (text: string) => ReactNode;
@@ -95,11 +96,11 @@ export function ClampedNote({ note, lines, textClassName = "", linkify = false, 
   return <>
     <div className={showMarker ? "grid min-w-0 grid-cols-[16px_minmax(0,1fr)] items-start gap-x-2 text-sm text-muted" : "min-w-0 text-sm text-muted"}>
       {showMarker && <span aria-hidden="true" className="flex h-4 w-4 items-center justify-center leading-4">✦</span>}
-      <p ref={textRef} className={`min-w-0 whitespace-pre-wrap break-words ${textClassName}`}>{renderNoteText(expanded || !preview ? note : preview, linkify, formattedRenderer)}{preview && !hideMoreAction && <> <button type="button" aria-label={expanded ? "收合備註" : "查看完整備註"} title={expanded ? "收合備註" : "查看完整備註"} onMouseDown={stopPropagation} onTouchStart={stopPropagation} onPointerDown={stopPropagation} onClick={() => inlineExpand ? setExpanded((value) => !value) : setOpen(true)} className="inline px-1 text-xs leading-[inherit] text-muted/90 transition-colors hover:text-muted">{expanded ? lessLabel : moreLabel}</button></>}</p>
+      <p ref={textRef} className={`min-w-0 whitespace-pre-wrap break-words ${BODY_TEXT_LAYOUT} ${textClassName}`}>{renderNoteText(expanded || !preview ? note : preview, linkify, formattedRenderer)}{preview && !hideMoreAction && <> <button type="button" aria-label={expanded ? "收合備註" : "查看完整備註"} title={expanded ? "收合備註" : "查看完整備註"} onMouseDown={stopPropagation} onTouchStart={stopPropagation} onPointerDown={stopPropagation} onClick={() => inlineExpand ? setExpanded((value) => !value) : setOpen(true)} className="inline px-1 text-xs leading-[inherit] text-muted/90 transition-colors hover:text-muted">{expanded ? lessLabel : moreLabel}</button></>}</p>
     </div>
     {!inlineExpand && <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent title="備註">
-        <p className="min-w-0 whitespace-pre-wrap break-words text-sm text-ink">{renderNoteText(note, linkify, formattedRenderer)}</p>
+        <p className={`min-w-0 whitespace-pre-wrap break-words text-sm text-ink ${BODY_TEXT_LAYOUT}`}>{renderNoteText(note, linkify, formattedRenderer)}</p>
       </DialogContent>
     </Dialog>}
   </>;

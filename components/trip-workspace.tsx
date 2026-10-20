@@ -13,7 +13,7 @@ import { AddCollectionItemToTripDialog } from "@/components/add-collection-item-
 import { BatchManagementDialog } from "@/components/batch-management-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { CARD_NOTE_TYPOGRAPHY, ClampedNote, LinkifiedText } from "@/components/clamped-note";
+import { BODY_TEXT_LAYOUT, CARD_NOTE_TYPOGRAPHY, ClampedNote, LinkifiedText } from "@/components/clamped-note";
 import { FlightDialog } from "@/components/flight-dialog";
 import { HotelStayDialog } from "@/components/hotel-stay-dialog";
 import { isDailyCardInteractiveTarget, MobileDailySwipeActions, MobileSwipeActions, useMobileSwipeGroup } from "@/components/mobile-daily-swipe-actions";
@@ -320,7 +320,7 @@ function ItemCard({ item, canEdit, canAddToTrip = false, collection = false, onE
       </>
     );
   }
-  return <article className="rounded-card border border-border bg-surface p-6 shadow-soft"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><ItemName item={item} /><p className="mt-2 text-xs text-muted">{item.date ? displayDate(item.date) : "未定"} · {item.category || (item.type === "place" ? "地點" : "美食")}</p></div>{canEdit && <div className="flex shrink-0">{controls}<Action label="編輯" onClick={onEdit}><SquarePen /></Action><Action label="刪除" onClick={onDelete}><Trash2 /></Action></div>}</div><div className="my-4 border-t border-divider" />{item.area && <p className="text-sm text-muted">{item.area}</p>}<BusinessHours item={item} compact={compactBusiness} />{item.note && <p className="mt-3 whitespace-pre-wrap break-words text-sm text-muted"><LinkifiedText text={item.note} /></p>}</article>;
+  return <article className="rounded-card border border-border bg-surface p-6 shadow-soft"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><ItemName item={item} /><p className="mt-2 text-xs text-muted">{item.date ? displayDate(item.date) : "未定"} · {item.category || (item.type === "place" ? "地點" : "美食")}</p></div>{canEdit && <div className="flex shrink-0">{controls}<Action label="編輯" onClick={onEdit}><SquarePen /></Action><Action label="刪除" onClick={onDelete}><Trash2 /></Action></div>}</div><div className="my-4 border-t border-divider" />{item.area && <p className="text-sm text-muted">{item.area}</p>}<BusinessHours item={item} compact={compactBusiness} />{item.note && <p className={`mt-3 whitespace-pre-wrap break-words text-sm text-muted ${BODY_TEXT_LAYOUT}`}><LinkifiedText text={item.note} /></p>}</article>;
 }
 
 function CardMetadata({ item, collection, canEdit, onToggleStatus, mobile = false }: { item: TravelItem; collection: boolean; canEdit: boolean; onToggleStatus: () => void; mobile?: boolean }) {
@@ -365,7 +365,7 @@ function CompletedTextPreview({ item, onOverflowChange }: { item: TravelItem; on
     observer.observe(element);
     return () => observer.disconnect();
   }, [item.consumedItems, item.experienceNote]);
-  return <p ref={textRef} className="line-clamp-2 min-w-0 flex-1 whitespace-pre-wrap break-words text-xs font-normal leading-[1.65] tracking-body">
+  return <p ref={textRef} className={`line-clamp-2 min-w-0 flex-1 whitespace-pre-wrap break-words text-xs font-normal leading-[1.65] tracking-body ${BODY_TEXT_LAYOUT}`}>
     {item.consumedItems && <span className="text-[#333333]">{item.consumedItems}</span>}
     {item.consumedItems && item.experienceNote && "\n"}
     {item.experienceNote && <span className="text-muted">{item.experienceNote}</span>}
@@ -383,7 +383,7 @@ function ItemDetailsDialog({ item, open, onOpenChange }: { item: TravelItem; ope
     { label: "吃了什麼", value: reviewVisible ? item.consumedItems : "", className: "text-[#333333]" },
     { label: "心得", value: reviewVisible ? item.experienceNote : "", className: "text-muted" },
   ].filter((section) => Boolean(section.value));
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent title="完整內容"><div className="divide-y divide-divider">{sections.map((section) => <section key={section.label} className="py-4 first:pt-0 last:pb-0"><h3 className="mb-2 text-xs font-medium text-ink">{section.label}</h3><p className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${section.className}`}>{section.label === "備註" ? <LinkifiedText text={section.value} /> : section.value}</p></section>)}</div></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent title="完整內容"><div className="divide-y divide-divider">{sections.map((section) => <section key={section.label} className="py-4 first:pt-0 last:pb-0"><h3 className="mb-2 text-xs font-medium text-ink">{section.label}</h3><p className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${BODY_TEXT_LAYOUT} ${section.className}`}>{section.label === "備註" ? <LinkifiedText text={section.value} /> : section.value}</p></section>)}</div></DialogContent></Dialog>;
 }
 
 function hasReviewInfo(item: TravelItem, collection: boolean) {
