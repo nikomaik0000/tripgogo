@@ -68,6 +68,9 @@ export interface TravelItem {
   closedRuleType: ClosedRuleType | null;
   closedRuleValues: ClosedRuleValue[] | null;
   note: string;
+  priceList?: string;
+  priceCheckedAt?: string;
+  priceSource?: string;
   status: CollectionItemStatus | null;
   rating: number | null;
   completedDate: string | null;

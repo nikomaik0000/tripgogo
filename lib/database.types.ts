@@ -27,7 +27,8 @@ export type TgTravelItemRow = {
   extra_link_1: string | null; extra_link_2: string | null; business_hours: string | null;
   closed_days_text: string | null; closed_rule_type: "weekday" | "monthly_date" | "specific_date" | "irregular" | null;
   closed_rule_values: (number | string)[] | null;
-  note: string; status: "planned" | "completed" | null; rating: number | null;
+  note: string; price_list: string | null; price_checked_at: string | null; price_source: string | null;
+  status: "planned" | "completed" | null; rating: number | null;
   completed_date: string | null; experience_note: string | null; consumed_items: string | null;
   image_path: string | null; image_fit: "cover" | "contain";
   duplicate_source_item_id: string | null; sort_order: number; created_at: string; updated_at: string;

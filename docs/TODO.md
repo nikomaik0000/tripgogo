@@ -4,6 +4,7 @@
 
 ### Done
 
+- Optional Place/Food price lists with checked dates and sources, conditional card Dialogs, shared title dividers, GPT JSON compatibility, and complete save/copy preservation
 - Chinese note/body-copy justification and strict punctuation line-breaking across card previews and full-content Dialogs
 - Resource note toolbar color-swatch polish and Dialog-scoped TravelItem image paste replacement without intercepting text fields
 - Resources card category-label cleanup, Place/Food-aligned body typography, and note-only structured bold/three-color highlighting with safe plain-text paste, URL-aware clamp/More rendering, and migration-free copy compatibility

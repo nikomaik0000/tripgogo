@@ -221,6 +221,7 @@ function Preview({ state, errorCount }: { state: PreviewState; errorCount: numbe
   return <PreviewList preview={state.value} errorCount={errorCount} renderSummary={(item) => item ? <>
     <p className="truncate font-medium">{item.name}</p>
     <p className="mt-1 text-xs text-muted">{item.type === "place" ? "景點" : "美食"}{item.date ? ` · ${item.date}` : item.status ? ` · ${item.status}` : ""}</p>
+    {item.priceList && <p className="mt-1 truncate text-xs text-muted">含價目表{item.priceCheckedAt ? ` · ${item.priceCheckedAt}` : ""}</p>}
   </> : <p className="font-medium">無法辨識名稱</p>} />;
 }
 

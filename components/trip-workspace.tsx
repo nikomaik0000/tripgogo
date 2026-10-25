@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowUpDown, CalendarCheck, CalendarDays, CarFront, ChevronRight, Clock3, Copy, Ellipsis, FolderHeart, Hotel, Link2, ListChecks, MapPin, MapPinned, MapPinPlus, Navigation, Plane, Search, SquarePen, TicketCheck, Trash2, UtensilsCrossed, X } from "lucide-react";
+import { ArrowLeft, ArrowUpDown, BookOpenText, CalendarCheck, CalendarDays, CarFront, ChevronRight, Clock3, Copy, Ellipsis, FolderHeart, Hotel, Link2, ListChecks, MapPin, MapPinned, MapPinPlus, Navigation, Plane, Search, SquarePen, TicketCheck, Trash2, UtensilsCrossed, X } from "lucide-react";
 import { closestCenter, DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -246,6 +246,7 @@ function compareItems(a: TravelItem, b: TravelItem, sort: TravelItemSort) {
 function ItemCard({ item, canEdit, canAddToTrip = false, collection = false, onEdit, onAddToTrip = () => undefined, onDuplicate = () => undefined, onDelete, onToggleStatus = () => undefined, controls, compactBusiness = false, listLayout = false, swipeOpen = false, onSwipeOpen = () => undefined, onSwipeClose = () => undefined }: { item: TravelItem; canEdit: boolean; canAddToTrip?: boolean; collection?: boolean; onEdit: () => void; onAddToTrip?: () => void; onDuplicate?: () => void; onDelete: () => void; onToggleStatus?: () => void; controls?: React.ReactNode; compactBusiness?: boolean; listLayout?: boolean; swipeOpen?: boolean; onSwipeOpen?: () => void; onSwipeClose?: () => void }) {
   const imageUrl = useTravelItemImageUrl(listLayout ? item.imagePath : undefined);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [priceListOpen, setPriceListOpen] = useState(false);
   const [mobileOverflow, setMobileOverflow] = useState({ note: false, completed: false });
   const [desktopOverflow, setDesktopOverflow] = useState({ note: false, completed: false });
   const reviewVisible = hasReviewInfo(item, collection);
@@ -262,7 +263,7 @@ function ItemCard({ item, canEdit, canAddToTrip = false, collection = false, onE
   if (listLayout) {
     const hasMobileMore = mobileOverflow.note || (reviewVisible && mobileOverflow.completed);
     const hasDesktopMore = desktopOverflow.note || (reviewVisible && desktopOverflow.completed);
-    const hasMobileFooterActions = Boolean(item.extraLink1 || item.extraLink2 || hasMobileMore);
+    const hasMobileFooterActions = Boolean(item.extraLink1 || item.extraLink2 || item.priceList || hasMobileMore);
     return (
       <>
       <MobileSwipeActions itemId={item.id} canAddToTrip={canAddToTrip} canEdit={canEdit} canDuplicate={canEdit} canDelete={canEdit} open={swipeOpen} mobileFrame onOpen={onSwipeOpen} onClose={onSwipeClose} onAddToTrip={onAddToTrip} onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete}>
@@ -284,6 +285,7 @@ function ItemCard({ item, canEdit, canAddToTrip = false, collection = false, onE
         {hasMobileFooterActions && <footer className="mt-auto flex min-h-12 shrink-0 items-center border-t border-divider">
           <div className="flex items-center gap-4">
             {hasMobileMore && <MoreDetailsAction onClick={() => setDetailsOpen(true)} />}
+            {item.priceList && <PriceListAction onClick={() => setPriceListOpen(true)} />}
             {item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} />}
             {item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} itemType={item.type} />}
           </div>
@@ -310,6 +312,7 @@ function ItemCard({ item, canEdit, canAddToTrip = false, collection = false, onE
         <footer className="mt-auto flex min-h-12 shrink-0 items-center border-t border-divider/60">
           <div className="flex items-center gap-4">
             {hasDesktopMore && <MoreDetailsAction onClick={() => setDetailsOpen(true)} quiet />}
+            {item.priceList && <PriceListAction onClick={() => setPriceListOpen(true)} quiet />}
             {item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} quiet />}
             {item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} itemType={item.type} quiet />}
           </div>
@@ -317,6 +320,7 @@ function ItemCard({ item, canEdit, canAddToTrip = false, collection = false, onE
         </footer>
       </article>
       <ItemDetailsDialog item={item} open={detailsOpen} onOpenChange={setDetailsOpen} />
+      <PriceListDialog item={item} open={priceListOpen} onOpenChange={setPriceListOpen} />
       </>
     );
   }
@@ -376,6 +380,14 @@ function MoreDetailsAction({ onClick, quiet = false }: { onClick: () => void; qu
   return <Action label="顯示完整內容" quiet={quiet} onPointerDown={stopDrag} onClick={onClick}><Ellipsis className="stroke-[1.5]" /></Action>;
 }
 
+function PriceListAction({ onClick, quiet = false }: { onClick: () => void; quiet?: boolean }) {
+  return <Action label="顯示價目表" quiet={quiet} onPointerDown={stopDrag} onClick={onClick}><BookOpenText className="stroke-[1.5]" /></Action>;
+}
+
+function DialogTitleDivider() {
+  return <div aria-hidden="true" className="mb-4 border-t border-divider" />;
+}
+
 function ItemDetailsDialog({ item, open, onOpenChange }: { item: TravelItem; open: boolean; onOpenChange: (open: boolean) => void }) {
   const reviewVisible = item.status !== "planned";
   const sections = [
@@ -383,7 +395,22 @@ function ItemDetailsDialog({ item, open, onOpenChange }: { item: TravelItem; ope
     { label: "吃了什麼", value: reviewVisible ? item.consumedItems : "", className: "text-[#333333]" },
     { label: "心得", value: reviewVisible ? item.experienceNote : "", className: "text-muted" },
   ].filter((section) => Boolean(section.value));
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent title="完整內容"><div className="divide-y divide-divider">{sections.map((section) => <section key={section.label} className="py-4 first:pt-0 last:pb-0"><h3 className="mb-2 text-xs font-medium text-ink">{section.label}</h3><p className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${BODY_TEXT_LAYOUT} ${section.className}`}>{section.label === "備註" ? <LinkifiedText text={section.value} /> : section.value}</p></section>)}</div></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent title="完整內容"><DialogTitleDivider /><div className="divide-y divide-divider">{sections.map((section) => <section key={section.label} className="py-4 first:pt-0 last:pb-0"><h3 className="mb-2 text-xs font-medium text-ink">{section.label}</h3><p className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${BODY_TEXT_LAYOUT} ${section.className}`}>{section.label === "備註" ? <LinkifiedText text={section.value} /> : section.value}</p></section>)}</div></DialogContent></Dialog>;
+}
+
+function PriceListDialog({ item, open, onOpenChange }: { item: TravelItem; open: boolean; onOpenChange: (open: boolean) => void }) {
+  if (!item.priceList) return null;
+  return <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent title="價目表">
+      <DialogTitleDivider />
+      <div className="mb-4 flex min-w-0 items-start justify-between gap-4 text-xs text-muted">
+        <p className="min-w-0 break-words font-medium text-ink">{item.name}</p>
+        {item.priceCheckedAt && <time dateTime={item.priceCheckedAt} className="shrink-0 whitespace-nowrap">{formatPriceCheckedDate(item.priceCheckedAt)}</time>}
+      </div>
+      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">{item.priceList}</p>
+      {item.priceSource && <section className="mt-5 border-t border-divider pt-4"><h3 className="mb-2 text-xs font-medium text-ink">價格來源</h3><p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-muted">{item.priceSource}</p></section>}
+    </DialogContent>
+  </Dialog>;
 }
 
 function hasReviewInfo(item: TravelItem, collection: boolean) {
@@ -394,6 +421,11 @@ function hasReviewInfo(item: TravelItem, collection: boolean) {
 function formatCompletedDate(date: string) {
   const [year, month, day] = date.split("-");
   return year && month && day ? `${year}/${month}/${day}` : date;
+}
+
+function formatPriceCheckedDate(date: string) {
+  const [year, month, day] = date.split("-");
+  return year && month && day ? `${year} / ${month} / ${day}` : date;
 }
 
 function useTravelItemImageUrl(path?: string) {

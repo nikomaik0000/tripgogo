@@ -1,5 +1,18 @@
 # Changelog
 
+## TRIP GOGO — Place and Food Price Lists
+
+Added
+
+- Added optional price-list text, checked date, and source metadata to shared Place/Food items without changing existing note or itinerary-date semantics.
+- Added a collapsed price-list editor and a conditional card action that opens the existing Dialog visual treatment with preserved multiline content.
+- Extended Trip/Collection GPT JSON prompts, parsing, previews, validation, and batch storage for the three optional price-list fields while retaining legacy JSON compatibility.
+
+Changed
+
+- Added the same quiet divider below the Price List and existing Full Content Dialog titles.
+- Item save, single-item duplication, whole Trip/Collection duplication, and cross-Trip copying now preserve price-list metadata.
+
 ## TRIP GOGO — Chinese Body Typography
 
 Changed

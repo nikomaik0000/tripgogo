@@ -1,7 +1,7 @@
 import { formatClosedDaysText, validateClosedRuleValues } from "@/lib/closed-days";
 import type { ClosedRuleType, ClosedRuleValue, CollectionItemStatus, Flight, HotelStay, TransportationInput, TravelItemType, Trip } from "@/lib/types";
 
-const COMMON_FIELDS = ["type", "category", "area", "name", "businessHours", "closedDaysText", "closedRuleType", "closedRuleValues", "googleMapsUrl", "link1", "link2", "note"] as const;
+const COMMON_FIELDS = ["type", "category", "area", "name", "businessHours", "closedDaysText", "closedRuleType", "closedRuleValues", "googleMapsUrl", "link1", "link2", "note", "priceList", "priceCheckedAt", "priceSource"] as const;
 const MODE_FIELDS = ["date", "status", "rating", "completedDate", "consumedItems", "experienceNote"] as const;
 const ALLOWED_FIELDS = new Set<string>([...COMMON_FIELDS, ...MODE_FIELDS]);
 const FLIGHT_FIELDS = new Set(["airline", "flightNumber", "departurePlace", "arrivalPlace", "departureDate", "departureTime", "arrivalDate", "arrivalTime", "link", "note"]);
@@ -27,6 +27,9 @@ export type TravelImportItem = {
   link1: string;
   link2: string;
   note: string;
+  priceList: string;
+  priceCheckedAt: string | null;
+  priceSource: string;
   status: CollectionItemStatus | null;
   rating: number | null;
   completedDate: string | null;
@@ -96,7 +99,7 @@ function parseImportArray<T>(source: string, validate: (value: unknown, index: n
 }
 
 export function getTravelImportPrompt(trip: Trip) {
-  const common = "type, category, area, name, businessHours, closedDaysText, closedRuleType, closedRuleValues, googleMapsUrl, link1, link2, note";
+  const common = "type, category, area, name, businessHours, closedDaysText, closedRuleType, closedRuleValues, googleMapsUrl, link1, link2, note, priceList, priceCheckedAt, priceSource";
   const closedDaysRules = [
     "店休日只輸出精簡資訊，不要把一般固定店休日重複寫入 note；查無資訊時省略 closedDaysText、closedRuleType、closedRuleValues。",
     "weekday：closedRuleType 為 weekday，closedRuleValues 使用 0–6（0=週日）；monthly_date 使用 1–31；specific_date 使用真實有效的 YYYY-MM-DD；irregular 使用空陣列。",
@@ -106,6 +109,11 @@ export function getTravelImportPrompt(trip: Trip) {
     "googleMapsUrl 優先填入可直接開啟該店家或景點的真實 Google Maps place URL；若無法確認精確 place URL，使用 https://www.google.com/maps/search/?api=1&query=...，query 由名稱加地區或城市組成。不要虛構 maps.app.goo.gl 或其他短網址；除非名稱資訊不足以定位，否則盡量不要留空。",
     "link1 優先填入官方網站；若無官網，可填入可信且有用的介紹、菜單或官方資訊頁。link2 對 food 只填訂位網址，對 place 只填訂票或預約網址；無法確認時省略或留空。所有連結都不得虛構。",
     "businessHours 只填一般或主要營業時間。若僅某一天或少數幾天時間不同，將差異以極簡格式寫入 note，例如「星期天：11:00~23:00」；若 note 已有內容就簡短接在後面，不要寫成說明長句，也不要把整套 weekly hours 塞入 businessHours。店休日仍只使用 closedDays 欄位。",
+  ];
+  const priceRules = [
+    "有價目表資料時才填入 priceList，並以保留原始換行、空白、符號及 Emoji 的完整多行文字字串輸出；不要拆分成品項陣列，也不可自行虛構價格。",
+    "有明確的價格確認日期時才填入 priceCheckedAt，格式必須是 YYYY-MM-DD；無法確認時省略。priceCheckedAt 是價格確認日期，與行程日期 date 不同，不可混淆。",
+    "有價格資料來源時填入 priceSource；不要將價目表內容重複寫入 note。沒有價格資訊時可以省略 priceList、priceCheckedAt、priceSource。",
   ];
   if (trip.mode === "trip") {
     return [
@@ -117,6 +125,7 @@ export function getTravelImportPrompt(trip: Trip) {
       "rating 若提供必須是 0 到 100 的數字；consumedItems 只適用於 food。",
       ...linkAndHoursRules,
       ...closedDaysRules,
+      ...priceRules,
       "沒有資料的選填字串請使用空字串或省略欄位。",
     ].join("\n");
   }
@@ -130,6 +139,7 @@ export function getTravelImportPrompt(trip: Trip) {
     "completedDate 若提供必須使用 YYYY-MM-DD；rating 若提供必須是 0 到 100 的數字；consumedItems 只適用於 food。",
     ...linkAndHoursRules,
     ...closedDaysRules,
+    ...priceRules,
     "沒有資料的選填字串請使用空字串或省略欄位。",
   ].join("\n");
 }
@@ -272,6 +282,9 @@ function validateRow(value: unknown, index: number, trip: Trip): TravelImportPre
   const link1 = readString(value, "link1", errors);
   const link2 = readString(value, "link2", errors);
   const note = readString(value, "note", errors);
+  const priceList = readRawString(value, "priceList", errors);
+  const priceCheckedAt = readDate(value, "priceCheckedAt", errors);
+  const priceSource = readString(value, "priceSource", errors);
   const consumedItems = readString(value, "consumedItems", errors);
   const experienceNote = readString(value, "experienceNote", errors);
   validateUrl("googleMapsUrl", googleMapsUrl, errors);
@@ -315,6 +328,9 @@ function validateRow(value: unknown, index: number, trip: Trip): TravelImportPre
     link1,
     link2,
     note,
+    priceList,
+    priceCheckedAt,
+    priceSource,
     status: normalizedStatus,
     rating,
     completedDate,
@@ -494,6 +510,16 @@ function readString(record: Record<string, unknown>, key: string, errors: string
   const normalized = value.trim();
   if (required && !normalized) errors.push(`${key} 不可為空白。`);
   return normalized;
+}
+
+function readRawString(record: Record<string, unknown>, key: string, errors: string[]) {
+  const value = record[key];
+  if (value === undefined || value === null) return "";
+  if (typeof value !== "string") {
+    errors.push(`${key} 必須是字串。`);
+    return "";
+  }
+  return value;
 }
 
 function readDate(record: Record<string, unknown>, key: string, errors: string[]) {

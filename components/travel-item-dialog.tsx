@@ -15,9 +15,9 @@ import type { ClosedRuleType, ClosedRuleValue, TravelItem, TravelItemImageFit, T
 
 type ClosedRuleSelection = ClosedRuleType | "none";
 
-const EMPTY_FORM = { category: "", area: "", date: "", name: "", googleMapsUrl: "", extraLink1: "", extraLink2: "", businessHours: "", closedDaysText: "", closedRuleType: "none" as ClosedRuleSelection, closedRuleValues: [] as ClosedRuleValue[], note: "", status: "planned", rating: "", completedDate: "", experienceNote: "", consumedItems: "", imageFit: "cover" as TravelItemImageFit };
+const EMPTY_FORM = { category: "", area: "", date: "", name: "", googleMapsUrl: "", extraLink1: "", extraLink2: "", businessHours: "", closedDaysText: "", closedRuleType: "none" as ClosedRuleSelection, closedRuleValues: [] as ClosedRuleValue[], note: "", priceList: "", priceCheckedAt: "", priceSource: "", status: "planned", rating: "", completedDate: "", experienceNote: "", consumedItems: "", imageFit: "cover" as TravelItemImageFit };
 
-type TravelItemDialogValue = Pick<TravelItem, "category" | "area" | "date" | "name" | "googleMapsUrl" | "extraLink1" | "extraLink2" | "businessHours" | "closedDaysText" | "closedRuleType" | "closedRuleValues" | "note" | "status" | "rating" | "completedDate" | "experienceNote" | "consumedItems" | "imagePath" | "imageFit"> & { imageFile?: File };
+type TravelItemDialogValue = Pick<TravelItem, "category" | "area" | "date" | "name" | "googleMapsUrl" | "extraLink1" | "extraLink2" | "businessHours" | "closedDaysText" | "closedRuleType" | "closedRuleValues" | "note" | "priceList" | "priceCheckedAt" | "priceSource" | "status" | "rating" | "completedDate" | "experienceNote" | "consumedItems" | "imagePath" | "imageFit"> & { imageFile?: File };
 
 const WEEKDAYS = [{ value: 1, label: "一" }, { value: 2, label: "二" }, { value: 3, label: "三" }, { value: 4, label: "四" }, { value: 5, label: "五" }, { value: 6, label: "六" }, { value: 0, label: "日" }] as const;
 const MONTH_DATES = Array.from({ length: 31 }, (_, index) => index + 1);
@@ -82,6 +82,14 @@ export function TravelItemDialog({ open, type, trip, item, items, initialDate, a
   const businessHoursField = <Field label="營業時間"><Input value={form.businessHours} placeholder="例如：11:00-22:00" onChange={(event) => set("businessHours", event.target.value)} /></Field>;
   const closedDaysField = <ClosedDaysField form={form} desktopTwoColumn={desktopTwoColumn} onTypeChange={changeClosedRuleType} onValuesChange={setClosedRuleValues} onTextChange={(value) => set("closedDaysText", value)} />;
   const noteField = <Field label="備註" className={desktopTwoColumn ? "sm:col-span-2" : undefined}><Textarea rows={3} value={form.note} onChange={(event) => set("note", event.target.value)} className="h-[140px] min-h-0 w-full" /></Field>;
+  const priceListFields = <details className={`${desktopTwoColumn ? "sm:col-span-2" : ""} group min-w-0 border-t border-divider pt-4`}>
+    <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-ink [&::-webkit-details-marker]:hidden">價目表（選填）<ChevronDown className="h-4 w-4 text-muted transition-transform group-open:rotate-180" /></summary>
+    <div className="grid min-w-0 gap-4 pt-4 sm:grid-cols-2">
+      <Field label="確認日期"><Input type="date" value={form.priceCheckedAt} onChange={(event) => set("priceCheckedAt", event.target.value)} className="block min-w-0 max-w-full" /></Field>
+      <Field label="價目表內容" className="sm:col-span-2"><Textarea rows={7} value={form.priceList} onChange={(event) => set("priceList", event.target.value)} className="min-h-[180px] w-full resize-y" /></Field>
+      <Field label="資料來源（選填）" className="sm:col-span-2"><Input value={form.priceSource} onChange={(event) => set("priceSource", event.target.value)} /></Field>
+    </div>
+  </details>;
   const statusField = trip.mode === "collection" && <Field label="狀態"><Select value={form.status} onValueChange={(value) => set("status", value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="planned">{type === "place" ? "想去" : "想吃"}</SelectItem><SelectItem value="completed">{type === "place" ? "去過" : "吃過"}</SelectItem></SelectContent></Select></Field>;
   const completedFields = trip.mode === "collection" && form.status === "completed" && <>
     <Field label="評分（滿分 100，選填）"><Input type="number" min="0" max="100" step="any" value={form.rating} onChange={(event) => set("rating", event.target.value)} /></Field>
@@ -116,15 +124,15 @@ export function TravelItemDialog({ open, type, trip, item, items, initialDate, a
             : undefined;
           setSaving(true);
           try {
-            await onSave({ ...form, category: form.category.trim(), area: form.area.trim(), name: form.name.trim(), date: trip.mode === "collection" ? null : form.date || null, status: trip.mode === "collection" ? form.status as TravelItem["status"] : null, rating: form.rating === "" ? null : Number(form.rating), completedDate: trip.mode === "collection" ? form.completedDate || null : null, experienceNote: form.experienceNote.trim(), consumedItems: type === "food" ? form.consumedItems.trim() : "", extraLink1: form.extraLink1.trim() || undefined, extraLink2: form.extraLink2.trim() || undefined, closedDaysText, closedRuleType, closedRuleValues: closedRuleValidation.values, imagePath: imageRemoved ? undefined : item?.imagePath, imageFile });
+            await onSave({ ...form, category: form.category.trim(), area: form.area.trim(), name: form.name.trim(), date: trip.mode === "collection" ? null : form.date || null, priceList: form.priceList || undefined, priceCheckedAt: form.priceCheckedAt || undefined, priceSource: form.priceSource.trim() || undefined, status: trip.mode === "collection" ? form.status as TravelItem["status"] : null, rating: form.rating === "" ? null : Number(form.rating), completedDate: trip.mode === "collection" ? form.completedDate || null : null, experienceNote: form.experienceNote.trim(), consumedItems: type === "food" ? form.consumedItems.trim() : "", extraLink1: form.extraLink1.trim() || undefined, extraLink2: form.extraLink2.trim() || undefined, closedDaysText, closedRuleType, closedRuleValues: closedRuleValidation.values, imagePath: imageRemoved ? undefined : item?.imagePath, imageFile });
           } finally {
             setSaving(false);
           }
         }}>
           {allowTypeChange && <Field label="類型"><Select value={type} onValueChange={(value) => onTypeChange?.(value as TravelItemType)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="place">地點</SelectItem><SelectItem value="food">美食</SelectItem></SelectContent></Select></Field>}
           {desktopTwoColumn
-            ? <div className="grid min-w-0 gap-4 sm:grid-cols-2">{categoryField}{areaField}{nameField}{dateField}{statusField}{businessHoursField}{closedDaysField}{mapsField}{firstLinkField}{secondLinkField}{noteField}{completedFields}{tripReviewFields}{imageField}</div>
-            : <>{categoryField}{areaField}{dateField}{nameField}{statusField}{mapsField}{firstLinkField}{secondLinkField}{businessHoursField}{closedDaysField}{noteField}{completedFields}{tripReviewFields}{imageField}</>}
+            ? <div className="grid min-w-0 gap-4 sm:grid-cols-2">{categoryField}{areaField}{nameField}{dateField}{statusField}{businessHoursField}{closedDaysField}{mapsField}{firstLinkField}{secondLinkField}{noteField}{priceListFields}{completedFields}{tripReviewFields}{imageField}</div>
+            : <>{categoryField}{areaField}{dateField}{nameField}{statusField}{mapsField}{firstLinkField}{secondLinkField}{businessHoursField}{closedDaysField}{noteField}{priceListFields}{completedFields}{tripReviewFields}{imageField}</>}
           <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="ghost" disabled={saving} onClick={requestClose}>取消</Button><Button type="submit" disabled={saving}>{saving ? "儲存中…" : "儲存"}</Button></div>
         </form>
       </DialogContent>
@@ -135,7 +143,15 @@ export function TravelItemDialog({ open, type, trip, item, items, initialDate, a
 
 function initialForm(item?: TravelItem, initialDate?: string, mode: Trip["mode"] = "trip") {
   const closedRuleType: ClosedRuleSelection = item?.closedRuleType ?? (item?.closedDaysText ? "irregular" : "none");
-  return { category: item?.category ?? "", area: item?.area ?? "", date: item?.date ?? initialDate ?? "", name: item?.name ?? "", googleMapsUrl: item?.googleMapsUrl ?? "", extraLink1: item?.extraLink1 ?? "", extraLink2: item?.extraLink2 ?? "", businessHours: item?.businessHours ?? "", closedDaysText: item?.closedDaysText ?? "", closedRuleType, closedRuleValues: item?.closedRuleValues ?? [], note: item?.note ?? "", status: item?.status ?? (mode === "collection" ? "planned" : ""), rating: item?.rating?.toString() ?? "", completedDate: item?.completedDate ?? "", experienceNote: item?.experienceNote ?? "", consumedItems: item?.consumedItems ?? "", imageFit: item?.imageFit ?? "cover" as TravelItemImageFit };
+  return { category: item?.category ?? "", area: item?.area ?? "", date: item?.date ?? initialDate ?? "", name: item?.name ?? "", googleMapsUrl: item?.googleMapsUrl ?? "", extraLink1: item?.extraLink1 ?? "", extraLink2: item?.extraLink2 ?? "", businessHours: item?.businessHours ?? "", closedDaysText: item?.closedDaysText ?? "", closedRuleType, closedRuleValues: item?.closedRuleValues ?? [], note: item?.note ?? "", priceList: item?.priceList ?? "", priceCheckedAt: item?.priceCheckedAt ?? (item ? "" : localIsoDate()), priceSource: item?.priceSource ?? "", status: item?.status ?? (mode === "collection" ? "planned" : ""), rating: item?.rating?.toString() ?? "", completedDate: item?.completedDate ?? "", experienceNote: item?.experienceNote ?? "", consumedItems: item?.consumedItems ?? "", imageFit: item?.imageFit ?? "cover" as TravelItemImageFit };
+}
+
+function localIsoDate() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
