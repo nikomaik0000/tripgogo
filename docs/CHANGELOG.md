@@ -1,5 +1,12 @@
 # Changelog
 
+## TRIP GOGO — Daily Price List Actions
+
+Changed
+
+- Added the existing Price List action to Daily cards on Desktop and Mobile, ordered between the supplemental link and reservation/ticket action when non-whitespace price-list content is available.
+- Preserved the existing Daily card columns, action sizing, swipe-based Mobile edit/delete controls, and shared Price List Dialog behavior.
+
 ## TRIP GOGO — Place and Food Price Lists
 
 Added

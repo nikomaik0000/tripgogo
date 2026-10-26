@@ -4,6 +4,7 @@
 
 ### Done
 
+- Daily Desktop/Mobile price-list actions using the existing card action column and shared Price List Dialog without changing card widths or swipe management
 - Optional Place/Food price lists with checked dates and sources, conditional card Dialogs, shared title dividers, GPT JSON compatibility, and complete save/copy preservation
 - Chinese note/body-copy justification and strict punctuation line-breaking across card previews and full-content Dialogs
 - Resource note toolbar color-swatch polish and Dialog-scoped TravelItem image paste replacement without intercepting text fields

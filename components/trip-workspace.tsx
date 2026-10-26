@@ -574,12 +574,13 @@ function SortableDailyCard({ item, swipeOpen, onSwipeOpen, onSwipeClose, onEdit,
 }
 
 function DailyCard({ item, canEdit, swipeOpen = false, swipeDragging = false, onSwipeOpen = () => undefined, onSwipeClose = () => undefined, onEdit, onDelete }: { item: TravelItem; canEdit: boolean; swipeOpen?: boolean; swipeDragging?: boolean; onSwipeOpen?: () => void; onSwipeClose?: () => void; onEdit: () => void; onDelete: () => void }) {
+  const [priceListOpen, setPriceListOpen] = useState(false);
   return <article className="h-full rounded-card border border-border bg-surface shadow-soft">
     <MobileDailySwipeActions itemId={item.id} enabled={canEdit} open={swipeOpen} dragging={swipeDragging} onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete}>
       <div className="grid min-h-[130px] min-w-0 grid-cols-[72px_minmax(0,1fr)_56px]">
         <div className="flex items-center justify-center"><TypeMark item={item} large /></div>
         <DailyDesktopInfo item={item} />
-        <DailyExternalLinks item={item} />
+        <DailyExternalLinks item={item} onOpenPriceList={() => setPriceListOpen(true)} />
       </div>
       {item.note && <div className="border-t border-divider/60 px-6 py-3"><ClampedNote note={item.note} lines={1} linkify showMarker={false} moreLabel="more+" inlineMore textClassName={CARD_NOTE_TYPOGRAPHY} /></div>}
     </MobileDailySwipeActions>
@@ -587,9 +588,10 @@ function DailyCard({ item, canEdit, swipeOpen = false, swipeDragging = false, on
       <div className="flex items-center justify-center"><TypeMark item={item} /></div>
       <DailyDesktopInfo item={item} />
       <div className="flex min-w-0 flex-col justify-center border-l border-divider/60 px-4 md:px-5">{item.note && <div className="min-w-0"><ClampedNote note={item.note} lines={5} linkify textClassName={CARD_NOTE_TYPOGRAPHY} showMarker={false} /></div>}</div>
-      <DailyExternalLinks item={item} />
+      <DailyExternalLinks item={item} onOpenPriceList={() => setPriceListOpen(true)} />
       <DailyDesktopManageActions canEdit={canEdit} onEdit={onEdit} onDelete={onDelete} />
     </div>
+    <PriceListDialog item={item} open={priceListOpen} onOpenChange={setPriceListOpen} />
   </article>;
 }
 
@@ -619,8 +621,8 @@ function DailyItemName({ item }: { item: TravelItem }) {
     : <p className={className}>{item.name}</p>;
 }
 
-function DailyExternalLinks({ item }: { item: TravelItem }) {
-  return <div className="flex flex-col items-center justify-center gap-1 border-l border-divider/60" data-no-dnd>{item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} quiet />}{item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} itemType={item.type} quiet />}</div>;
+function DailyExternalLinks({ item, onOpenPriceList }: { item: TravelItem; onOpenPriceList: () => void }) {
+  return <div className="flex flex-col items-center justify-center gap-1 border-l border-divider/60" data-no-dnd>{item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} quiet />}{item.priceList?.trim() && <PriceListAction onClick={onOpenPriceList} quiet />}{item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} itemType={item.type} quiet />}</div>;
 }
 
 function DailyDesktopManageActions({ canEdit, onEdit, onDelete }: { canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
