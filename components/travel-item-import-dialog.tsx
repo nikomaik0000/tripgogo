@@ -23,10 +23,21 @@ import {
   type TravelImportResult,
 } from "@/lib/travel-import";
 import { travelRepository } from "@/lib/travel-repository";
-import type { Trip } from "@/lib/types";
+import {
+  analyzeTravelUpdate,
+  buildTravelUpdateOperations,
+  buildTravelUpdatePatch,
+  emptyProvidedFields,
+  fieldLabel,
+  type TravelUpdateAnalysisRow,
+  type TravelUpdateResolution,
+} from "@/lib/travel-update-import";
+import type { TravelItem, Trip } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export type TravelImportMode = "itinerary" | "flight" | "hotel" | "transportation";
+type ItineraryImportMode = "append" | "update";
+type UpdateContext = { items: TravelItem[]; snapshotToken: string };
 
 type PreviewState =
   | { mode: "itinerary"; value: ImportPreview<TravelImportItem> }
@@ -52,24 +63,41 @@ export function TravelItemImportDialog({ open, trip, onOpenChange, onImported }:
   onImported: (mode: TravelImportMode) => Promise<void> | void;
 }) {
   const [mode, setMode] = useState<TravelImportMode>("itinerary");
+  const [itineraryMode, setItineraryMode] = useState<ItineraryImportMode>(trip.mode === "trip" ? "update" : "append");
   const [source, setSource] = useState("");
   const [preview, setPreview] = useState<PreviewState>();
+  const [updateContext, setUpdateContext] = useState<UpdateContext>();
+  const [updateRows, setUpdateRows] = useState<TravelUpdateAnalysisRow[]>([]);
+  const [resolutions, setResolutions] = useState<Map<number, TravelUpdateResolution>>(new Map());
+  const [clearFields, setClearFields] = useState<Map<number, Set<string>>>(new Map());
+  const [requestId, setRequestId] = useState("");
   const [result, setResult] = useState<TravelImportResult>();
+  const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setMode("itinerary");
+    setItineraryMode(trip.mode === "trip" ? "update" : "append");
     setSource("");
     setPreview(undefined);
+    resetUpdateState();
     setResult(undefined);
+    setParsing(false);
     setImporting(false);
-  }, [open, trip.id]);
+  }, [open, trip.id, trip.mode]);
 
   const activePreview = preview?.mode === mode ? preview.value : undefined;
   const errorCount = useMemo(() => activePreview?.rows.filter((row) => row.errors.length > 0).length ?? 0, [activePreview]);
   const importableRows = useMemo(() => activePreview?.rows.filter((row) => row.errors.length === 0 && row.item) ?? [], [activePreview]);
-  const canImport = Boolean(activePreview && !activePreview.parseError && activePreview.rows.length > 0 && errorCount === 0 && importableRows.length === activePreview.rows.length && !result);
+  const safeResolutions = useMemo(() => withoutDuplicateTargets(resolutions), [resolutions]);
+  const updateOperations = useMemo(() => updateContext
+    ? buildTravelUpdateOperations(updateRows, updateContext.items, safeResolutions, clearFields)
+    : [], [clearFields, safeResolutions, updateContext, updateRows]);
+  const updatingItinerary = mode === "itinerary" && trip.mode === "trip" && itineraryMode === "update";
+  const canImport = updatingItinerary
+    ? Boolean(activePreview && !activePreview.parseError && errorCount === 0 && updateContext && updateOperations.length > 0 && !result)
+    : Boolean(activePreview && !activePreview.parseError && activePreview.rows.length > 0 && errorCount === 0 && importableRows.length === activePreview.rows.length && !result);
 
   const copyPrompt = async (prompt: string, label: string) => {
     try {
@@ -85,11 +113,30 @@ export function TravelItemImportDialog({ open, trip, onOpenChange, onImported }:
     setMode(nextMode);
     setSource("");
     setPreview(undefined);
+    resetUpdateState();
     setResult(undefined);
   };
 
-  const parseSource = () => {
+  const changeItineraryMode = (nextMode: ItineraryImportMode) => {
+    if (nextMode === itineraryMode || importing) return;
+    setItineraryMode(nextMode);
+    setSource("");
+    setPreview(undefined);
+    resetUpdateState();
     setResult(undefined);
+  };
+
+  function resetUpdateState() {
+    setUpdateContext(undefined);
+    setUpdateRows([]);
+    setResolutions(new Map());
+    setClearFields(new Map());
+    setRequestId("");
+  }
+
+  const parseSource = async () => {
+    setResult(undefined);
+    resetUpdateState();
     if (mode === "flight") {
       setPreview({ mode, value: parseFlightImport(source) });
     } else if (mode === "hotel") {
@@ -97,7 +144,23 @@ export function TravelItemImportDialog({ open, trip, onOpenChange, onImported }:
     } else if (mode === "transportation") {
       setPreview({ mode, value: parseTransportationImport(source) });
     } else {
-      setPreview({ mode, value: parseTravelImport(source, trip) });
+      const nextPreview = parseTravelImport(source, trip);
+      setPreview({ mode, value: nextPreview });
+      if (trip.mode === "trip" && itineraryMode === "update" && !nextPreview.parseError && nextPreview.rows.every((row) => row.errors.length === 0 && row.item)) {
+        setParsing(true);
+        try {
+          const context = await travelRepository.prepareTravelItemsUpdate(trip.id);
+          const rows = analyzeTravelUpdate(nextPreview, context.items);
+          setUpdateContext(context);
+          setUpdateRows(rows);
+          setResolutions(new Map(rows.map((row) => [row.index, row.defaultResolution])));
+          setRequestId(crypto.randomUUID());
+        } catch (error) {
+          toast.error(errorMessage(error, "無法比對目前行程"));
+        } finally {
+          setParsing(false);
+        }
+      }
     }
   };
 
@@ -112,6 +175,8 @@ export function TravelItemImportDialog({ open, trip, onOpenChange, onImported }:
         nextResult = await travelRepository.importHotelStays(trip.id, preview.value.rows.flatMap((row) => row.item ? [row.item] : []));
       } else if (preview.mode === "transportation") {
         nextResult = await travelRepository.importTransportations(trip.id, preview.value.rows.flatMap((row) => row.item ? [row.item] : []));
+      } else if (updatingItinerary && updateContext) {
+        nextResult = await travelRepository.updateTravelItems(trip.id, updateContext.snapshotToken, requestId, updateOperations);
       } else {
         nextResult = await travelRepository.importTravelItems(trip.id, preview.value.rows.flatMap((row) => row.item ? [row.item] : []));
       }
@@ -151,6 +216,14 @@ export function TravelItemImportDialog({ open, trip, onOpenChange, onImported }:
               </span> : <span className="mt-2 inline-flex min-w-0 items-center whitespace-nowrap"><ModeButton mode="itinerary" activeMode={mode} onClick={changeMode} disabled={importing} /></span>}
             </div>
           </div>
+          {trip.mode === "trip" && mode === "itinerary" && <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
+            <span className="shrink-0">匯入模式</span>
+            <span className="inline-flex min-w-0 items-center whitespace-nowrap">
+              <ItineraryModeButton value="append" activeValue={itineraryMode} onClick={changeItineraryMode} disabled={importing} />
+              <PromptDivider />
+              <ItineraryModeButton value="update" activeValue={itineraryMode} onClick={changeItineraryMode} disabled={importing} />
+            </span>
+          </div>}
         </div>
 
         <label className="block space-y-2 text-sm">
@@ -158,7 +231,7 @@ export function TravelItemImportDialog({ open, trip, onOpenChange, onImported }:
           <Textarea
             aria-label="GPT JSON"
             value={source}
-            onChange={(event) => { setSource(event.target.value); setPreview(undefined); setResult(undefined); }}
+            onChange={(event) => { setSource(event.target.value); setPreview(undefined); resetUpdateState(); setResult(undefined); }}
             rows={10}
             spellCheck={false}
             placeholder={placeholder(mode)}
@@ -168,10 +241,25 @@ export function TravelItemImportDialog({ open, trip, onOpenChange, onImported }:
         </label>
 
         <div className="flex justify-end">
-          <Button type="button" variant="outline" disabled={!source.trim() || importing || Boolean(result)} onClick={parseSource}>解析並預覽</Button>
+          <Button type="button" variant="outline" disabled={!source.trim() || parsing || importing || Boolean(result)} onClick={() => void parseSource()}>{parsing ? "比對中…" : "解析並預覽"}</Button>
         </div>
 
-        {preview?.mode === mode && <Preview state={preview} errorCount={errorCount} />}
+        {preview?.mode === mode && (updatingItinerary && updateContext
+          ? <UpdatePreview
+              rows={updateRows}
+              existingItems={updateContext.items}
+              resolutions={resolutions}
+              clearFields={clearFields}
+              onResolutionChange={(index, resolution) => setResolutions((current) => new Map(current).set(index, resolution))}
+              onClearFieldChange={(index, field, checked) => setClearFields((current) => {
+                const next = new Map(current);
+                const fields = new Set(next.get(index) ?? []);
+                if (checked) fields.add(field); else fields.delete(field);
+                next.set(index, fields);
+                return next;
+              })}
+            />
+          : <Preview state={preview} errorCount={errorCount} />)}
         {result && <ImportResult result={result} />}
 
         <div className="flex justify-end gap-2 border-t border-divider pt-4">
@@ -181,6 +269,11 @@ export function TravelItemImportDialog({ open, trip, onOpenChange, onImported }:
       </div>
     </DialogContent>
   </Dialog>;
+}
+
+function ItineraryModeButton({ value, activeValue, onClick, disabled }: { value: ItineraryImportMode; activeValue: ItineraryImportMode; onClick: (value: ItineraryImportMode) => void; disabled: boolean }) {
+  const active = value === activeValue;
+  return <button type="button" aria-pressed={active} disabled={disabled} onClick={() => onClick(value)} className={cn("border-b py-1 text-[#222222] transition-colors hover:text-[#555555]", active ? "border-ink font-medium" : "border-transparent")}>{value === "append" ? "新增匯入" : "更新行程"}</button>;
 }
 
 function PromptButton({ label, onClick }: { label: string; onClick: () => void }) {
@@ -246,6 +339,128 @@ function PreviewList<T>({ preview, errorCount, renderSummary }: { preview: Impor
     </div>
     {errorCount > 0 && <p className="text-xs leading-5 text-red-700">請回到上方 JSON 修正所有錯誤並重新解析，才能確認匯入。</p>}
   </section>;
+}
+
+function UpdatePreview({ rows, existingItems, resolutions, clearFields, onResolutionChange, onClearFieldChange }: {
+  rows: TravelUpdateAnalysisRow[];
+  existingItems: TravelItem[];
+  resolutions: ReadonlyMap<number, TravelUpdateResolution>;
+  clearFields: ReadonlyMap<number, ReadonlySet<string>>;
+  onResolutionChange: (index: number, resolution: TravelUpdateResolution) => void;
+  onClearFieldChange: (index: number, field: string, checked: boolean) => void;
+}) {
+  const duplicateTargets = duplicateTargetIds(resolutions);
+  const summaries = rows.map((row) => summarizeUpdateRow(row, existingItems, resolutions.get(row.index) ?? row.defaultResolution, clearFields.get(row.index) ?? new Set(), duplicateTargets));
+  const count = (status: UpdateRowSummary["status"]) => summaries.filter((summary) => summary.status === status).length;
+  const sortedItems = [...existingItems].sort((a, b) => a.date?.localeCompare(b.date ?? "") || a.name.localeCompare(b.name));
+
+  return <section aria-label="更新行程預覽" className="space-y-3">
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs sm:text-sm">
+      <span>新增 {count("add")}</span>
+      <span>更新 {count("update")}</span>
+      <span>移動日期 {count("move")}</span>
+      <span className="text-muted">不變 {count("unchanged")}</span>
+      <span className={count("pending") ? "text-red-600" : "text-muted"}>待手動確認 {count("pending")}</span>
+      <span className="text-muted">略過 {count("skip")}</span>
+    </div>
+    <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
+      {summaries.map(({ row, resolution, status, label, existing, diffs, duplicateTarget }) => {
+        const emptyFields = emptyProvidedFields(row);
+        return <article key={row.index} className="rounded-card border border-border bg-bg px-3 py-3 text-sm">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="shrink-0 pt-0.5 text-xs text-muted">#{row.index + 1}</span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-medium">{row.item.name}</p>
+              <p className="mt-1 text-xs text-muted">{row.item.type === "place" ? "景點" : "美食"} · {row.item.date}</p>
+            </div>
+            <span className={cn("shrink-0 pt-0.5 text-xs", status === "pending" || duplicateTarget ? "text-red-600" : "text-muted")}>{label}</span>
+          </div>
+
+          {row.requiresManualMatch && <div className="mt-3 space-y-2 border-t border-divider pt-3">
+            <p className="text-xs leading-5 text-red-700">{row.reason}；未確認時預設略過。</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" disabled={sortedItems.length === 0} onClick={() => {
+                const firstId = row.suggestedIds[0] ?? sortedItems[0]?.id;
+                if (firstId) onResolutionChange(row.index, { kind: "update", existingId: firstId, confirmed: true });
+              }} className={choiceClass(resolution.kind === "update")}>指定既有項目</button>
+              <button type="button" onClick={() => onResolutionChange(row.index, { kind: "add", confirmed: true })} className={choiceClass(resolution.kind === "add")}>視為新增</button>
+              <button type="button" onClick={() => onResolutionChange(row.index, { kind: "skip", confirmed: true })} className={choiceClass(resolution.kind === "skip" && resolution.confirmed)}>略過此筆</button>
+            </div>
+            {resolution.kind === "update" && <select
+              aria-label={`指定「${row.item.name}」對應的既有項目`}
+              value={resolution.existingId}
+              onChange={(event) => onResolutionChange(row.index, { kind: "update", existingId: event.target.value, confirmed: true })}
+              className="form-control h-10 w-full rounded-input border border-border bg-surface px-3 text-xs text-ink outline-none focus:border-muted"
+            >
+              {sortedItems.map((item) => <option key={item.id} value={item.id}>{item.name}｜{item.type === "place" ? "景點" : "美食"}｜{item.date ?? "未定"}｜{item.area || "未分類"}</option>)}
+            </select>}
+            {duplicateTarget && <p className="text-xs text-red-700">同一既有項目被指定超過一次；這些重複指定會安全略過，其他項目仍可匯入。</p>}
+          </div>}
+
+          {existing && diffs.length > 0 && !duplicateTarget && <ul className="mt-3 space-y-1 border-t border-divider pt-2 text-xs leading-5 text-muted">
+            {diffs.map((diff) => <li key={diff.field}><span className="text-ink">{diff.label}</span>：{diff.before} → {diff.after}</li>)}
+          </ul>}
+          {existing && emptyFields.length > 0 && resolution.kind === "update" && !duplicateTarget && <div className="mt-3 border-t border-divider pt-2">
+            <p className="text-xs leading-5 text-muted">JSON 的空字串或 null 預設保留原值；只有勾選後才會清除。</p>
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+              {emptyFields.map(({ field, sourceKind }) => <label key={field} className="inline-flex items-center gap-1.5 text-xs text-muted">
+                <input type="checkbox" checked={clearFields.get(row.index)?.has(field) ?? false} onChange={(event) => onClearFieldChange(row.index, field, event.target.checked)} className="form-control h-3.5 w-3.5 accent-ink" />
+                清除{fieldLabel(field)}（JSON {sourceKind === "null" ? "null" : "空字串"}）
+              </label>)}
+            </div>
+          </div>}
+        </article>;
+      })}
+    </div>
+    <p className="text-xs leading-5 text-muted">未出現在 JSON 的既有項目不會變更。日期未改變的項目保留原排序；移動日期與新增項目才會追加至目標日期末尾。</p>
+  </section>;
+}
+
+type UpdateRowSummary = {
+  row: TravelUpdateAnalysisRow;
+  resolution: TravelUpdateResolution;
+  status: "add" | "update" | "move" | "unchanged" | "pending" | "skip";
+  label: string;
+  existing?: TravelItem;
+  diffs: ReturnType<typeof buildTravelUpdatePatch>["diffs"];
+  duplicateTarget: boolean;
+};
+
+function summarizeUpdateRow(row: TravelUpdateAnalysisRow, existingItems: TravelItem[], resolution: TravelUpdateResolution, clearFields: ReadonlySet<string>, duplicateTargets: ReadonlySet<string>): UpdateRowSummary {
+  if (resolution.kind === "skip") {
+    return { row, resolution, status: resolution.confirmed ? "skip" : "pending", label: resolution.confirmed ? "略過" : "待手動確認", diffs: [], duplicateTarget: false };
+  }
+  if (resolution.kind === "add") {
+    return { row, resolution, status: "add", label: "新增", diffs: [], duplicateTarget: false };
+  }
+  const existing = existingItems.find((item) => item.id === resolution.existingId);
+  const duplicateTarget = duplicateTargets.has(resolution.existingId);
+  if (!existing || duplicateTarget) {
+    return { row, resolution, status: "pending", label: duplicateTarget ? "重複指定" : "待手動確認", existing, diffs: [], duplicateTarget };
+  }
+  const { diffs, movedDate } = buildTravelUpdatePatch(row, existing, clearFields);
+  if (diffs.length === 0) return { row, resolution, status: "unchanged", label: "不變", existing, diffs, duplicateTarget: false };
+  return { row, resolution, status: movedDate ? "move" : "update", label: movedDate ? "移動日期" : "更新內容", existing, diffs, duplicateTarget: false };
+}
+
+function choiceClass(active: boolean) {
+  return cn("rounded-tag border px-2.5 py-1.5 text-xs transition-colors disabled:opacity-40", active ? "border-ink bg-surface text-ink" : "border-border bg-transparent text-muted hover:text-ink");
+}
+
+function duplicateTargetIds(resolutions: ReadonlyMap<number, TravelUpdateResolution>) {
+  const counts = new Map<string, number>();
+  for (const resolution of resolutions.values()) {
+    if (resolution.kind === "update") counts.set(resolution.existingId, (counts.get(resolution.existingId) ?? 0) + 1);
+  }
+  return new Set([...counts].filter(([, count]) => count > 1).map(([id]) => id));
+}
+
+function withoutDuplicateTargets(resolutions: ReadonlyMap<number, TravelUpdateResolution>) {
+  const duplicates = duplicateTargetIds(resolutions);
+  if (duplicates.size === 0) return resolutions;
+  return new Map([...resolutions].map(([index, resolution]) => resolution.kind === "update" && duplicates.has(resolution.existingId)
+    ? [index, { kind: "skip", confirmed: false } satisfies TravelUpdateResolution]
+    : [index, resolution]));
 }
 
 function ImportResult({ result }: { result: TravelImportResult }) {

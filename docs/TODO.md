@@ -4,6 +4,8 @@
 
 ### Done
 
+- Trip batch-management aggregate view with cross-type selection, scoped select-all controls, per-type deletion confirmation, and whole-Trip name verification
+- Safe GPT itinerary append/update modes with exact matching, non-blocking manual assignment/add/skip decisions, field-preserving diffs, stable same-date order, atomic snapshot validation, and idempotent requests
 - Daily Desktop/Mobile price-list actions using the existing card action column and shared Price List Dialog without changing card widths or swipe management
 - Optional Place/Food price lists with checked dates and sources, conditional card Dialogs, shared title dividers, GPT JSON compatibility, and complete save/copy preservation
 - Chinese note/body-copy justification and strict punctuation line-breaking across card previews and full-content Dialogs

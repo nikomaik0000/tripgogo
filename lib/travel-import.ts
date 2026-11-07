@@ -45,6 +45,8 @@ export type ImportPreviewRow<T> = {
   index: number;
   item?: T;
   errors: string[];
+  providedFields?: string[];
+  sourceValues?: Record<string, unknown>;
 };
 
 export type ImportPreview<T> = {
@@ -338,7 +340,7 @@ function validateRow(value: unknown, index: number, trip: Trip): TravelImportPre
     experienceNote,
   } satisfies TravelImportItem : undefined;
 
-  return { index, item, errors };
+  return { index, item, errors, providedFields: Object.keys(value), sourceValues: value };
 }
 
 function validateFlightRow(value: unknown, index: number): ImportPreviewRow<FlightImportItem> {

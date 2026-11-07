@@ -1,5 +1,29 @@
 # Changelog
 
+## TRIP GOGO — Batch Management All Tab
+
+Added
+
+- Added a Trip-only `全部` batch-management tab that aggregates Places, Food, Flights, Stays, and Transportation while reusing the five existing selection sets and deletion paths.
+- Added a deletion summary with the Trip name, total count, and per-type counts, plus exact Trip-name confirmation only when every manageable item in the current Trip is selected.
+
+Changed
+
+- Batch selection now stays synchronized between each existing type tab and the aggregate view, whose select-all and clear-all actions operate across all five types without changing Collection behavior.
+
+## TRIP GOGO — Safe GPT Itinerary Updates
+
+Added
+
+- Added `新增匯入` and default `更新行程` modes below the existing itinerary import type without changing GPT prompts or Flight, Hotel, Transportation, and Collection imports.
+- Added exact-name/type matching, ambiguity-safe manual assignment, explicit add/skip choices, field-level before/after previews, and opt-in clearing for JSON empty strings or null values.
+- Added one atomic, permission-aware update RPC with preview snapshot validation and idempotent request IDs.
+
+Changed
+
+- Same-date updates preserve the existing row ID, image reference, review metadata, price metadata, and `sort_order` unless a corresponding non-empty field or explicit clear is confirmed.
+- Date moves and new rows append to the target date while existing items not present in the JSON remain untouched.
+
 ## TRIP GOGO — Daily Price List Actions
 
 Changed

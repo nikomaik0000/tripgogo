@@ -4,6 +4,7 @@ import type { TgFlightRow, TgHotelStayRow, TgProfileRow, TgTransportationRow, Tg
 import { mapFlight, mapHotelStay, mapItem, mapTransportation, mapTrip, mapTripResource } from "@/lib/travel-mappers";
 import { getTravelItemImageExtensionFromPath, getTravelItemImageFormat } from "@/lib/travel-item-image";
 import type { FlightImportItem, HotelImportItem, TransportationImportItem, TravelImportItem, TravelImportResult } from "@/lib/travel-import";
+import type { TravelUpdateOperation } from "@/lib/travel-update-import";
 import type { Flight, HotelStay, PendingTripInvitation, Transportation, TransportationInput, TravelItem, Trip, TripEditor, TripInvitation, TripResource, TripRole } from "@/lib/types";
 
 const RESOURCE_IMAGE_BUCKET = "tg-trip-resources";
@@ -301,6 +302,22 @@ export const travelRepository = {
     const { data, error } = await createClient().rpc("tg_import_travel_items", {
       p_trip_id: tripId,
       p_items: items,
+    });
+    return result(data, error) as unknown as TravelImportResult;
+  },
+
+  async prepareTravelItemsUpdate(tripId: string) {
+    const { data, error } = await createClient().rpc("tg_prepare_travel_items_update", { p_trip_id: tripId });
+    const context = result(data, error) as unknown as { items: TgTravelItemRow[]; snapshotToken: string };
+    return { items: context.items.map(mapItem), snapshotToken: context.snapshotToken };
+  },
+
+  async updateTravelItems(tripId: string, snapshotToken: string, requestId: string, operations: TravelUpdateOperation[]): Promise<TravelImportResult> {
+    const { data, error } = await createClient().rpc("tg_update_travel_items", {
+      p_trip_id: tripId,
+      p_snapshot_token: snapshotToken,
+      p_request_id: requestId,
+      p_operations: operations,
     });
     return result(data, error) as unknown as TravelImportResult;
   },
