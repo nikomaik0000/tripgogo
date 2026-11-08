@@ -1,5 +1,38 @@
 # Changelog
 
+## TRIP GOGO — Stay and Transportation Map Links
+
+Changed
+
+- Stay names and rental-car company names now open their existing Google Maps URLs on both Desktop and Mobile, while names without map URLs and rail names remain plain text.
+- Removed the duplicate Stay and rental-car Google Maps footer actions without changing their other external links, card details, or edit/delete controls.
+
+## TRIP GOGO — Collection Smart JSON Update and Export
+
+Added
+
+- Added default `更新收藏` and existing-behavior `新增匯入` modes to the shared Collection itinerary importer, including ambiguity-safe assignment, explicit add/skip choices, opt-in field clearing, and unchanged-item detection.
+- Added Collection JSON copy/download export beside the existing import action, preserving every Place/Food row, null itinerary dates, collection status, completed dates, ordering, multiline content, Unicode, and zero ratings.
+- Added Collection support to the atomic TravelItem update transaction with edit authorization, workspace snapshot validation, idempotent request IDs, row locking, and all-or-nothing mixed add/update execution.
+
+Changed
+
+- Shared Trip/Collection matching and diff helpers now apply mode-specific date and addition rules while retaining the tested Trip update, null-date, ordering, and lossless-text behavior.
+- Collection updates keep `date` null and existing `sort_order`, treat `completedDate` as the separate visit date, preserve missing/null/empty fields by default, and never offer status clearing.
+
+## TRIP GOGO — Itinerary JSON Export
+
+Added
+
+- Added Trip-only itinerary JSON export beside the existing import action, with shared copy and UTF-8 download content, safe local-date filenames, and responsive Dialog controls.
+- Added import-schema and unchanged-round-trip validation that blocks incompatible records with item-specific reasons instead of silently omitting data.
+
+Changed
+
+- Exported Places and Food now follow Daily date/order/creation ordering, omit empty optional fields, preserve raw price-list text, and warn when duplicate names may require manual update matching.
+- Unscheduled Trip items now export with an explicit `date: null`; Update mode treats that value as “keep the existing date,” while Append mode still requires a valid Trip date and unsafe undated additions remain skipped.
+- Update-mode parsing now preserves exact content/link-field whitespace, line breaks, Unicode spaces, and Emoji so unchanged exported notes and related fields remain unchanged while names, closed-day display text, Append, and non-itinerary imports retain their existing normalization.
+
 ## TRIP GOGO — Batch Management All Tab
 
 Added

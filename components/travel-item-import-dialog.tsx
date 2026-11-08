@@ -63,7 +63,7 @@ export function TravelItemImportDialog({ open, trip, onOpenChange, onImported }:
   onImported: (mode: TravelImportMode) => Promise<void> | void;
 }) {
   const [mode, setMode] = useState<TravelImportMode>("itinerary");
-  const [itineraryMode, setItineraryMode] = useState<ItineraryImportMode>(trip.mode === "trip" ? "update" : "append");
+  const [itineraryMode, setItineraryMode] = useState<ItineraryImportMode>("update");
   const [source, setSource] = useState("");
   const [preview, setPreview] = useState<PreviewState>();
   const [updateContext, setUpdateContext] = useState<UpdateContext>();
@@ -78,7 +78,7 @@ export function TravelItemImportDialog({ open, trip, onOpenChange, onImported }:
   useEffect(() => {
     if (!open) return;
     setMode("itinerary");
-    setItineraryMode(trip.mode === "trip" ? "update" : "append");
+    setItineraryMode("update");
     setSource("");
     setPreview(undefined);
     resetUpdateState();
@@ -92,9 +92,9 @@ export function TravelItemImportDialog({ open, trip, onOpenChange, onImported }:
   const importableRows = useMemo(() => activePreview?.rows.filter((row) => row.errors.length === 0 && row.item) ?? [], [activePreview]);
   const safeResolutions = useMemo(() => withoutDuplicateTargets(resolutions), [resolutions]);
   const updateOperations = useMemo(() => updateContext
-    ? buildTravelUpdateOperations(updateRows, updateContext.items, safeResolutions, clearFields)
-    : [], [clearFields, safeResolutions, updateContext, updateRows]);
-  const updatingItinerary = mode === "itinerary" && trip.mode === "trip" && itineraryMode === "update";
+    ? buildTravelUpdateOperations(updateRows, updateContext.items, safeResolutions, clearFields, { allowUnscheduledAdds: trip.mode === "collection" })
+    : [], [clearFields, safeResolutions, trip.mode, updateContext, updateRows]);
+  const updatingItinerary = mode === "itinerary" && itineraryMode === "update";
   const canImport = updatingItinerary
     ? Boolean(activePreview && !activePreview.parseError && errorCount === 0 && updateContext && updateOperations.length > 0 && !result)
     : Boolean(activePreview && !activePreview.parseError && activePreview.rows.length > 0 && errorCount === 0 && importableRows.length === activePreview.rows.length && !result);
@@ -144,19 +144,29 @@ export function TravelItemImportDialog({ open, trip, onOpenChange, onImported }:
     } else if (mode === "transportation") {
       setPreview({ mode, value: parseTransportationImport(source) });
     } else {
-      const nextPreview = parseTravelImport(source, trip);
+      const updatingTrip = trip.mode === "trip" && itineraryMode === "update";
+      const updatingCollection = trip.mode === "collection" && itineraryMode === "update";
+      const nextPreview = parseTravelImport(source, trip, {
+        allowUnscheduledTripDate: updatingTrip,
+        collectionUpdateMode: updatingCollection,
+        preserveOptionalTextWhitespace: updatingTrip || updatingCollection,
+      });
       setPreview({ mode, value: nextPreview });
-      if (trip.mode === "trip" && itineraryMode === "update" && !nextPreview.parseError && nextPreview.rows.every((row) => row.errors.length === 0 && row.item)) {
+      if (itineraryMode === "update" && !nextPreview.parseError && nextPreview.rows.every((row) => row.errors.length === 0 && row.item)) {
         setParsing(true);
         try {
           const context = await travelRepository.prepareTravelItemsUpdate(trip.id);
-          const rows = analyzeTravelUpdate(nextPreview, context.items);
+          const rows = analyzeTravelUpdate(nextPreview, context.items, {
+            allowUnscheduledAdds: trip.mode === "collection",
+            requireCrossTypeNameConfirmation: trip.mode === "collection",
+            workspaceLabel: trip.mode === "collection" ? "收藏" : "旅程",
+          });
           setUpdateContext(context);
           setUpdateRows(rows);
           setResolutions(new Map(rows.map((row) => [row.index, row.defaultResolution])));
           setRequestId(crypto.randomUUID());
         } catch (error) {
-          toast.error(errorMessage(error, "無法比對目前行程"));
+          toast.error(errorMessage(error, trip.mode === "collection" ? "無法比對目前收藏" : "無法比對目前行程"));
         } finally {
           setParsing(false);
         }
@@ -216,12 +226,12 @@ export function TravelItemImportDialog({ open, trip, onOpenChange, onImported }:
               </span> : <span className="mt-2 inline-flex min-w-0 items-center whitespace-nowrap"><ModeButton mode="itinerary" activeMode={mode} onClick={changeMode} disabled={importing} /></span>}
             </div>
           </div>
-          {trip.mode === "trip" && mode === "itinerary" && <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
+          {mode === "itinerary" && <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
             <span className="shrink-0">匯入模式</span>
             <span className="inline-flex min-w-0 items-center whitespace-nowrap">
               <ItineraryModeButton value="append" activeValue={itineraryMode} onClick={changeItineraryMode} disabled={importing} />
               <PromptDivider />
-              <ItineraryModeButton value="update" activeValue={itineraryMode} onClick={changeItineraryMode} disabled={importing} />
+              <ItineraryModeButton value="update" activeValue={itineraryMode} onClick={changeItineraryMode} disabled={importing} collection={trip.mode === "collection"} />
             </span>
           </div>}
         </div>
@@ -250,6 +260,7 @@ export function TravelItemImportDialog({ open, trip, onOpenChange, onImported }:
               existingItems={updateContext.items}
               resolutions={resolutions}
               clearFields={clearFields}
+              collection={trip.mode === "collection"}
               onResolutionChange={(index, resolution) => setResolutions((current) => new Map(current).set(index, resolution))}
               onClearFieldChange={(index, field, checked) => setClearFields((current) => {
                 const next = new Map(current);
@@ -271,9 +282,9 @@ export function TravelItemImportDialog({ open, trip, onOpenChange, onImported }:
   </Dialog>;
 }
 
-function ItineraryModeButton({ value, activeValue, onClick, disabled }: { value: ItineraryImportMode; activeValue: ItineraryImportMode; onClick: (value: ItineraryImportMode) => void; disabled: boolean }) {
+function ItineraryModeButton({ value, activeValue, onClick, disabled, collection = false }: { value: ItineraryImportMode; activeValue: ItineraryImportMode; onClick: (value: ItineraryImportMode) => void; disabled: boolean; collection?: boolean }) {
   const active = value === activeValue;
-  return <button type="button" aria-pressed={active} disabled={disabled} onClick={() => onClick(value)} className={cn("border-b py-1 text-[#222222] transition-colors hover:text-[#555555]", active ? "border-ink font-medium" : "border-transparent")}>{value === "append" ? "新增匯入" : "更新行程"}</button>;
+  return <button type="button" aria-pressed={active} disabled={disabled} onClick={() => onClick(value)} className={cn("border-b py-1 text-[#222222] transition-colors hover:text-[#555555]", active ? "border-ink font-medium" : "border-transparent")}>{value === "append" ? "新增匯入" : collection ? "更新收藏" : "更新行程"}</button>;
 }
 
 function PromptButton({ label, onClick }: { label: string; onClick: () => void }) {
@@ -341,20 +352,23 @@ function PreviewList<T>({ preview, errorCount, renderSummary }: { preview: Impor
   </section>;
 }
 
-function UpdatePreview({ rows, existingItems, resolutions, clearFields, onResolutionChange, onClearFieldChange }: {
+function UpdatePreview({ rows, existingItems, resolutions, clearFields, collection, onResolutionChange, onClearFieldChange }: {
   rows: TravelUpdateAnalysisRow[];
   existingItems: TravelItem[];
   resolutions: ReadonlyMap<number, TravelUpdateResolution>;
   clearFields: ReadonlyMap<number, ReadonlySet<string>>;
+  collection: boolean;
   onResolutionChange: (index: number, resolution: TravelUpdateResolution) => void;
   onClearFieldChange: (index: number, field: string, checked: boolean) => void;
 }) {
   const duplicateTargets = duplicateTargetIds(resolutions);
   const summaries = rows.map((row) => summarizeUpdateRow(row, existingItems, resolutions.get(row.index) ?? row.defaultResolution, clearFields.get(row.index) ?? new Set(), duplicateTargets));
   const count = (status: UpdateRowSummary["status"]) => summaries.filter((summary) => summary.status === status).length;
-  const sortedItems = [...existingItems].sort((a, b) => a.date?.localeCompare(b.date ?? "") || a.name.localeCompare(b.name));
+  const sortedItems = [...existingItems].sort((a, b) => collection
+    ? a.order - b.order || a.createdAt.localeCompare(b.createdAt)
+    : a.date?.localeCompare(b.date ?? "") || a.name.localeCompare(b.name));
 
-  return <section aria-label="更新行程預覽" className="space-y-3">
+  return <section aria-label={collection ? "更新收藏預覽" : "更新行程預覽"} className="space-y-3">
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs sm:text-sm">
       <span>新增 {count("add")}</span>
       <span>更新 {count("update")}</span>
@@ -371,7 +385,7 @@ function UpdatePreview({ rows, existingItems, resolutions, clearFields, onResolu
             <span className="shrink-0 pt-0.5 text-xs text-muted">#{row.index + 1}</span>
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium">{row.item.name}</p>
-              <p className="mt-1 text-xs text-muted">{row.item.type === "place" ? "景點" : "美食"} · {row.item.date}</p>
+              <p className="mt-1 text-xs text-muted">{row.item.type === "place" ? "景點" : "美食"} · {collection ? row.item.status === "completed" ? "已完成" : "計畫中" : row.item.date ?? "未定"}</p>
             </div>
             <span className={cn("shrink-0 pt-0.5 text-xs", status === "pending" || duplicateTarget ? "text-red-600" : "text-muted")}>{label}</span>
           </div>
@@ -383,16 +397,17 @@ function UpdatePreview({ rows, existingItems, resolutions, clearFields, onResolu
                 const firstId = row.suggestedIds[0] ?? sortedItems[0]?.id;
                 if (firstId) onResolutionChange(row.index, { kind: "update", existingId: firstId, confirmed: true });
               }} className={choiceClass(resolution.kind === "update")}>指定既有項目</button>
-              <button type="button" onClick={() => onResolutionChange(row.index, { kind: "add", confirmed: true })} className={choiceClass(resolution.kind === "add")}>視為新增</button>
+              <button type="button" disabled={!collection && row.item.date === null} title={!collection && row.item.date === null ? "未排日期項目需先由 GPT 補上日期，才能視為新增" : undefined} onClick={() => onResolutionChange(row.index, { kind: "add", confirmed: true })} className={choiceClass(resolution.kind === "add")}>視為新增</button>
               <button type="button" onClick={() => onResolutionChange(row.index, { kind: "skip", confirmed: true })} className={choiceClass(resolution.kind === "skip" && resolution.confirmed)}>略過此筆</button>
             </div>
+            {!collection && row.item.date === null && <p className="text-xs leading-5 text-muted">JSON 的 date: null 會保留既有日期；未補上有效日期前不能視為新增。</p>}
             {resolution.kind === "update" && <select
               aria-label={`指定「${row.item.name}」對應的既有項目`}
               value={resolution.existingId}
               onChange={(event) => onResolutionChange(row.index, { kind: "update", existingId: event.target.value, confirmed: true })}
               className="form-control h-10 w-full rounded-input border border-border bg-surface px-3 text-xs text-ink outline-none focus:border-muted"
             >
-              {sortedItems.map((item) => <option key={item.id} value={item.id}>{item.name}｜{item.type === "place" ? "景點" : "美食"}｜{item.date ?? "未定"}｜{item.area || "未分類"}</option>)}
+              {sortedItems.map((item) => <option key={item.id} value={item.id}>{item.name}｜{item.type === "place" ? "景點" : "美食"}｜{collection ? item.status === "completed" ? "已完成" : "計畫中" : item.date ?? "未定"}｜{item.area || "未分類"}</option>)}
             </select>}
             {duplicateTarget && <p className="text-xs text-red-700">同一既有項目被指定超過一次；這些重複指定會安全略過，其他項目仍可匯入。</p>}
           </div>}
@@ -412,7 +427,7 @@ function UpdatePreview({ rows, existingItems, resolutions, clearFields, onResolu
         </article>;
       })}
     </div>
-    <p className="text-xs leading-5 text-muted">未出現在 JSON 的既有項目不會變更。日期未改變的項目保留原排序；移動日期與新增項目才會追加至目標日期末尾。</p>
+    <p className="text-xs leading-5 text-muted">{collection ? "未出現在 JSON 的既有收藏不會變更。更新項目保留原排序；新增項目追加至收藏末尾。date 永遠維持 null，實際造訪日期使用 completedDate。" : "未出現在 JSON 的既有項目不會變更。日期未改變的項目保留原排序；移動日期與新增項目才會追加至目標日期末尾。"}</p>
   </section>;
 }
 

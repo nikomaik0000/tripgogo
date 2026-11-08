@@ -4,6 +4,9 @@
 
 ### Done
 
+- Responsive Stay and rental-car name links using existing Google Maps URLs, with duplicate footer map actions removed and all unrelated links preserved
+- Collection smart JSON updates and copy/download export with null itinerary dates, status/completed-date round trips, lossless optional text, ambiguity-safe matching, stable ordering, and atomic mixed add/update requests
+- Trip itinerary JSON copy/download export with scheduled/unscheduled ordering, lossless optional-text Update round trips, explicit null-date compatibility, safe filenames, and duplicate-name matching warnings
 - Trip batch-management aggregate view with cross-type selection, scoped select-all controls, per-type deletion confirmation, and whole-Trip name verification
 - Safe GPT itinerary append/update modes with exact matching, non-blocking manual assignment/add/skip decisions, field-preserving diffs, stable same-date order, atomic snapshot validation, and idempotent requests
 - Daily Desktop/Mobile price-list actions using the existing card action column and shared Price List Dialog without changing card widths or swipe management

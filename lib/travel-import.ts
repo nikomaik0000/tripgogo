@@ -71,8 +71,14 @@ export type TravelImportResult = {
   failures: TravelImportFailure[];
 };
 
-export function parseTravelImport(source: string, trip: Trip): TravelImportPreview {
-  return parseImportArray(source, (value, index) => validateRow(value, index, trip));
+export type TravelImportOptions = {
+  allowUnscheduledTripDate?: boolean;
+  collectionUpdateMode?: boolean;
+  preserveOptionalTextWhitespace?: boolean;
+};
+
+export function parseTravelImport(source: string, trip: Trip, options: TravelImportOptions = {}): TravelImportPreview {
+  return parseImportArray(source, (value, index) => validateRow(value, index, trip, options));
 }
 
 export function parseFlightImport(source: string): FlightImportPreview {
@@ -257,7 +263,7 @@ function stripOuterJsonCodeFence(source: string) {
   return fenced ? fenced[1].trim() : trimmed;
 }
 
-function validateRow(value: unknown, index: number, trip: Trip): TravelImportPreviewRow {
+function validateRow(value: unknown, index: number, trip: Trip, options: TravelImportOptions): TravelImportPreviewRow {
   if (!isRecord(value)) return { index, errors: ["每筆資料必須是 JSON object。"] };
 
   const errors: string[] = [];
@@ -269,26 +275,27 @@ function validateRow(value: unknown, index: number, trip: Trip): TravelImportPre
   if (!type) errors.push("type 必須是 place 或 food。");
 
   const name = readString(value, "name", errors, true);
-  const category = readString(value, "category", errors);
-  const area = readString(value, "area", errors);
-  const businessHours = readString(value, "businessHours", errors);
+  const preserveWhitespace = options.preserveOptionalTextWhitespace ?? false;
+  const category = readString(value, "category", errors, false, preserveWhitespace);
+  const area = readString(value, "area", errors, false, preserveWhitespace);
+  const businessHours = readString(value, "businessHours", errors, false, preserveWhitespace);
   let closedDaysText = readString(value, "closedDaysText", errors);
   const closedRuleType = readClosedRuleType(value, errors);
   const closedRuleValidation = validateClosedRuleValues(closedRuleType, value.closedRuleValues);
   if (closedRuleValidation.error) errors.push(closedRuleValidation.error);
   const closedRuleValues = closedRuleValidation.values;
-  if (closedRuleType && !closedDaysText && closedRuleValues) {
+  if (closedRuleType && !closedDaysText.trim() && closedRuleValues) {
     closedDaysText = formatClosedDaysText(closedRuleType, closedRuleValues);
   }
-  const googleMapsUrl = readString(value, "googleMapsUrl", errors);
-  const link1 = readString(value, "link1", errors);
-  const link2 = readString(value, "link2", errors);
-  const note = readString(value, "note", errors);
+  const googleMapsUrl = readString(value, "googleMapsUrl", errors, false, preserveWhitespace);
+  const link1 = readString(value, "link1", errors, false, preserveWhitespace);
+  const link2 = readString(value, "link2", errors, false, preserveWhitespace);
+  const note = readString(value, "note", errors, false, preserveWhitespace);
   const priceList = readRawString(value, "priceList", errors);
   const priceCheckedAt = readDate(value, "priceCheckedAt", errors);
-  const priceSource = readString(value, "priceSource", errors);
-  const consumedItems = readString(value, "consumedItems", errors);
-  const experienceNote = readString(value, "experienceNote", errors);
+  const priceSource = readString(value, "priceSource", errors, false, preserveWhitespace);
+  const consumedItems = readString(value, "consumedItems", errors, false, preserveWhitespace);
+  const experienceNote = readString(value, "experienceNote", errors, false, preserveWhitespace);
   validateUrl("googleMapsUrl", googleMapsUrl, errors);
   validateUrl("link1", link1, errors);
   validateUrl("link2", link2, errors);
@@ -302,7 +309,9 @@ function validateRow(value: unknown, index: number, trip: Trip): TravelImportPre
   let completedDate: string | null = null;
   let normalizedStatus: CollectionItemStatus | null = null;
   if (trip.mode === "trip") {
-    if (!inputDate) {
+    if (value.date === null && options.allowUnscheduledTripDate) {
+      date = null;
+    } else if (!inputDate) {
       if (value.date === undefined || value.date === null || value.date === "") errors.push("Trip 資料必須提供 date，格式為 YYYY-MM-DD。");
     } else if (!trip.startDate || !trip.endDate || inputDate < trip.startDate || inputDate > trip.endDate) {
       errors.push(`date 必須位於 ${trip.startDate ?? "Trip 起日"} 至 ${trip.endDate ?? "Trip 迄日"} 之間。`);
@@ -310,11 +319,14 @@ function validateRow(value: unknown, index: number, trip: Trip): TravelImportPre
       date = inputDate;
     }
   } else {
-    normalizedStatus = status ?? "planned";
+    if (options.collectionUpdateMode && value.date !== undefined && value.date !== null && value.date !== "") {
+      errors.push("Collection 資料的 date 必須是 null 或省略；實際造訪日期請使用 completedDate。");
+    }
+    normalizedStatus = options.collectionUpdateMode ? status : status ?? "planned";
     completedDate = inputCompletedDate;
   }
 
-  if (type === "place" && consumedItems) errors.push("consumedItems 只適用於 food。");
+  if (type === "place" && consumedItems.trim()) errors.push("consumedItems 只適用於 food。");
 
   const item = type && name ? {
     type,
@@ -499,7 +511,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function readString(record: Record<string, unknown>, key: string, errors: string[], required = false) {
+function readString(record: Record<string, unknown>, key: string, errors: string[], required = false, preserveWhitespace = false) {
   const value = record[key];
   if (value === undefined || value === null) {
     if (required) errors.push(`${key} 為必填欄位。`);
@@ -511,7 +523,7 @@ function readString(record: Record<string, unknown>, key: string, errors: string
   }
   const normalized = value.trim();
   if (required && !normalized) errors.push(`${key} 不可為空白。`);
-  return normalized;
+  return preserveWhitespace ? value : normalized;
 }
 
 function readRawString(record: Record<string, unknown>, key: string, errors: string[]) {
@@ -598,9 +610,10 @@ function isIsoDate(value: string) {
 }
 
 function validateUrl(key: string, value: string, errors: string[]) {
-  if (!value) return;
+  const normalized = value.trim();
+  if (!normalized) return;
   try {
-    const url = new URL(value);
+    const url = new URL(normalized);
     if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("Unsupported protocol");
   } catch {
     errors.push(`${key} 必須是有效的 http(s) 網址。`);

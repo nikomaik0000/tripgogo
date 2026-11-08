@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowUpDown, BookOpenText, CalendarCheck, CalendarDays, CarFront, ChevronRight, Clock3, Copy, Ellipsis, FolderHeart, Hotel, Link2, ListChecks, MapPin, MapPinned, MapPinPlus, Navigation, Plane, Search, SquarePen, TicketCheck, Trash2, UtensilsCrossed, X } from "lucide-react";
+import { ArrowLeft, ArrowUpDown, BookOpenText, CalendarCheck, CalendarDays, CarFront, ChevronRight, Clock3, Copy, Ellipsis, FolderHeart, Hotel, Link2, ListChecks, MapPin, MapPinned, MapPinPlus, Plane, Search, SquarePen, TicketCheck, Trash2, UtensilsCrossed, X } from "lucide-react";
 import { closestCenter, DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -19,6 +19,7 @@ import { HotelStayDialog } from "@/components/hotel-stay-dialog";
 import { isDailyCardInteractiveTarget, MobileDailySwipeActions, MobileSwipeActions, useMobileSwipeGroup } from "@/components/mobile-daily-swipe-actions";
 import { TransportationDialog } from "@/components/transportation-dialog";
 import { TravelItemDialog } from "@/components/travel-item-dialog";
+import { TravelItemExportAction, TravelItemExportDialog } from "@/components/travel-item-export-dialog";
 import { TravelItemImportAction, TravelItemImportDialog } from "@/components/travel-item-import-dialog";
 import { StandaloneRefreshAction } from "@/components/standalone-refresh-action";
 import { TripPrimaryNav, type TripPrimaryTab } from "@/components/trip-primary-nav";
@@ -52,6 +53,7 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
   const [sort, setSort] = useState<TravelItemSort>(initialTrip?.mode === "collection" ? "area" : "date");
   const [dialog, setDialog] = useState<{ open: boolean; type: TravelItemType; item?: TravelItem; initialDate?: string; allowTypeChange?: boolean; desktopTwoColumn?: boolean }>({ open: false, type: "place" });
   const [importOpen, setImportOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [outlineRefreshVersion, setOutlineRefreshVersion] = useState(0);
   const [deleting, setDeleting] = useState<TravelItem>();
   const [addingToTrip, setAddingToTrip] = useState<TravelItem>();
@@ -139,8 +141,8 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
       <header className="sticky top-0 z-20 -mx-4 flex items-center gap-3 border-b border-border bg-bg/95 px-4 pb-3 pt-3 backdrop-blur sm:-mx-6 sm:gap-4 sm:px-6 sm:py-4">
         <div className="flex min-w-0 flex-1 items-center gap-3 sm:flex-initial"><Link href="/" aria-label="返回" title="返回" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-muted hover:bg-searchBackground hover:text-[#555555] sm:h-9 sm:w-9"><ArrowLeft className="h-4 w-4 stroke-[1.5]" /></Link><h1 className="min-w-0 truncate text-title font-semibold !tracking-[0.02em] sm:!tracking-[0.04em]">{trip.name}</h1></div>
         <div aria-hidden="true" className="hidden min-w-4 flex-1 sm:block" />
-        <div className="hidden shrink-0 items-center gap-3 sm:flex"><TripPrimaryNav activeTab={tab} onTabChange={setTab} collection={trip.mode === "collection"} /><div className="flex shrink-0 items-center justify-end gap-1 before:mr-2 before:h-[30px] before:w-px before:shrink-0 before:bg-border before:content-['']"><StandaloneRefreshAction className="border-0 bg-transparent shadow-none hover:bg-transparent" />{canEdit && <TravelItemImportAction onClick={() => setImportOpen(true)} className="border-0 bg-transparent shadow-none hover:bg-transparent hover:text-ink" />}<Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" className="flex h-11 w-11 shrink-0 items-center justify-center border-0 bg-transparent text-muted shadow-none hover:bg-transparent hover:text-ink"><FolderHeart className="h-4 w-4 stroke-[1.5]" /></Link><AuthControl className="border-0 bg-transparent text-muted shadow-none hover:bg-transparent hover:text-ink [&>svg]:h-4 [&>svg]:w-4" /></div></div>
-        <div className="flex shrink-0 items-center justify-end gap-2 sm:hidden"><StandaloneRefreshAction />{canEdit && <TravelItemImportAction onClick={() => setImportOpen(true)} />}<Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-muted hover:bg-searchBackground hover:text-[#555555]"><FolderHeart className="h-4 w-4 stroke-[1.5]" /></Link><AuthControl /></div>
+        <div className="hidden shrink-0 items-center gap-3 sm:flex"><TripPrimaryNav activeTab={tab} onTabChange={setTab} collection={trip.mode === "collection"} /><div className="flex shrink-0 items-center justify-end gap-1 before:mr-2 before:h-[30px] before:w-px before:shrink-0 before:bg-border before:content-['']"><StandaloneRefreshAction className="border-0 bg-transparent shadow-none hover:bg-transparent" />{canEdit && <TravelItemImportAction onClick={() => setImportOpen(true)} className="border-0 bg-transparent shadow-none hover:bg-transparent hover:text-ink" />}{canEdit && <TravelItemExportAction onClick={() => setExportOpen(true)} className="border-0 bg-transparent shadow-none hover:bg-transparent hover:text-ink" />}<Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" className="flex h-11 w-11 shrink-0 items-center justify-center border-0 bg-transparent text-muted shadow-none hover:bg-transparent hover:text-ink"><FolderHeart className="h-4 w-4 stroke-[1.5]" /></Link><AuthControl className="border-0 bg-transparent text-muted shadow-none hover:bg-transparent hover:text-ink [&>svg]:h-4 [&>svg]:w-4" /></div></div>
+        <div className="flex shrink-0 items-center justify-end gap-2 max-[359px]:gap-0 sm:hidden"><StandaloneRefreshAction />{canEdit && <TravelItemImportAction onClick={() => setImportOpen(true)} />}{canEdit && <TravelItemExportAction onClick={() => setExportOpen(true)} />}<Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-muted hover:bg-searchBackground hover:text-[#555555]"><FolderHeart className="h-4 w-4 stroke-[1.5]" /></Link><AuthControl /></div>
       </header>
       <div className="sm:hidden"><TripPrimaryNav activeTab={tab} onTabChange={setTab} collection={trip.mode === "collection"} /></div>
       {trip.mode === "trip" && tab === "daily" && <Daily trip={trip} items={items} canEdit={canEdit} onAdd={(date) => setDialog({ open: true, type: "place", initialDate: date, allowTypeChange: true })} onEdit={edit} onDelete={remove} onReorder={reorder} onMoveOrSwapDay={moveOrSwapDay} />}
@@ -153,6 +155,7 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
           setOutlineRefreshVersion((version) => version + 1);
         }
       }} />}
+      {canEdit && <TravelItemExportDialog open={exportOpen} trip={trip} items={items} onOpenChange={setExportOpen} />}
       <TravelItemDialog open={dialog.open} type={dialog.type} trip={trip} item={dialog.item} items={items} initialDate={dialog.initialDate} allowTypeChange={dialog.allowTypeChange} desktopTwoColumn={dialog.desktopTwoColumn} onTypeChange={(type) => setDialog((value) => ({ ...value, type }))} onOpenChange={(open) => setDialog((value) => ({ ...value, open }))} onSave={async (value) => {
         const { imageFile, ...itemValue } = value;
         try {
@@ -761,14 +764,13 @@ function HotelStayCard({ stay, canEdit, swipeOpen, onSwipeOpen, onSwipeClose, on
   const hasTimes = stay.checkInTime || stay.checkOutTime;
   return <MobileSwipeActions itemId={`hotel-${stay.id}`} canEdit={canEdit} canDelete={canEdit} open={swipeOpen} desktopPassthrough mobileFrame onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete}>
   <article className="flex min-w-0 flex-col bg-surface px-6 pt-6 sm:rounded-card sm:border sm:border-border sm:shadow-soft">
-    {stay.googleMapsUrl && <a href={stay.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label={`在 Google Maps 開啟${stay.name}`} title="開啟 Google Maps" className="line-clamp-2 font-medium text-ink no-underline focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-ink sm:hidden">{stay.name}</a>}
-    <h3 className={`line-clamp-2 font-medium ${stay.googleMapsUrl ? "hidden sm:block" : ""}`}>{stay.name}</h3>
+    <GoogleMapsName name={stay.name} url={stay.googleMapsUrl} className="line-clamp-2 font-medium" />
     <div className="mt-5 border-t border-divider" />
     <div className="space-y-4 py-6"><p className="text-center font-medium"><time dateTime={stay.checkInDate}><DailyDateLabel date={stay.checkInDate} /></time><span className="mx-3 text-muted">–</span><time dateTime={stay.checkOutDate}><DailyDateLabel date={stay.checkOutDate} /></time></p>
       {hasTimes && <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 rounded-pill bg-searchBackground px-4 py-2 text-sm text-muted">{stay.checkInTime && <span>入住&nbsp; {stay.checkInTime}</span>}{stay.checkOutTime && <span>退房&nbsp; {stay.checkOutTime}</span>}</div>}
       {stay.address && <ContactRow label="地址" value={stay.address} />}{stay.phone && <ContactRow label="電話" value={stay.phone} />}{stay.note && <ClampedNote note={stay.note} lines={2} showMarker={false} textClassName="leading-[1.65]" />}
     </div>
-    <footer className={`${stay.link ? "flex" : "hidden"} mt-auto h-14 items-center border-t border-divider sm:flex`}><div className="ml-auto flex items-center gap-4 sm:ml-0">{stay.link && <ExternalLinkAction href={stay.link} index={1} />}{stay.googleMapsUrl && <a href={stay.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label="開啟 Google Maps" title="開啟 Google Maps" className="hidden h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-[#555555] sm:flex sm:h-9 sm:w-9"><Navigation className="h-4 w-4" /></a>}</div>{canEdit && <div className="ml-auto hidden items-center gap-4 sm:flex"><Action label="編輯" smallIcon onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onClick={onDelete}><Trash2 /></Action></div>}</footer>
+    <footer className={`${stay.link ? "flex" : "hidden"} mt-auto h-14 items-center border-t border-divider sm:flex`}><div className="ml-auto flex items-center gap-4 sm:ml-0">{stay.link && <ExternalLinkAction href={stay.link} index={1} />}</div>{canEdit && <div className="ml-auto hidden items-center gap-4 sm:flex"><Action label="編輯" smallIcon onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onClick={onDelete}><Trash2 /></Action></div>}</footer>
   </article>
   </MobileSwipeActions>;
 }
@@ -784,12 +786,12 @@ function TransportationCard({ transportation, canEdit, swipeOpen, onSwipeOpen, o
     .filter((detail): detail is [string, string] => Boolean(detail[1]));
   return <MobileSwipeActions itemId={`transportation-${transportation.id}`} canEdit={canEdit} canDelete={canEdit} open={swipeOpen} desktopPassthrough mobileFrame onOpen={onSwipeOpen} onClose={onSwipeClose} onEdit={onEdit} onDelete={onDelete}>
   <article className="flex min-w-0 flex-col bg-surface px-6 pt-6 sm:rounded-card sm:border sm:border-border sm:shadow-soft">
-    <header className="flex min-w-0 items-center justify-between gap-4 pb-5"><div className="flex min-w-0 items-center gap-4"><h3 className="min-w-0 truncate font-medium">{title}</h3>{secondary && <span className="min-w-0 truncate text-sm text-muted">{secondary}</span>}</div>{transportation.reservationNumber && <span className="max-w-24 shrink-0 truncate text-sm text-muted sm:max-w-40">{transportation.reservationNumber}</span>}</header>
+    <header className="flex min-w-0 items-center justify-between gap-4 pb-5"><div className="flex min-w-0 items-center gap-4"><GoogleMapsName name={title} url={isRental ? transportation.googleMapsUrl : undefined} className="min-w-0 truncate font-medium" />{secondary && <span className="min-w-0 truncate text-sm text-muted">{secondary}</span>}</div>{transportation.reservationNumber && <span className="max-w-24 shrink-0 truncate text-sm text-muted sm:max-w-40">{transportation.reservationNumber}</span>}</header>
     <div className="border-t border-divider" />
     <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2 py-6"><div className="shrink-0 text-sm text-muted"><time dateTime={transportation.startDate}><DailyDateLabel date={transportation.startDate} /></time></div><div className="flex items-center gap-3 text-title font-medium"><time dateTime={transportation.startTime}>{transportation.startTime}</time><ChevronRight className="h-4 w-4 text-muted" />{crossesDate && <time dateTime={transportation.endDate} className="text-sm font-normal text-muted"><DailyDateLabel date={transportation.endDate} /></time>}<time dateTime={transportation.endTime}>{transportation.endTime}</time></div></div>
     <div className="flex min-w-0 items-center justify-between gap-4 rounded-pill bg-searchBackground px-4 py-2 text-sm text-muted"><span className="min-w-0 truncate">{transportation.departurePlace}</span><span className="min-w-0 truncate text-right">{transportation.arrivalPlace}</span></div>
     <div className="space-y-4 py-6">{details.map(([label, value]) => <ContactRow key={label} label={label} value={value} />)}{transportation.note && <ClampedNote note={transportation.note} lines={2} showMarker={false} />}</div>
-    <footer className={`${transportation.link || (isRental && transportation.googleMapsUrl) ? "flex" : "hidden"} mt-auto h-14 items-center border-t border-divider sm:flex`}><div className="flex items-center gap-4">{transportation.link && <ExternalLinkAction href={transportation.link} index={1} />}{isRental && transportation.googleMapsUrl && <a href={transportation.googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label="開啟取車地點 Google Maps" title="開啟取車地點 Google Maps" className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-[#555555] sm:h-9 sm:w-9"><Navigation className="h-4 w-4" /></a>}</div>{canEdit && <div className="ml-auto hidden items-center gap-4 sm:flex"><Action label="編輯" smallIcon onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onClick={onDelete}><Trash2 /></Action></div>}</footer>
+    <footer className={`${transportation.link ? "flex" : "hidden"} mt-auto h-14 items-center border-t border-divider sm:flex`}><div className="flex items-center gap-4">{transportation.link && <ExternalLinkAction href={transportation.link} index={1} />}</div>{canEdit && <div className="ml-auto hidden items-center gap-4 sm:flex"><Action label="編輯" smallIcon onClick={onEdit}><SquarePen /></Action><Action label="刪除" smallIcon onClick={onDelete}><Trash2 /></Action></div>}</footer>
   </article>
   </MobileSwipeActions>;
 }
@@ -802,6 +804,12 @@ function deleteLabel(deleting: { kind: "flight"; value: Flight } | { kind: "hote
 
 function ContactRow({ label, value }: { label: string; value: string }) {
   return <div className="grid min-w-0 grid-cols-[42px_minmax(0,1fr)] gap-3 text-sm"><span className="font-medium tracking-body">{label}</span><p className="break-words border-l border-divider pl-3 text-muted">{value}</p></div>;
+}
+
+function GoogleMapsName({ name, url, className }: { name: string; url?: string; className: string }) {
+  return <h3 className={className}>{url
+    ? <a href={url} target="_blank" rel="noopener noreferrer" aria-label={`在 Google Maps 開啟${name}`} title="開啟 Google Maps" className="cursor-pointer text-ink no-underline transition-colors hover:text-[#666666] hover:no-underline focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-ink">{name}</a>
+    : name}</h3>;
 }
 
 function ItemName({ item }: { item: TravelItem }) { return item.googleMapsUrl ? <a href={item.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 font-medium hover:text-[#555555]"><span>{item.name}</span><MapPinned className="h-4 w-4 shrink-0" /></a> : <p className="font-medium">{item.name}</p>; }
