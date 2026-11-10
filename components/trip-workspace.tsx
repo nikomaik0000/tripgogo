@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowUpDown, BookOpenText, CalendarCheck, CalendarDays, CarFront, ChevronRight, Clock3, Copy, Ellipsis, FolderHeart, Hotel, Link2, ListChecks, MapPin, MapPinned, MapPinPlus, Plane, Search, SquarePen, TicketCheck, Trash2, UtensilsCrossed, X } from "lucide-react";
-import { closestCenter, DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { ArrowLeft, ArrowUpDown, BookOpenText, CalendarCheck, CalendarDays, CarFront, ChevronLeft, ChevronRight, Clock3, Columns3, Copy, Ellipsis, FolderHeart, Hotel, Link2, List, ListChecks, MapPin, MapPinned, MapPinPlus, Plane, Search, SquarePen, TicketCheck, Trash2, UtensilsCrossed, X } from "lucide-react";
+import { closestCenter, DndContext, MouseSensor, TouchSensor, useDroppable, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
@@ -35,6 +35,19 @@ import type { CollectionItemStatus, Flight, HotelStay, Transportation, TravelIte
 
 type Tab = TripPrimaryTab;
 type DayOperation = "move" | "swap";
+type DailyViewMode = "list" | "board";
+type MoveItemBetweenDatesInput = {
+  itemId: string;
+  sourceDate: string;
+  targetDate: string;
+  sourceSnapshot: string;
+  targetSnapshot: string;
+  sourceOrderedIds: string[];
+  targetOrderedIds: string[];
+};
+
+const DAILY_VIEW_MODE_KEY = "travel-gogo:daily-view-mode";
+const dailyItemOrder = (a: TravelItem, b: TravelItem) => a.order - b.order || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
 
 export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlights, initialHotelStays, initialTransportations }: {
   tripId: string;
@@ -129,6 +142,24 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
       await refresh();
     }
   };
+  const moveItemBetweenDates = async (input: MoveItemBetweenDatesInput) => {
+    const sourceOrders = new Map(input.sourceOrderedIds.map((id, order) => [id, order]));
+    const targetOrders = new Map(input.targetOrderedIds.map((id, order) => [id, order]));
+    setItems((current) => current.map((item) => {
+      if (sourceOrders.has(item.id)) return { ...item, date: input.sourceDate, order: sourceOrders.get(item.id)! };
+      if (targetOrders.has(item.id)) return { ...item, date: input.targetDate, order: targetOrders.get(item.id)! };
+      return item;
+    }));
+    try {
+      await travelRepository.moveItemBetweenDates({ tripId, ...input });
+    } catch (error) {
+      toast.error(errorMessage(error, "跨日期移動失敗，已重新載入最新行程"));
+    } finally {
+      // The database is authoritative after both success and failure. This is
+      // intentionally not an optimistic rollback of the local array.
+      await refresh();
+    }
+  };
   const moveOrSwapDay = async (sourceDate: string, targetDate: string, operation: DayOperation) => {
     await travelRepository.moveOrSwapTripDayItems(tripId, sourceDate, targetDate, operation);
     await refresh();
@@ -145,7 +176,7 @@ export function TripWorkspace({ tripId, initialTrip, initialItems, initialFlight
         <div className="flex shrink-0 items-center justify-end gap-2 max-[359px]:gap-0 sm:hidden"><StandaloneRefreshAction />{canEdit && <TravelItemImportAction onClick={() => setImportOpen(true)} />}{canEdit && <TravelItemExportAction onClick={() => setExportOpen(true)} />}<Link href={`/trip/${tripId}/resources`} aria-label="旅途資訊" title="旅途資訊" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-muted hover:bg-searchBackground hover:text-[#555555]"><FolderHeart className="h-4 w-4 stroke-[1.5]" /></Link><AuthControl /></div>
       </header>
       <div className="sm:hidden"><TripPrimaryNav activeTab={tab} onTabChange={setTab} collection={trip.mode === "collection"} /></div>
-      {trip.mode === "trip" && tab === "daily" && <Daily trip={trip} items={items} canEdit={canEdit} onAdd={(date) => setDialog({ open: true, type: "place", initialDate: date, allowTypeChange: true })} onEdit={edit} onDelete={remove} onReorder={reorder} onMoveOrSwapDay={moveOrSwapDay} />}
+      {trip.mode === "trip" && tab === "daily" && <Daily trip={trip} items={items} canEdit={canEdit} onAdd={(date) => setDialog({ open: true, type: "place", initialDate: date, allowTypeChange: true })} onEdit={edit} onDelete={remove} onReorder={reorder} onMoveItemBetweenDates={moveItemBetweenDates} onMoveOrSwapDay={moveOrSwapDay} />}
       {(tab === "place" || tab === "food") && <ItemList type={tab} items={items} query={query} sort={sort} collection={trip.mode === "collection"} canEdit={canEdit} canAddToTrip={canEdit && editableTrips.length > 0} onQuery={setQuery} onSort={setSort} onAdd={() => setDialog({ open: true, type: tab, desktopTwoColumn: true })} onEdit={editListItem} onAddToTrip={setAddingToTrip} onDuplicate={duplicate} onDelete={remove} onToggleStatus={toggleCollectionStatus} />}
       {tab === "outline" && (trip.mode === "collection" ? <CollectionOutline items={items} canEdit={canEdit} onRefreshItems={refresh} /> : <Outline trip={trip} items={items} canEdit={canEdit} initialFlights={initialFlights} initialHotelStays={initialHotelStays} initialTransportations={initialTransportations} refreshVersion={outlineRefreshVersion} onRefreshItems={refresh} />)}
       {canEdit && <TravelItemImportDialog open={importOpen} trip={trip} onOpenChange={setImportOpen} onImported={async (mode) => {
@@ -454,12 +485,21 @@ function TravelItemCardImage({ item, url, mobile = false }: { item: TravelItem; 
   </div>;
 }
 
-function Daily({ trip, items, canEdit, onAdd, onEdit, onDelete, onReorder, onMoveOrSwapDay }: { trip: Trip; items: TravelItem[]; canEdit: boolean; onAdd: (date: string) => void; onEdit: (item: TravelItem) => void; onDelete: (item: TravelItem) => void; onReorder: (activeId: string, overId: string) => void; onMoveOrSwapDay: (sourceDate: string, targetDate: string, operation: DayOperation) => Promise<void> }) {
+function Daily({ trip, items, canEdit, onAdd, onEdit, onDelete, onReorder, onMoveItemBetweenDates, onMoveOrSwapDay }: { trip: Trip; items: TravelItem[]; canEdit: boolean; onAdd: (date: string) => void; onEdit: (item: TravelItem) => void; onDelete: (item: TravelItem) => void; onReorder: (activeId: string, overId: string) => Promise<void>; onMoveItemBetweenDates: (input: MoveItemBetweenDatesInput) => Promise<void>; onMoveOrSwapDay: (sourceDate: string, targetDate: string, operation: DayOperation) => Promise<void> }) {
   const dates = tripDates(trip);
   const [activeDate, setActiveDate] = useState(trip.startDate ?? "");
   const [dayActionDate, setDayActionDate] = useState<string>();
   const [openSwipeItemId, setOpenSwipeItemId] = useState<string>();
+  const [viewMode, setViewMode] = useState<DailyViewMode>("list");
   useEffect(() => setActiveDate(trip.startDate ?? ""), [trip.startDate]);
+  useLayoutEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(DAILY_VIEW_MODE_KEY);
+      if (saved === "list" || saved === "board") setViewMode(saved);
+    } catch {
+      // Keep the safe list default when browser storage is unavailable.
+    }
+  }, []);
   useEffect(() => {
     if (!openSwipeItemId) return;
     const closeFromOutside = (event: PointerEvent) => {
@@ -477,13 +517,29 @@ function Daily({ trip, items, canEdit, onAdd, onEdit, onDelete, onReorder, onMov
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
     if (over && active.id !== over.id) onReorder(String(active.id), String(over.id));
   };
+  const changeViewMode = (nextMode: DailyViewMode) => {
+    setViewMode(nextMode);
+    setOpenSwipeItemId(undefined);
+    try {
+      window.localStorage.setItem(DAILY_VIEW_MODE_KEY, nextMode);
+    } catch {
+      // View switching remains functional without persistence.
+    }
+  };
   const jumpToDate = (date: string) => {
     setActiveDate(date);
-    document.getElementById(`daily-${date}`)?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    document.getElementById(viewMode === "board" ? `daily-board-${date}` : `daily-${date}`)?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: viewMode === "board" ? "nearest" : "start",
+      inline: viewMode === "board" ? "start" : "nearest",
+    });
   };
   return <>
-    <nav aria-label="快速跳轉日期" className="no-scrollbar mb-8 max-w-full overflow-x-auto pt-5 sm:pt-6"><div className="flex min-w-max flex-nowrap items-center gap-5 pr-4">{dates.map((date) => <button key={date} type="button" onClick={() => jumpToDate(date)} aria-current={activeDate === date ? "date" : undefined} className={`shrink-0 border-b pb-1 text-xs transition-colors ${activeDate === date ? "border-muted text-ink" : "border-transparent text-muted hover:text-[#555555]"}`}><DailyDateLabel date={date} /></button>)}</div></nav>
-    <div className="space-y-8">{dates.map((date) => {
+    <div className="mb-8 flex min-w-0 items-end gap-3 pt-5 sm:pt-6">
+      <nav aria-label="快速跳轉日期" className="no-scrollbar min-w-0 flex-1 overflow-x-auto"><div className="flex min-w-max flex-nowrap items-center gap-5 pr-4">{dates.map((date) => <button key={date} type="button" onClick={() => jumpToDate(date)} aria-current={activeDate === date ? "date" : undefined} className={`shrink-0 border-b pb-1 text-xs transition-colors ${activeDate === date ? "border-muted text-ink" : "border-transparent text-muted hover:text-[#555555]"}`}><DailyDateLabel date={date} /></button>)}</div></nav>
+      <DailyViewToggle value={viewMode} onChange={changeViewMode} />
+    </div>
+    {viewMode === "list" ? <div className="space-y-8">{dates.map((date) => {
       const day = items.filter((item) => item.date === date).sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt));
       return <section id={`daily-${date}`} className="scroll-mt-36" key={date}>
         <div className="mb-4 flex items-center justify-between">
@@ -495,7 +551,7 @@ function Daily({ trip, items, canEdit, onAdd, onEdit, onDelete, onReorder, onMov
         </div>
         {day.length === 0 ? <EmptyState title="今天尚未安排" description="" /> : canEdit ? <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={() => setOpenSwipeItemId(undefined)} onDragEnd={handleDragEnd}><SortableContext items={day.map((item) => item.id)} strategy={verticalListSortingStrategy}><div className="space-y-3">{day.map((item) => <SortableDailyCard key={item.id} item={item} swipeOpen={openSwipeItemId === item.id} onSwipeOpen={() => setOpenSwipeItemId(item.id)} onSwipeClose={() => setOpenSwipeItemId((current) => current === item.id ? undefined : current)} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />)}</div></SortableContext></DndContext> : <div className="space-y-3">{day.map((item) => <DailyCard key={item.id} item={item} canEdit={false} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />)}</div>}
       </section>;
-    })}</div>
+    })}</div> : <DailyBoard dates={dates} items={items} canEdit={canEdit} onActiveDateChange={setActiveDate} onAdd={onAdd} onDayAction={setDayActionDate} onEdit={onEdit} onDelete={onDelete} onReorder={onReorder} onMoveItemBetweenDates={onMoveItemBetweenDates} />}
     <TripDayActionDialog
       open={Boolean(dayActionDate)}
       sourceDate={dayActionDate}
@@ -506,6 +562,176 @@ function Daily({ trip, items, canEdit, onAdd, onEdit, onDelete, onReorder, onMov
         await onMoveOrSwapDay(dayActionDate, targetDate, operation);
       }}
     />
+  </>;
+}
+
+function DailyViewToggle({ value, onChange }: { value: DailyViewMode; onChange: (value: DailyViewMode) => void }) {
+  return <div className="flex h-8 shrink-0 overflow-hidden rounded-[5px] border border-border bg-surface" role="group" aria-label="每日檢視模式">
+    <button type="button" aria-label="清單模式" title="清單模式" aria-pressed={value === "list"} onClick={() => onChange("list")} className={`flex h-full w-8 items-center justify-center transition-colors ${value === "list" ? "bg-searchBackground text-ink" : "text-muted hover:text-ink"}`}><List className="h-3.5 w-3.5" /></button>
+    <button type="button" aria-label="看板模式" title="看板模式" aria-pressed={value === "board"} onClick={() => onChange("board")} className={`flex h-full w-8 items-center justify-center border-l border-divider transition-colors ${value === "board" ? "bg-searchBackground text-ink" : "text-muted hover:text-ink"}`}><Columns3 className="h-3.5 w-3.5" /></button>
+  </div>;
+}
+
+function DailyBoard({ dates, items, canEdit, onActiveDateChange, onAdd, onDayAction, onEdit, onDelete, onReorder, onMoveItemBetweenDates }: { dates: string[]; items: TravelItem[]; canEdit: boolean; onActiveDateChange: (date: string) => void; onAdd: (date: string) => void; onDayAction: (date: string) => void; onEdit: (item: TravelItem) => void; onDelete: (item: TravelItem) => void; onReorder: (activeId: string, overId: string) => Promise<void>; onMoveItemBetweenDates: (input: MoveItemBetweenDatesInput) => Promise<void> }) {
+  const boardRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const dragSnapshots = useRef<Map<string, string[]>>(new Map());
+  const [activeItemId, setActiveItemId] = useState<string>();
+  const [saving, setSaving] = useState(false);
+  const [isBoardCenteredInViewport, setIsBoardCenteredInViewport] = useState(false);
+  const [scrollState, setScrollState] = useState({ left: false, right: false });
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 350, tolerance: 8 } })
+  );
+  const dayItems = useMemo(() => new Map(dates.map((date) => [date, items.filter((item) => item.date === date).sort(dailyItemOrder)])), [dates, items]);
+  const updateScrollState = useCallback(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const next = { left: element.scrollLeft > 1, right: element.scrollLeft + element.clientWidth < element.scrollWidth - 1 };
+    setScrollState((current) => current.left === next.left && current.right === next.right ? current : next);
+    const columns = Array.from(element.querySelectorAll<HTMLElement>("[data-daily-board-date]"));
+    const visible = columns.find((column) => column.offsetLeft + column.offsetWidth / 2 >= element.scrollLeft + 1);
+    const date = visible?.dataset.dailyBoardDate;
+    if (date) onActiveDateChange(date);
+  }, [onActiveDateChange]);
+  useLayoutEffect(() => {
+    updateScrollState();
+    const element = scrollRef.current;
+    if (!element) return;
+    const observer = new ResizeObserver(updateScrollState);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [dates.length, updateScrollState]);
+  useEffect(() => {
+    const element = boardRef.current;
+    if (!element) return;
+    let observer: IntersectionObserver | undefined;
+    const observeViewportCenter = () => {
+      observer?.disconnect();
+      const verticalInset = Math.floor(window.innerHeight * 0.45);
+      observer = new IntersectionObserver(([entry]) => setIsBoardCenteredInViewport(entry.isIntersecting), {
+        rootMargin: `-${verticalInset}px 0px -${verticalInset}px 0px`,
+        threshold: 0,
+      });
+      observer.observe(element);
+    };
+    observeViewportCenter();
+    window.addEventListener("resize", observeViewportCenter);
+    return () => {
+      window.removeEventListener("resize", observeViewportCenter);
+      observer?.disconnect();
+    };
+  }, []);
+  const handleDragStart = ({ active }: DragStartEvent) => {
+    setActiveItemId(String(active.id));
+    dragSnapshots.current = new Map(dates.map((date) => [date, (dayItems.get(date) ?? []).map((item) => item.id)]));
+  };
+  const handleDragEnd = async ({ active, over }: DragEndEvent) => {
+    setActiveItemId(undefined);
+    if (!over || saving || active.id === over.id) return;
+    const itemId = String(active.id);
+    const sourceDate = String(active.data.current?.date ?? "");
+    const targetDate = String(over.data.current?.date ?? "");
+    if (!sourceDate || !targetDate) return;
+    if (sourceDate === targetDate) {
+      if (over.data.current?.kind === "item") await onReorder(itemId, String(over.id));
+      return;
+    }
+    const sourceSnapshotIds = dragSnapshots.current.get(sourceDate) ?? [];
+    const targetSnapshotIds = dragSnapshots.current.get(targetDate) ?? [];
+    if (!sourceSnapshotIds.includes(itemId)) return;
+    const sourceOrderedIds = sourceSnapshotIds.filter((id) => id !== itemId);
+    const targetOrderedIds = [...targetSnapshotIds];
+    const overIndex = over.data.current?.kind === "item" ? targetOrderedIds.indexOf(String(over.id)) : targetOrderedIds.length;
+    targetOrderedIds.splice(overIndex < 0 ? targetOrderedIds.length : overIndex, 0, itemId);
+    setSaving(true);
+    try {
+      await onMoveItemBetweenDates({
+        itemId,
+        sourceDate,
+        targetDate,
+        sourceSnapshot: sourceSnapshotIds.join(","),
+        targetSnapshot: targetSnapshotIds.join(","),
+        sourceOrderedIds,
+        targetOrderedIds,
+      });
+    } finally {
+      setSaving(false);
+      dragSnapshots.current = new Map();
+    }
+  };
+  const columns = <div className="flex min-w-max items-start gap-4 pr-8 sm:gap-5">{dates.map((date) => <DailyBoardColumn key={date} date={date} items={dayItems.get(date) ?? []} canEdit={canEdit} dragDisabled={saving} onAdd={() => onAdd(date)} onDayAction={() => onDayAction(date)} onEdit={onEdit} onDelete={onDelete} />)}</div>;
+  return <div ref={boardRef} className="relative min-w-0 max-w-full pb-2">
+    <div ref={scrollRef} onScroll={updateScrollState} className="no-scrollbar max-w-full overflow-x-auto overscroll-x-contain scroll-smooth pb-2">
+      {canEdit ? <DndContext sensors={sensors} collisionDetection={closestCenter} autoScroll={{ threshold: { x: 0.15, y: 0.2 }, acceleration: 12 }} onDragStart={handleDragStart} onDragCancel={() => { setActiveItemId(undefined); dragSnapshots.current = new Map(); }} onDragEnd={handleDragEnd}>{columns}</DndContext> : columns}
+    </div>
+    {isBoardCenteredInViewport && <>
+      <button type="button" aria-label="向左捲動看板" title="向左捲動" disabled={!scrollState.left || Boolean(activeItemId)} onClick={() => scrollRef.current?.scrollBy({ left: -276, behavior: "smooth" })} className={`fixed left-4 top-1/2 z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-surface/95 text-muted shadow-soft transition-opacity hover:text-ink disabled:pointer-events-none disabled:opacity-0 sm:flex ${scrollState.left ? "opacity-100" : "opacity-0"}`}><ChevronLeft className="h-4 w-4" /></button>
+      <button type="button" aria-label="向右捲動看板" title="向右捲動" disabled={!scrollState.right || Boolean(activeItemId)} onClick={() => scrollRef.current?.scrollBy({ left: 276, behavior: "smooth" })} className={`fixed right-4 top-1/2 z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-surface/95 text-muted shadow-soft transition-opacity hover:text-ink disabled:pointer-events-none disabled:opacity-0 sm:flex ${scrollState.right ? "opacity-100" : "opacity-0"}`}><ChevronRight className="h-4 w-4" /></button>
+    </>}
+  </div>;
+}
+
+function DailyBoardColumn({ date, items, canEdit, dragDisabled, onAdd, onDayAction, onEdit, onDelete }: { date: string; items: TravelItem[]; canEdit: boolean; dragDisabled: boolean; onAdd: () => void; onDayAction: () => void; onEdit: (item: TravelItem) => void; onDelete: (item: TravelItem) => void }) {
+  const droppableId = `daily-board-drop-${date}`;
+  const { setNodeRef, isOver } = useDroppable({ id: droppableId, data: { kind: "date", date }, disabled: !canEdit || dragDisabled });
+  return <section id={`daily-board-${date}`} data-daily-board-date={date} className="w-[calc(100vw-64px)] min-w-[240px] max-w-[320px] shrink-0 scroll-mx-1 sm:w-64 sm:min-w-64 sm:max-w-64">
+    <header className="mb-4 flex min-h-9 items-center justify-between gap-2">
+      <h2 className="text-title font-semibold"><DailyDateLabel date={date} /></h2>
+      {canEdit && <div className="flex items-center"><AddIconButton label={`新增 ${displayDate(date)} 行程`} onClick={onAdd} />{items.length > 0 && <Action label={`調整 ${displayDate(date)} 整天行程`} quiet onClick={onDayAction}><Ellipsis /></Action>}</div>}
+    </header>
+    <SortableContext items={items.map((item) => item.id)} strategy={verticalListSortingStrategy}>
+      <div ref={setNodeRef} className={`min-h-32 space-y-3 rounded-card transition-colors ${isOver ? "bg-searchBackground/70" : "bg-transparent"}`}>
+        {items.length === 0 && <div className="flex min-h-32 items-center justify-center rounded-card border border-dashed border-border px-4 text-center text-xs text-muted">今天尚未安排</div>}
+        {items.map((item) => canEdit ? <SortableDailyBoardCard key={item.id} item={item} disabled={dragDisabled} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} /> : <DailyBoardCard key={item.id} item={item} canEdit={false} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />)}
+      </div>
+    </SortableContext>
+  </section>;
+}
+
+function SortableDailyBoardCard({ item, disabled, onEdit, onDelete }: { item: TravelItem; disabled: boolean; onEdit: () => void; onDelete: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id, data: { kind: "item", date: item.date }, disabled });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+  const handleMouseDown: React.MouseEventHandler<HTMLDivElement> = (event) => {
+    if (!isDailyCardInteractiveTarget(event.target)) listeners?.onMouseDown?.(event);
+  };
+  const handleTouchStart: React.TouchEventHandler<HTMLDivElement> = (event) => {
+    if (!isDailyCardInteractiveTarget(event.target)) listeners?.onTouchStart?.(event);
+  };
+  return <div ref={setNodeRef} style={style} {...attributes} {...listeners} onMouseDown={handleMouseDown} onTouchStart={handleTouchStart} className={`cursor-grab touch-auto active:cursor-grabbing ${isDragging ? "relative z-10 opacity-60" : ""}`}><DailyBoardCard item={item} canEdit onEdit={onEdit} onDelete={onDelete} /></div>;
+}
+
+function DailyBoardCard({ item, canEdit, onEdit, onDelete }: { item: TravelItem; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
+  const imageUrl = useTravelItemImageUrl(item.imagePath);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [priceListOpen, setPriceListOpen] = useState(false);
+  return <>
+    <article className="min-w-0 overflow-hidden rounded-card border border-border bg-surface shadow-soft">
+      <div className="px-4 pb-3 pt-4">
+        <div className={`grid min-w-0 items-center ${item.imagePath ? "grid-cols-[minmax(0,1fr)_112px] gap-3" : "grid-cols-1"}`}>
+          <div className="flex min-w-0 flex-col items-start text-left">
+            <TypeMark item={item} large alignStart />
+            {item.area && <div className="mt-3 w-full min-w-0 text-left text-xs leading-4 text-muted"><span className="block min-w-0 max-w-full whitespace-normal break-words">{item.area}</span></div>}
+          </div>
+          {item.imagePath && <div className={`flex aspect-[3/2] w-28 shrink-0 items-center justify-center overflow-hidden rounded-card ${item.imageFit === "contain" ? "bg-searchBackground" : "bg-transparent"}`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {imageUrl && <img src={imageUrl} alt={item.name} loading="lazy" className={`h-full w-full ${item.imageFit === "cover" ? "object-cover" : "object-contain"}`} />}
+          </div>}
+        </div>
+        <div className="mt-4 min-w-0"><DailyItemName item={item} /></div>
+        <BusinessInfo item={item} className="mt-2 text-xs leading-4" desktopEnglish desktopCompact showClosedDays={false} />
+      </div>
+      {(item.note || item.priceList?.trim() || item.extraLink1 || item.extraLink2 || canEdit) && <footer className="flex min-h-11 flex-wrap items-center border-t border-divider/60 px-1 sm:min-h-10" data-no-dnd>
+        {item.note && <MoreDetailsAction onClick={() => setDetailsOpen(true)} quiet />}
+        {item.extraLink1 && <ExternalLinkAction href={item.extraLink1} index={1} quiet />}
+        {item.priceList?.trim() && <PriceListAction onClick={() => setPriceListOpen(true)} quiet />}
+        {item.extraLink2 && <ExternalLinkAction href={item.extraLink2} index={2} itemType={item.type} quiet />}
+        {canEdit && <div className="ml-auto flex"><Action label="編輯" quiet onPointerDown={stopDrag} onClick={onEdit}><SquarePen /></Action><Action label="刪除" quiet onPointerDown={stopDrag} onClick={onDelete}><Trash2 /></Action></div>}
+      </footer>}
+    </article>
+    <ItemDetailsDialog item={item} open={detailsOpen} onOpenChange={setDetailsOpen} />
+    <PriceListDialog item={item} open={priceListOpen} onOpenChange={setPriceListOpen} />
   </>;
 }
 
@@ -610,11 +836,11 @@ function LocationCategory({ item, wrapOnDesktop = false }: { item: TravelItem; w
   return <span className={`min-w-0 max-w-full truncate ${wrapOnDesktop ? "sm:overflow-visible sm:whitespace-normal sm:text-clip sm:break-words" : ""}`}>{[item.area, item.category].filter(Boolean).join(" ｜ ")}</span>;
 }
 
-function TypeMark({ item, large = false }: { item: TravelItem; large?: boolean }) {
+function TypeMark({ item, large = false, alignStart = false }: { item: TravelItem; large?: boolean; alignStart?: boolean }) {
   const isShop = item.type === "place" && item.category === "店";
   const label = item.type === "food" ? "食" : isShop ? "店" : "景";
   const accent = item.type === "food" ? "bg-travelType-food" : isShop ? "bg-travelType-shop" : "bg-travelType-place";
-  return <span className="flex w-12 min-w-12 shrink-0 flex-col items-center justify-center text-ink"><span className={`${large ? "text-title" : "text-base"} font-medium leading-none`}>{label}</span><span aria-hidden="true" className={`mt-[11px] h-[3px] w-8 rounded-[2px] ${accent}`} /></span>;
+  return <span className={`flex w-12 min-w-12 shrink-0 flex-col justify-center text-ink ${alignStart ? "items-start" : "items-center"}`}><span className={`${large ? "text-title" : "text-base"} font-medium leading-none`}>{label}</span><span aria-hidden="true" className={`mt-[11px] h-[3px] w-8 rounded-[2px] ${accent}`} /></span>;
 }
 
 function DailyItemName({ item }: { item: TravelItem }) {
@@ -819,13 +1045,13 @@ function ItemCompactBusinessHours({ item }: { item: TravelItem }) {
 function BusinessHours({ item, compact, flush = false }: { item: TravelItem; compact: boolean; flush?: boolean }) {
   return <BusinessInfo item={item} className={`leading-4 ${compact ? `${flush ? "" : "mt-2"} text-xs` : `${flush ? "" : "mt-3"} text-sm`}`} />;
 }
-function BusinessInfo({ item, className, desktopEnglish = false, desktopCompact = false }: { item: TravelItem; className: string; desktopEnglish?: boolean; desktopCompact?: boolean }) {
-  if (!item.businessHours && !item.closedDaysText) return null;
+function BusinessInfo({ item, className, desktopEnglish = false, desktopCompact = false, showClosedDays = true }: { item: TravelItem; className: string; desktopEnglish?: boolean; desktopCompact?: boolean; showClosedDays?: boolean }) {
   const status = getBusinessStatus(item.businessHours, { closedRuleType: item.closedRuleType, closedRuleValues: item.closedRuleValues });
+  if (!item.businessHours && !(showClosedDays && item.closedDaysText) && !(!showClosedDays && status)) return null;
   return <div className={`flex min-w-0 flex-wrap items-center gap-2 text-muted ${className}`}>
     {item.businessHours && <><Clock3 className="h-4 w-4 shrink-0" /><span className="min-w-0 break-words">{item.businessHours}</span></>}
     {status && <BusinessStatusLabel status={status} desktopEnglish={desktopEnglish} desktopCompact={desktopCompact} />}
-    {item.closedDaysText && <ClosedDaysLabel text={item.closedDaysText} compact={desktopCompact} />}
+    {showClosedDays && item.closedDaysText && <ClosedDaysLabel text={item.closedDaysText} compact={desktopCompact} />}
   </div>;
 }
 function ClosedDaysLabel({ text, compact = false }: { text: string; compact?: boolean }) {

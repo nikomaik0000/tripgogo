@@ -4,6 +4,7 @@
 
 ### Done
 
+- Trip Daily List/Board modes with an icon-only persisted switch, responsive horizontal date columns, left-aligned and vertically centered area-only signed-image cards, center-visible fixed Desktop arrows, Board-only closed-day text suppression, hidden-scrollbar navigation, and snapshot-protected atomic cross-date insertion
 - macOS Chrome PWA Dock icon now uses a cache-safe, opaque full-canvas maskable asset while preserving the existing luggage artwork exactly
 - Responsive Stay and rental-car name links using existing Google Maps URLs, with duplicate footer map actions removed and all unrelated links preserved
 - Collection smart JSON updates and copy/download export with null itinerary dates, status/completed-date round trips, lossless optional text, ambiguity-safe matching, stable ordering, and atomic mixed add/update requests

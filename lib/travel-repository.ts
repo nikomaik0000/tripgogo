@@ -553,6 +553,29 @@ export const travelRepository = {
     if (error) throw new Error(error.message);
   },
 
+  async moveItemBetweenDates(input: {
+    tripId: string;
+    itemId: string;
+    sourceDate: string;
+    targetDate: string;
+    sourceSnapshot: string;
+    targetSnapshot: string;
+    sourceOrderedIds: string[];
+    targetOrderedIds: string[];
+  }) {
+    const { error } = await createClient().rpc("tg_move_travel_item_between_dates", {
+      p_trip_id: input.tripId,
+      p_item_id: input.itemId,
+      p_source_date: input.sourceDate,
+      p_target_date: input.targetDate,
+      p_source_snapshot: input.sourceSnapshot,
+      p_target_snapshot: input.targetSnapshot,
+      p_source_ordered_ids: input.sourceOrderedIds,
+      p_target_ordered_ids: input.targetOrderedIds,
+    });
+    if (error) throw new Error(error.message);
+  },
+
   async moveOrSwapTripDayItems(tripId: string, sourceDate: string, targetDate: string, operation: "move" | "swap") {
     const { error } = await createClient().rpc("tg_move_or_swap_trip_day_items", {
       p_trip_id: tripId,

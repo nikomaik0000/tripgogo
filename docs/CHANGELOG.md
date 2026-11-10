@@ -1,5 +1,24 @@
 # Changelog
 
+## TRIP GOGO — Daily Horizontal Board
+
+Added
+
+- Added a persisted List/Board control to Trip Daily without changing the existing List cards, same-day sorting behavior, or image-free List presentation.
+- Added responsive horizontal date columns with hidden scrollbars, Desktop arrow controls, Mobile next-column affordance, date-navigation scrolling, compact signed-URL image cards, and the existing Maps, detail, price-list, external-link, edit, delete, and create flows.
+- Added same-day Board sorting and atomic cross-date insertion, including empty targets and emptied sources, through `tg_move_travel_item_between_dates`.
+- Added disposable SQL regression coverage for positioned insertion, empty targets, emptied sources, duplicate/missing/cross-Trip IDs, stale ordering, concurrent target changes, and failure rollback.
+
+Changed
+
+- Cross-date moves now validate complete ordered groups and drag-start order snapshots after consistent Trip/item row locking; stale or partial requests fail before the single transactional date/order update.
+- Mobile Board scrolling remains a normal horizontal gesture while TravelItem dragging retains the existing 350ms long-press activation and nested actions remain excluded from drag sensors.
+- Refined Board cards around a compact type/area/image header, independent linked name and business-status rows, a tighter responsive action footer, and Board-only closed-day text suppression without changing closed-day status calculations or List cards.
+- Reduced the persisted Daily List/Board control to its two accessible icons while preserving the selected treatment, grouped border, titles, and storage behavior.
+- Simplified the Daily Board type header to show only the existing area beneath its type mark, leaving category data and every other category presentation unchanged.
+- Left-aligned the enlarged Daily Board type mark, accent line, and wrapping area label on one shared edge while vertically centering the group beside the unchanged image.
+- Kept the existing Desktop Board arrows fixed near the viewport midpoint while the Board crosses a central visibility band, preserving horizontal limits, drag suppression, and touch-only Mobile navigation.
+
 ## TRIP GOGO — macOS PWA Dock Icon
 
 Changed
