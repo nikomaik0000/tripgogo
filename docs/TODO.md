@@ -4,6 +4,7 @@
 
 ### Done
 
+- macOS Chrome PWA Dock icon now uses a cache-safe, opaque full-canvas maskable asset while preserving the existing luggage artwork exactly
 - Responsive Stay and rental-car name links using existing Google Maps URLs, with duplicate footer map actions removed and all unrelated links preserved
 - Collection smart JSON updates and copy/download export with null itinerary dates, status/completed-date round trips, lossless optional text, ambiguity-safe matching, stable ordering, and atomic mixed add/update requests
 - Trip itinerary JSON copy/download export with scheduled/unscheduled ordering, lossless optional-text Update round trips, explicit null-date compatibility, safe filenames, and duplicate-name matching warnings

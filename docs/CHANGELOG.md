@@ -1,5 +1,12 @@
 # Changelog
 
+## TRIP GOGO — macOS PWA Dock Icon
+
+Changed
+
+- Replaced the pre-masked circular PWA icon with an opaque, full-canvas `#F9F9F9` maskable asset so Chrome and macOS can apply the native app-icon shape without exposing a gray circular background.
+- Preserved the existing luggage artwork, colors, scale, and position, and moved the manifest reference to a new asset URL to avoid reusing the previously installed icon cache.
+
 ## TRIP GOGO — Stay and Transportation Map Links
 
 Changed
